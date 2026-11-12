@@ -4,17 +4,17 @@
   #define AppVersion "0.2.0"
 #endif
 #ifndef AppSourceDir
-  #define AppSourceDir "..\dist\windows\CreatorHub"
+  #define AppSourceDir "..\dist\windows\aispace"
 #endif
 [Setup]
 AppId={{93FD4B37-6436-4CE0-8249-BC487CC5A062}
-AppName=CreatorHub
+AppName=获客助手
 AppVersion={#AppVersion}
-AppVerName=CreatorHub v{#AppVersion}
-AppPublisher=CreatorHub
+AppVerName=获客助手 v{#AppVersion}
+AppPublisher=获客助手（基于 CreatorHub）
 AppPublisherURL=https://github.com/3441293738/creatorhub
-DefaultDirName={localappdata}\Programs\CreatorHub
-DefaultGroupName=CreatorHub
+DefaultDirName={localappdata}\Programs\aispace
+DefaultGroupName=获客助手
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 PrivilegesRequired=lowest
@@ -22,11 +22,11 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir=..\dist\installer
-OutputBaseFilename=CreatorHub-Setup-{#AppVersion}-windows-x64
+OutputBaseFilename=aispace-Setup-{#AppVersion}-windows-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\CreatorHub.exe
+UninstallDisplayIcon={app}\aispace.exe
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
@@ -42,11 +42,11 @@ DialogFontName=Microsoft YaHei UI
 WelcomeFontName=Microsoft YaHei UI
 
 [CustomMessages]
-LaunchCreatorHub=启动 CreatorHub
+LaunchCreatorHub=启动 获客助手
 InstallingWebView2=正在安装 Microsoft WebView2 运行环境，请保持网络连接…
 WebView2StartFailed=WebView2 安装程序启动失败，请重新运行安装包。
-WebView2Required=需要安装 Microsoft WebView2 运行环境才能继续。请检查网络连接后重试，原有 CreatorHub 数据保持不变。
-UninstallKeepData=卸载将保留账号资料、配置、下载内容和备份。%n%n用户数据目录：%1%n%n卸载前请先退出 CreatorHub。如不再需要这些数据，可在卸载完成后自行备份并清理该目录。
+WebView2Required=需要安装 Microsoft WebView2 运行环境才能继续。请检查网络连接后重试，原有 获客助手 数据保持不变。
+UninstallKeepData=卸载将保留账号资料、配置、下载内容和备份。%n%n用户数据目录：%1%n%n卸载前请先退出 获客助手。如不再需要这些数据，可在卸载完成后自行备份并清理该目录。
 
 [Files]
 Source: "..\build\windows\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
@@ -55,6 +55,8 @@ Source: "{#AppSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdi
 ; Full-package upgrades also retire the old media stack. These three paths
 ; belong exclusively to the application, never to user-data or account profiles.
 [InstallDelete]
+Type: files; Name: "{app}\CreatorHub.exe"
+Type: files; Name: "{app}\_internal\desktop\CreatorHubUpdater.exe"
 Type: filesandordirs; Name: "{app}\_internal\cv2"
 Type: filesandordirs; Name: "{app}\_internal\numpy"
 Type: filesandordirs; Name: "{app}\_internal\numpy.libs"
@@ -63,17 +65,17 @@ Type: filesandordirs; Name: "{app}\_internal\numpy.libs"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: checkedonce
 
 [Icons]
-Name: "{group}\CreatorHub"; Filename: "{app}\CreatorHub.exe"
-Name: "{autodesktop}\CreatorHub"; Filename: "{app}\CreatorHub.exe"; Tasks: desktopicon
+Name: "{group}\获客助手"; Filename: "{app}\aispace.exe"
+Name: "{autodesktop}\获客助手"; Filename: "{app}\aispace.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\CreatorHub.exe"; Description: "{cm:LaunchCreatorHub}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\aispace.exe"; Description: "{cm:LaunchCreatorHub}"; Flags: nowait postinstall skipifsilent
 
 ; Delta updates can add application-owned files not in the original install log.
 ; User data lives outside {app}; never delete the parent/user-data directories.
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\_internal"
-Type: files; Name: "{app}\CreatorHub.exe"
+Type: files; Name: "{app}\aispace.exe"
 
 [Code]
 function HasWebView2(): Boolean;

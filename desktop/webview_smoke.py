@@ -20,7 +20,7 @@ def renderer_snapshot(window, token, results):
             body: JSON.stringify({name: 'renderer_snapshot', data: {
                 stopped: text.includes('启动本地服务'),
                 theme: text.includes('跟随系统'),
-                updates: text.includes('检查更新'),
+                updates: text.includes('更新由本地构建提供'),
                 mains: document.querySelectorAll('main').length
             }})
         });

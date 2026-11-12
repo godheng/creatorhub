@@ -28,6 +28,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+from app.brand import PRODUCT_NAME, BRAND
+
 def resources() -> Path:
     return Path(getattr(sys, "_MEIPASS", ROOT))
 
@@ -161,6 +163,26 @@ def serve(home: Path, session: str, install_browser: bool, parent_pid=0) -> int:
         service_lock.close()
 
 
+def ensure_browser():
+    """Match BrowserManager's system-Chrome-first selection before downloading."""
+    from patchright.sync_api import sync_playwright
+    with sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch(channel="chrome", headless=True)
+        except Exception:
+            print("本机 Chrome 不可用，检查配套浏览器。", flush=True)
+        else:
+            browser.close()
+            print("已检测到可用的本机 Chrome，无需下载浏览器组件。", flush=True)
+            return
+        if Path(playwright.chromium.executable_path).is_file():
+            return
+    print("首次启动：下载浏览器组件，请保持联网。完成后会自动打开面板。", flush=True)
+    from patchright._impl._driver import compute_driver_executable, get_driver_env
+    node, cli = compute_driver_executable()
+    subprocess.run([node, cli, "install", "chromium"], env=get_driver_env(), check=True)
+
+
 def _serve(home: Path, session: str, install_browser: bool) -> int:
     os.chdir(home)
     os.environ["CREATORHUB_CONFIG_PATH"] = str(home / "config.yaml")
@@ -230,7 +252,7 @@ def smoke_test() -> int:
             assert (resources() / "config.example.yaml").is_file()
             assert (resources() / "desktop-guide" / "xhs" / "index.html").is_file()
             if os.name == "nt" and getattr(sys, "frozen", False):
-                updater = resources() / "desktop" / "CreatorHubUpdater.exe"
+                updater = resources() / "desktop" / "aispaceUpdater.exe"
                 assert updater.is_file()
                 from desktop.update_helper import clean_environment
                 subprocess.run([str(updater), "--self-test"], env=clean_environment(),
@@ -319,7 +341,9 @@ def recover_interrupted_update(home):
     if not journal or journal.get("phase") in {"committed", "rolled_back"}:
         return False
     from desktop.update_helper import clean_environment
-    helper = home / "runtime/updates" / journal["attempt"] / "CreatorHubUpdater.exe"
+    helper = home / "runtime/updates" / journal["attempt"] / "aispaceUpdater.exe"
+    if not helper.is_file():
+        helper = helper.with_name("CreatorHubUpdater.exe")  # Existing interrupted update.
     ready = home / "runtime/update-recovery-ready.json"
     ready.unlink(missing_ok=True)
     (home / "runtime/update-recovery-cancel").unlink(missing_ok=True)
@@ -481,7 +505,7 @@ class Launcher:
                 import pystray
                 from desktop.ui import brand_image
                 icon = brand_image()
-                self.tray = pystray.Icon("CreatorHub", icon, "CreatorHub 正在本地运行", menu=pystray.Menu(
+                self.tray = pystray.Icon("CreatorHub", icon, f"{PRODUCT_NAME} 正在本地运行", menu=pystray.Menu(
                     pystray.MenuItem("打开管理器", lambda: self.events.put(("show", None)), default=True),
                     pystray.MenuItem("停止并退出", lambda: self.events.put(("exit", None)))))
                 self.tray.run_detached()
@@ -576,7 +600,7 @@ def main() -> int:
                         install_browser=not args.skip_browser_install)
     except Exception as exc:
         from tkinter import messagebox
-        messagebox.showerror("CreatorHub 启动提示", str(exc))
+        messagebox.showerror(f"{PRODUCT_NAME} 启动提示", str(exc))
         return 1
     return 0
 
