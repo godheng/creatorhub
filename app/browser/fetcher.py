@@ -947,6 +947,7 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
     而非"输入框是否清空"(后者会被验证码/频控误判为成功)。
     reply_to_text 非空:尝试定位含该文本的评论、点其「回复」内联输入;失败回退顶层评论。
     返回 (ok, error)。⚠️ 选择器随抖音改版可能失效,集中在 _COMMENT_INPUT/_COMMENT_SUBMIT。"""
+    from app.licensing import LicenseRequired, require_active
     content = (content or "").strip()
     if not content:
         return False, "空文案"
@@ -1035,17 +1036,21 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
             try:
                 btn = page.locator(sel).first
                 if await btn.count() and await btn.is_enabled():
-                    from app.licensing import require_active
                     require_active()
                     await btn.click(timeout=3000)
                     sent = True
                     break
+            except LicenseRequired:
+                raise
             except Exception:
                 continue
         if not sent:
             try:
+                require_active()
                 await page.keyboard.press("Enter")
                 sent = True
+            except LicenseRequired:
+                raise
             except Exception:
                 pass
         if not sent:
@@ -1072,6 +1077,8 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
         if content[:8] in left:
             return False, "已输入但未触发发表(可能弹了验证码/发送按钮未激活)"
         return False, "未捕获到抖音发表接口响应,无法确认是否成功(请人工核对该作品评论区)"
+    except LicenseRequired:
+        raise
     except Exception as e:
         return False, f"发评论异常: {e!r}"
     finally:
