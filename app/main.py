@@ -627,7 +627,7 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(15)
     _webhook_delivery_task = asyncio.create_task(webhook_delivery_loop())
     yield
-    licensing.stop()
+    await asyncio.to_thread(licensing.stop)
     if _webhook_delivery_task:
         _webhook_delivery_task.cancel()
         await asyncio.gather(_webhook_delivery_task, return_exceptions=True)

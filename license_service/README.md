@@ -54,3 +54,9 @@ sudo systemctl is-enabled aispace-license
 sudo systemctl is-active aispace-license
 ```
 If python3-venv is unavailable, install that OS package after inspecting the OS. Do not change firewall until its current rules and SSH path are confirmed. Permit TCP8088 only from tester public /32 addresses. Do not overwrite pre-existing directories or keys.
+
+## Client platform identity and runtime checks
+Windows keeps the existing MachineGuid digest unchanged. macOS uses IOPlatformUUID; Linux uses /etc/machine-id with /var/lib/dbus/machine-id as fallback. Only application-specific hashes are sent; failed reads never produce a shared default. Successful identity reads are cached for the process.
+Elapsed clocks compare suspend-inclusive and awake time: Windows GetTickCount64/QueryUnbiasedInterruptTime, Linux CLOCK_BOOTTIME/CLOCK_MONOTONIC, macOS mach_continuous_time/mach_absolute_time. Calendar adjustments do not extend authorization.
+Network validation is serialized separately from cached-state access. Async business checks after resume reject new operations and schedule revalidation without blocking the event loop; old pre-suspend responses cannot restore permission.
+Validation: Windows/Linux native identity and clock smoke passed; macOS covered through injected API tests only, pending native hardware verification. Focused P1/P2 plus authorization/DM regressions: 61 passed.
