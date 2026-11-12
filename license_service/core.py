@@ -11,7 +11,11 @@ class Store:
     def __init__(self, path, key, clock=time.time):
         self.path, self.key, self.clock = str(path), key, clock
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             db.execute('CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, code_hash TEXT UNIQUE, expires REAL, enabled INTEGER, device TEXT, version INTEGER, credential TEXT)')
+            columns={r['name'] for r in db.execute('PRAGMA table_info(licenses)')}
+            if 'note' not in columns: db.execute("ALTER TABLE licenses ADD COLUMN note TEXT NOT NULL DEFAULT ''")
+            db.execute('CREATE TABLE IF NOT EXISTS admin_requests (request_id TEXT PRIMARY KEY, license_id TEXT NOT NULL)')
     @contextmanager
     def connect(self):
         db=sqlite3.connect(self.path, timeout=30)
@@ -21,12 +25,24 @@ class Store:
                 yield db
         finally:
             db.close()
-    def create(self, expires):
+    def list_licenses(self):
+        with self.connect() as db:
+            return [dict(r) for r in db.execute('SELECT id,expires,enabled,device IS NOT NULL AS bound,note FROM licenses ORDER BY rowid DESC')]
+    def create(self, expires, note='', request_id=None):
         code=secrets.token_urlsafe(32); lid=secrets.token_hex(12)
-        with self.connect() as db: db.execute('INSERT INTO licenses VALUES (?,?,?,1,NULL,0,NULL)',(lid,digest(code),expires))
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if request_id and db.execute('SELECT 1 FROM admin_requests WHERE request_id=?',(request_id,)).fetchone():
+                raise ValueError('Request already processed; check the list. Code cannot be shown again.')
+            db.execute('INSERT INTO licenses (id,code_hash,expires,enabled,device,version,credential,note) VALUES (?,?,?,1,NULL,0,NULL,?)',(lid,digest(code),expires,note))
+            if request_id: db.execute('INSERT INTO admin_requests VALUES (?,?)',(request_id,lid))
         return {'license_id':lid,'code':code}
     def admin(self, action, lid, expires=None):
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            current=db.execute('SELECT expires FROM licenses WHERE id=?',(lid,)).fetchone()
+            if current is None: raise ValueError('Unknown license')
+            if action=='renew' and (expires is None or expires <= current['expires']): raise ValueError('New expiry must be later than current expiry')
             if action=='renew': db.execute('UPDATE licenses SET expires=? WHERE id=?',(expires,lid))
             elif action=='disable': db.execute('UPDATE licenses SET enabled=0,version=version+1 WHERE id=?',(lid,))
             elif action=='unbind': db.execute('UPDATE licenses SET device=NULL,credential=NULL,version=version+1 WHERE id=?',(lid,))

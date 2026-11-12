@@ -65,7 +65,7 @@ def test_bad_activation_does_not_use_old_cache(env):
 
 def test_expiry_bound(env):
     c,s,i,t,*_=env
-    s.admin('renew',i['license_id'],10005)
+    i=s.create(10005)
     c.validate(i['code']);t[:]=[1005,1005]
     assert not c.allowed()
 @pytest.mark.parametrize('field,value', [('nonce','wrong'),('device','b'*64),('binding_version',999),('license_id','wrong'),('credential','wrong')])
