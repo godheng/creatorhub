@@ -878,6 +878,7 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
     """用账号持久 profile(已含登录态)打开作品页,在评论框输入并发送。
     headed=True:弹真实窗口(写操作有头更稳,且能手动过验证码)。
     返回 (ok, error)。⚠️ 选择器随快手改版可能失效,集中在 _COMMENT_INPUT/_COMMENT_SUBMIT。"""
+    from app.licensing import LicenseRequired, require_active
     content = (content or "").strip()
     if not content:
         return False, "空文案"
@@ -954,15 +955,21 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
             try:
                 btn = page.locator(sel).first
                 if await btn.count() and await btn.is_enabled():
+                    require_active()
                     await btn.click(timeout=3000)
                     sent = True
                     break
+            except LicenseRequired:
+                raise
             except Exception:
                 continue
         if not sent:
             try:
+                require_active()
                 await page.keyboard.press("Enter")
                 sent = True
+            except LicenseRequired:
+                raise
             except Exception:
                 pass
         if not sent:
@@ -979,6 +986,8 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
             return False, (f"快手拒绝评论({pub['msg'] or '未知原因'})—— 多为验证码/频控/风控,"
                            f"请降低频率或换号稍后再试")
         return False, "未捕获到快手提交接口响应,无法确认是否成功(请人工核对该作品评论区)"
+    except LicenseRequired:
+        raise
     except Exception as e:
         return False, f"发评论异常: {e!r}"
     finally:
