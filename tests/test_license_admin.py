@@ -4,7 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 from license_service.core import Store,create_app
-from license_service.admin import create_admin_app
+from license_service.admin import create_admin_app, set_password
+from unittest.mock import patch
 
 class AdminTests(unittest.TestCase):
     def setUp(self):
@@ -17,6 +18,20 @@ class AdminTests(unittest.TestCase):
         (self.root/'admin-password.json').write_text(json.dumps(dict(salt=salt,hash=hashlib.scrypt(b'test-password-only',salt=bytes.fromhex(salt),n=16384,r=8,p=1).hex())))
         self.assertEqual(self.client.post('/login',headers={'x-admin-login':'1'},json={'password':'test-password-only'}).status_code,200)
         self.headers={'x-csrf-token':self.client.get('/api/licenses').json()['csrf']}
+    def test_password_setup_login_boundaries(self):
+        path=self.root/'admin-password.json'
+        for length in (8,1024):
+            password='x'*length
+            with patch('license_service.admin.getpass.getpass',return_value=password):
+                set_password(self.root)
+            self.assertEqual(self.client.post('/login',headers={'x-admin-login':'1'},json={'password':password}).status_code,200)
+        previous=path.read_bytes()
+        for length in (7,1025):
+            with patch('license_service.admin.getpass.getpass',return_value='x'*length):
+                with self.assertRaises(ValueError): set_password(self.root)
+            self.assertEqual(path.read_bytes(),previous)
+        self.assertEqual(self.client.post('/login',headers={'x-admin-login':'1'},json={'password':'x'*1025}).status_code,400)
+
     def test_auth_csrf_logout_public(self):
         self.assertEqual(self.client.get('/').status_code,503)
         self.login()

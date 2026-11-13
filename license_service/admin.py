@@ -3,9 +3,11 @@ from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 
+MAX_PASSWORD_LENGTH = 1024
+
 def set_password(root):
-    password=getpass.getpass('New administrator password (at least 8 characters): ')
-    if len(password)<8: raise ValueError('Use at least 8 characters')
+    password=getpass.getpass(f'New administrator password (8-{MAX_PASSWORD_LENGTH} characters): ')
+    if not 8 <= len(password) <= MAX_PASSWORD_LENGTH: raise ValueError(f'Use 8-{MAX_PASSWORD_LENGTH} characters')
     if password!=getpass.getpass('Confirm password: '): raise ValueError('Passwords differ')
     salt=secrets.token_hex(16)
     value={'salt':salt,'hash':hashlib.scrypt(password.encode(),salt=bytes.fromhex(salt),n=16384,r=8,p=1).hex()}
@@ -43,7 +45,7 @@ def create_admin_app(store, root):
         if len(attempts)>=10: raise HTTPException(429,'Wait one minute before retrying')
         attempts.append(now);body=await request.json();record=json.loads(cfg)
         password=body.get('password','')
-        if not isinstance(password,str) or len(password)>1024: raise HTTPException(400,'Invalid password')
+        if not isinstance(password,str) or len(password)>MAX_PASSWORD_LENGTH: raise HTTPException(400,'Invalid password')
         actual=hashlib.scrypt(password.encode(),salt=bytes.fromhex(record['salt']),n=16384,r=8,p=1).hex()
         if not secrets.compare_digest(actual,record['hash']): raise HTTPException(401,'Incorrect password')
         token=secrets.token_urlsafe(32);sessions[token]={'csrf':secrets.token_urlsafe(32),'until':now+28800,'config':cfg}
