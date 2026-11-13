@@ -73,7 +73,7 @@ sudo -u aispace-license venv/bin/python -m license_service.cli admin-password
 sudo systemctl restart aispace-license-admin
 ```
 
-No default password exists. Passwords use salted scrypt; password changes invalidate existing sessions.
+No default password exists. Passwords require at least 8 characters and use salted scrypt; password changes invalidate existing sessions. The single administrator signs in with only a password, without a username.
 Sessions last eight hours, are memory-only, and expire on service restart. Mutation requests require a session CSRF token.
 Creation request IDs persist without retaining plaintext codes. A repeated request is rejected with instructions to check the list; it never creates another license.
 

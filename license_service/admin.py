@@ -4,8 +4,8 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 
 def set_password(root):
-    password=getpass.getpass('New administrator password: ')
-    if len(password)<12: raise ValueError('Use at least 12 characters')
+    password=getpass.getpass('New administrator password (at least 8 characters): ')
+    if len(password)<8: raise ValueError('Use at least 8 characters')
     if password!=getpass.getpass('Confirm password: '): raise ValueError('Passwords differ')
     salt=secrets.token_hex(16)
     value={'salt':salt,'hash':hashlib.scrypt(password.encode(),salt=bytes.fromhex(salt),n=16384,r=8,p=1).hex()}
