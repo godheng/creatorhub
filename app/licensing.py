@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import secrets
+import socket
 import threading
 import urllib.request
 from datetime import datetime, timezone
@@ -22,6 +23,13 @@ def transport(path, body):
         return json.loads(response.read(32768))
 
 
+def device_name():
+    try:
+        return ''.join(c for c in socket.gethostname().strip() if c.isprintable())[:128]
+    except Exception:
+        return ''
+
+
 class LicenseClient:
     def __init__(self, device=device_digest, timer=clock, request=transport, public_key=None, read=get_setting, write=set_setting):
         self.device, self.timer, self.request = device, timer, request
@@ -35,7 +43,7 @@ class LicenseClient:
         self.next_check = 0
         self.needs_resume = False
         self.authorized_device = None
-        self.data = dict(status='inactive', valid=False, expires_at=None, customer='', device_digest='', reason='启动时需要联网校验')
+        self.data = dict(status='inactive', valid=False, expires_at=None, customer='', license_id='', device_name='', device_digest='', reason='启动时需要联网校验')
         self.event = threading.Event()
         self.thread = None
 
@@ -53,6 +61,14 @@ class LicenseClient:
 
     def status(self):
         with self.lock:
+            self.data['device_name'] = device_name()
+            if not self.data['license_id']:
+                try:
+                    saved = json.loads(self.read(KEY) or '{}')
+                    lid = saved.get('license_id', '')
+                    if isinstance(lid, str): self.data['license_id'] = lid[:128]
+                except Exception:
+                    pass
             try:
                 now = self._time()
                 if self.device is not device_digest:
@@ -79,7 +95,7 @@ class LicenseClient:
                 nonce = secrets.token_urlsafe(32)
                 saved = {} if code is not None else json.loads(self.read(KEY) or '{}')
                 credential = saved.get('credential', '')
-                body = dict(device=device, nonce=nonce)
+                body = dict(device=device, nonce=nonce, device_name=device_name())
                 body.update(code=code) if code is not None else body.update(credential=credential)
                 response = self.request('/v1/activate' if code is not None else '/v1/check', body)
                 raw = base64.urlsafe_b64decode(response['payload'] + '=' * (-len(response['payload']) % 4))
@@ -108,7 +124,7 @@ class LicenseClient:
                         self.authorized_device = device
                         self.deadline = start + until-server
                         self.next_check = start + 600
-                        self.data.update(status='active', reason='', expires_at=datetime.fromtimestamp(expiry, timezone.utc).isoformat())
+                        self.data.update(status='active', reason='', license_id=data['license_id'], expires_at=datetime.fromtimestamp(expiry, timezone.utc).isoformat())
             except Exception as exc:
                 with self.lock:
                     self.data.update(status='offline', reason='联网或签名校验失败，请重试')

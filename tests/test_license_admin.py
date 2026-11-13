@@ -34,7 +34,7 @@ class AdminTests(unittest.TestCase):
         other=Store(self.root/'db',self.key,lambda:1000)
         with self.assertRaises(ValueError):other.create(5000,'',body['request_id'])
         rows=self.client.get('/api/licenses').json()['licenses'];self.assertEqual(len(rows),1)
-        self.assertEqual(set(rows[0]),{'id','expires','enabled','bound','note'})
+        self.assertEqual(set(rows[0]),{'id','expires','enabled','bound','note','device','device_name'})
         self.assertEqual(rows[0]['note'],'客户甲')
         with self.store.connect() as db:self.assertNotIn(code,str(dict(db.execute('select * from licenses').fetchone())))
         self.assertEqual(self.client.post(f'/api/licenses/{lid}/renew',json={'expires':4000},headers=self.headers).status_code,400)
