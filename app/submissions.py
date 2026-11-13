@@ -8,12 +8,14 @@ import re
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from .models import (TaskSubmission, PublishTask, AccountActionTask, CommentRule,
+from . import licensing
+
+from .models import (TaskSubmission, PublishTask, AccountActionTask, CommentRule, MonitorTarget,
                      DmAutoReplyRule, KeywordCollectionJob)
 
 _MODELS = {"publish": PublishTask, "repost": PublishTask,
            "account-action": AccountActionTask, "comment-rule": CommentRule,
-           "dm-rule": DmAutoReplyRule, "collection": KeywordCollectionJob}
+           "dm-rule": DmAutoReplyRule, "collection": KeywordCollectionJob, "monitor": MonitorTarget}
 
 
 def _identity(request, scope, body):
@@ -61,6 +63,7 @@ def submit_once(session, *, request, scope: str, body, create):
     """
     identity = _identity(request, scope, body)
     if identity is None:
+        licensing.require_active()
         payload = create()
         session.commit()
         return payload, True
@@ -80,6 +83,7 @@ def submit_once(session, *, request, scope: str, body, create):
         if existing is None:
             raise
         return _replay(session, existing, payload_hash), False
+    licensing.require_active()
     payload = create()
     model = _MODELS.get(scope.split(":", 1)[0])
     if model is not None:
