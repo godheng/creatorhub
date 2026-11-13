@@ -1,3 +1,4 @@
+import brand from "../app/brand.json";
 import React, { useEffect, useRef, useState } from "react";
 import { Icon, Tabs } from "./ui/primitives";
 import { selectionMarker } from "./ui/motion";
@@ -19,9 +20,9 @@ async function request(path, options = {}) {
     headers: { "Content-Type": "application/json", ...options.headers } });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (path === "/channels" && response.status === 404) throw new Error("本地后端尚未加载多渠道接口，请重启 CreatorHub 后刷新页面。");
+    if (path === "/channels" && response.status === 404) throw new Error(`本地后端尚未加载多渠道接口，请重启 ${brand.name} 后刷新页面。`);
     if (path === "/models" && response.status === 404) {
-      throw new Error("本地工作台的模型目录接口不存在（404）。请重启 CreatorHub 后刷新页面；若仍出现，请检查后端地址或反向代理路由。这不是上游密钥校验结果。");
+      throw new Error(`本地工作台的模型目录接口不存在（404）。请重启 ${brand.name} 后刷新页面；若仍出现，请检查后端地址或反向代理路由。这不是上游密钥校验结果。`);
     }
     const detail = result.detail;
     throw new Error(Array.isArray(detail) ? detail.map(item => `${(item.loc || []).join(".")}: ${item.msg}`).join("；")
@@ -490,7 +491,7 @@ export function AgentAssistant({ page }) {
         <button type="button" className="ghost" disabled={busy} onClick={cancelSettings}>取消</button>
         <button type="submit" form="agent-settings-form" disabled={busy || addingModel} aria-label="保存配置" title={addingModel ? "请先添加或取消当前模型" : undefined}>{busy ? "处理中…" : "保存配置"}</button>
       </div>
-      <footer className="agent-window-footer"><Icon name="shield" /><span>基于证据分析 · 操作前确认</span><span>{running(run) ? "分析中" : "CreatorHub"}</span></footer>
+      <footer className="agent-window-footer"><Icon name="shield" /><span>基于证据分析 · 操作前确认</span><span>{running(run) ? "分析中" : brand.name}</span></footer>
     </section>
     {settings && <ModelPicker open={pickerOpen && open && view === "settings"} available={catalog?.models || []} configured={settings.models}
       returnFocus={fetchModelsButton} onOpenChange={setPickerOpen} onApply={models => {

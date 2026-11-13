@@ -12,6 +12,8 @@ def test_agent_and_commercial_license(ui):
     expect(page.get_by_role('button', name='授权与激活', exact=True)).to_be_visible()
     open_agent(page, enabled=False)
     expect(page.locator('#agent-dialog')).to_be_visible()
+    from app.brand import PRODUCT_NAME
+    expect(page.locator('.agent-window-footer')).to_contain_text(PRODUCT_NAME)
     capture_agent(page, 'commercial-ai-disabled')
     page.keyboard.press('Escape')
     page.get_by_role('button', name='授权与激活', exact=True).click()
