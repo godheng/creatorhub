@@ -51,6 +51,10 @@ export function LicenseControl() {
     } catch (e) { setError(e.message); await refresh(); }
     finally { setBusy(false); }
   };
+  const copyLicense = async () => {
+    try { await navigator.clipboard.writeText(license.license_id); setMessage("授权编号已复制。"); }
+    catch { setError("无法访问剪贴板，请手动选择并复制授权编号。"); }
+  };
   const copyDevice = async () => {
     try { await navigator.clipboard.writeText(license.device_digest); setMessage("设备标识已复制。"); }
     catch { setError("无法访问剪贴板，请手动选择并复制设备标识。"); }
@@ -61,9 +65,11 @@ export function LicenseControl() {
     <Sheet open={open} onOpenChange={setOpen} title="授权与激活" description="一个授权码绑定一台设备；续期后重新校验即可" busy={busy} onReturnFocus={() => trigger.current?.focus()}>
       <div className="wb-sheet-scroll" style={{ padding: "24px" }}>
         <p role="status"><strong>{status}</strong></p>
-        {license?.customer && <p>授权对象：{license.customer}</p>}
+        <p style={{ overflowWrap: "anywhere", userSelect: "text" }}>授权编号：{license?.license_id || "尚未激活"}</p>
+        <button type="button" disabled={!license?.license_id} onClick={copyLicense}>复制授权编号</button>
         <p>到期时间：{license?.expires_at ? new Date(license.expires_at).toLocaleString("zh-CN", { timeZoneName: "short" }) : "—"}</p>
-        <p style={{ overflowWrap: "anywhere" }}>设备标识：{license?.device_digest || "未读取"}</p>
+        <p style={{ overflowWrap: "anywhere" }}>当前电脑名称：{license?.device_name || "设备名称未获取"}</p>
+        <p style={{ overflowWrap: "anywhere", userSelect: "text" }}>当前设备标识：{license?.device_digest || "未读取"}</p>
         {license?.reason && <p role="status">{license.reason}</p>}
         <button type="button" disabled={!license?.device_digest} onClick={copyDevice}>复制设备标识</button>
         <button type="button" disabled={busy} onClick={revalidate}>手动重新校验</button>

@@ -7,8 +7,11 @@ from .core import Store
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--data',default=os.getenv('LICENSE_DATA','/var/lib/aispace-license'))
-    p.add_argument('action',choices=['init','create','status','renew','disable','unbind']); p.add_argument('--id'); p.add_argument('--expires')
+    p.add_argument('action',choices=['admin-password','init','create','status','renew','disable','unbind']); p.add_argument('--id'); p.add_argument('--expires')
     a=p.parse_args(); root=Path(a.data); keyfile=root/'signing.pem'
+    if a.action=='admin-password':
+        from .admin import set_password
+        set_password(root); return
     if a.action=='init':
         root.mkdir(parents=True,exist_ok=True); os.chmod(root,0o700)
         key=Ed25519PrivateKey.generate()

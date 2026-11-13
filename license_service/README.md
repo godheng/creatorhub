@@ -21,11 +21,11 @@ sudo -u aispace-license venv/bin/python -m license_service.cli unbind --id LICEN
 journalctl -u aispace-license -n 100 --no-pager
 sudo systemctl stop aispace-license
 ```
-Create prints the code once. Protect that terminal output. No admin HTTP routes exist. Access logging is disabled by the unit; do not enable request-body logging in a proxy.
+Create prints the code once. Protect that terminal output. The public application exposes no admin HTTP routes; the separate local-only administrator service is documented below. Access logging is disabled by the unit; do not enable request-body logging in a proxy.
 
 Unbind increments binding generation and removes the previous bearer credential. Same-device activation returns the existing credential. Disable immediately rejects subsequent checks. Existing signed runtime permission can last up to its original 30-minute/expiry deadline if offline. Renewal does not re-enable disabled licenses; issue a new code if needed.
 
-Rollback: stop the unit, restore the previous code directory/version while retaining the protected persistent directory and restart. No legacy license migration is supported or required. Before opening port 8088, limit its security-group/firewall source to test public IPs and preserve SSH. Confirm NTP and `/health` from the test machine.
+Rollback: stop the unit, restore the previous code directory/version while retaining the protected persistent directory and restart. Existing license records are preserved by the compatible schema migration documented below. Before opening port 8088, limit its security-group/firewall source to test public IPs and preserve SSH. Confirm NTP and `/health` from the test machine.
 
 ## First installation commands (after SSH/preflight succeeds)
 These commands have not been executed on the target server. Upload only the license_service source directory to a staging directory first.
@@ -60,3 +60,35 @@ Windows keeps the existing MachineGuid digest unchanged. macOS uses IOPlatformUU
 Elapsed clocks compare suspend-inclusive and awake time: Windows GetTickCount64/QueryUnbiasedInterruptTime, Linux CLOCK_BOOTTIME/CLOCK_MONOTONIC, macOS mach_continuous_time/mach_absolute_time. Calendar adjustments do not extend authorization.
 Network validation is serialized separately from cached-state access. Async business checks after resume reject new operations and schedule revalidation without blocking the event loop; old pre-suspend responses cannot restore permission.
 Validation: Windows/Linux native identity and clock smoke passed; macOS covered through injected API tests only, pending native hardware verification. Focused P1/P2 plus authorization/DM regressions: 61 passed.
+
+## Local administrator web (v1)
+
+The separate `aispace-license-admin.service` serves only `127.0.0.1:8089`.
+The public application has no administrator routes. Both use the same Store and database.
+Set or reset the single administrator password locally (hidden interactive prompts):
+
+```sh
+cd /opt/aispace-license
+sudo -u aispace-license venv/bin/python -m license_service.cli admin-password
+sudo systemctl restart aispace-license-admin
+```
+
+No default password exists. Passwords require at least 8 characters and use salted scrypt; password changes invalidate existing sessions. The single administrator signs in with only a password, without a username.
+Sessions last eight hours, are memory-only, and expire on service restart. Mutation requests require a session CSRF token.
+Creation request IDs persist without retaining plaintext codes. A repeated request is rejected with instructions to check the list; it never creates another license.
+
+```powershell
+ssh -i G:\aws-server\aws-server.pem -N -L 8089:127.0.0.1:8089 ubuntu@ec2-3-38-149-16.ap-northeast-2.compute.amazonaws.com
+```
+
+Open http://127.0.0.1:8089 in the administrator browser while SSH remains connected.
+
+```sh
+sudo systemctl start aispace-license-admin
+sudo systemctl stop aispace-license-admin
+sudo journalctl -u aispace-license-admin -n 100 --no-pager
+```
+
+Before deployment, back up code and use SQLite's backup API for a consistent database backup.
+Migration adds a non-null empty-default `note` column and an `admin_requests` table, retaining old records and credentials.
+Rollback: stop the administrator unit and restore prior public code. The original public activation/check routes remain compatible with the added column. The old CLI create uses positional INSERT and is not compatible: retain the new explicit-column INSERT in core.py if creation via old CLI is required, or restore the database backup only if no post-backup writes need preservation. Do not overwrite signing.pem. Avoid database restore that discards subsequent licensing activity.
