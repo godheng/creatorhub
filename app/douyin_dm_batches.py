@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/douyin/dm")
 class PreviewIn(BaseModel):
     account_id: int
     links: list[str] = Field(default_factory=list, max_length=200)
+    comment_sec_uids: list[str] = Field(default_factory=list, max_length=200)
     contact_ids: list[int] = Field(default_factory=list, max_length=200)
 
 
@@ -107,6 +108,16 @@ async def preview(body: PreviewIn):
                 continue
             rows.append(Recipient(target_uid=row.peer_uid, target_sec_uid=row.peer_sec_uid,
                 target_nick=row.peer_nickname, conv_id=row.conv_id))
+    for sec_uid in body.comment_sec_uids:
+        try:
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", sec_uid) or sec_uid.isdigit():
+                raise ValueError("评论用户缺少有效 sec_uid，不能使用数字 UID 代替")
+            recipient = await resolve_profile(account, "https://www.douyin.com/user/" + sec_uid)
+            if recipient.target_sec_uid != sec_uid:
+                raise ValueError("解析身份与评论用户不一致，请重新采集或核对")
+            rows.append(recipient)
+        except Exception as exc:
+            invalid.append({"input": sec_uid, "error": str(exc)})
     for link in body.links:
         try:
             rows.append(await resolve_profile(account, link))

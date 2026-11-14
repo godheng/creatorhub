@@ -208,3 +208,22 @@ def test_api_batch_executes_new_conversations_and_continues_after_recipient_reje
             assert not (await engine.execute_action_task(batch['task_ids'][1]))['ok']
     asyncio.run(scenario())
     assert calls==[('create','101'),('send','conv-101'),('create','102'),('send','conv-102')]
+
+
+def test_comment_identity_mapping_rejects_numeric_mismatch_and_errors(active, monkeypatch):
+    calls = []
+    async def resolve(account, link):
+        sec = link.rsplit("/", 1)[-1]
+        calls.append(sec)
+        if sec == "failed": raise ValueError("解析失败")
+        return dm.Recipient(target_uid="42", target_sec_uid="other" if sec == "mismatch" else sec, target_nick="评论者")
+    monkeypatch.setattr(dm, "resolve_profile", resolve)
+    result = asyncio.run(dm.preview(dm.PreviewIn(account_id=active,
+        comment_sec_uids=["123", "", "valid", "valid", "mismatch", "failed"])))
+    assert len(result["recipients"]) == 1
+    assert result["recipients"][0]["target_sec_uid"] == "valid"
+    assert result["duplicates"] == 1
+    assert len(result["invalid"]) == 4
+    assert "123" not in calls and "" not in calls
+    with db.get_session() as session:
+        assert not session.exec(select(AccountActionTask)).all()
