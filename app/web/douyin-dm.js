@@ -15,8 +15,18 @@ function dyDmCommentActions(comment) {
   if (!key) return '<p class="mut">缺少有效 sec_uid，无法加入私信名单</p>';
   return `<div><label><input type="checkbox" data-dm-select="${esc(key)}" ${dyDmSelected.has(key)?'checked':''} onchange="dyDmSelectComment(this)">选择用户</label> <a href="https://www.douyin.com/user/${encodeURIComponent(key)}" target="_blank" rel="noopener noreferrer">查看主页</a> <button class="ghost sm" data-dm-add="${esc(key)}" onclick="dyDmAddComments([this.dataset.dmAdd])">${dyDmDraft.has(key)?'已加入':'加入私信名单'}</button></div>`;
 }
+function dyDmPageUsers() {
+  return new Map(dyDmCommentRows.map(row=>[dyDmSec(row),row]).filter(([key])=>key));
+}
+function dyDmSelectPage(checked) {
+  for (const [key,row] of dyDmPageUsers()) {
+    if (checked) dyDmSelected.set(key,row); else dyDmSelected.delete(key);
+  }
+  dyDmSyncComments();
+  document.querySelectorAll('[data-dm-select]').forEach(e=>e.checked=dyDmSelected.has(e.dataset.dmSelect));
+}
 function dyDmCommentToolbar() {
-  return `<div><span data-dm-selected>已选 ${dyDmSelected.size} 人</span> <button class="btn sm" onclick="dyDmAddComments([...dyDmSelected.keys()])">批量加入私信名单</button> <button onclick="openDouyinDm(true)">查看名单 / 去编辑私信（<span data-dm-count>${dyDmDraft.size}</span> 人）</button><p data-dm-feedback role="status"></p></div>`;
+  return `<div><label><input type="checkbox" data-dm-select-page onchange="dyDmSelectPage(this.checked)" ${dyDmPageUsers().size?'':'disabled'}>全选本页</label> <button class="ghost sm" onclick="dyDmSelectPage(false)" ${dyDmPageUsers().size?'':'disabled'}>取消本页选择</button> <span data-dm-selected>已选 ${dyDmSelected.size} 人</span> <button class="btn sm" onclick="dyDmAddComments([...dyDmSelected.keys()])">批量加入私信名单</button> <button onclick="openDouyinDm(true)">查看名单 / 去编辑私信（<span data-dm-count>${dyDmDraft.size}</span> 人）</button><p data-dm-feedback role="status"></p></div>`;
 }
 function dyDmSelectComment(input) {
   const key=input.dataset.dmSelect;
@@ -25,6 +35,11 @@ function dyDmSelectComment(input) {
   document.querySelectorAll('[data-dm-select]').forEach(e=>e.checked=dyDmSelected.has(e.dataset.dmSelect));
 }
 function dyDmSyncComments(message='') {
+  const pageKeys=[...dyDmPageUsers().keys()], count=pageKeys.filter(key=>dyDmSelected.has(key)).length;
+  document.querySelectorAll('[data-dm-select-page]').forEach(e=>{
+    e.disabled=!pageKeys.length; e.checked=pageKeys.length>0 && count===pageKeys.length;
+    e.indeterminate=count>0 && count<pageKeys.length;
+  });
   document.querySelectorAll('[data-dm-add]').forEach(e=>e.textContent=dyDmDraft.has(e.dataset.dmAdd)?'已加入':'加入私信名单');
   document.querySelectorAll('[data-dm-selected]').forEach(e=>e.textContent=`已选 ${dyDmSelected.size} 人`);
   document.querySelectorAll('[data-dm-count]').forEach(e=>e.textContent=dyDmDraft.size);

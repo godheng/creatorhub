@@ -45,7 +45,21 @@ def test_workbench_comment_dm_walkthrough(ui):
     page.locator('[data-dm-add="MS4wLjABdemoA"]').first.click()
     expect(page.locator('[data-dm-add="MS4wLjABdemoA"]').last).to_have_text('已加入')
     page.locator('[data-dm-select="MS4wLjABdemoA"]').first.check()
-    page.locator('[data-dm-select="MS4wLjABdemoB"]').check()
+    page_control=page.locator('[data-dm-select-page]')
+    assert page_control.evaluate('(e)=>e.indeterminate')
+    page_control.check()
+    expect(page_control).to_be_checked()
+    assert page.locator('[data-dm-select]:checked').count()==3
+    expect(modal.locator('[data-dm-selected]')).to_have_text('已选 2 人')
+    # A selection from another page survives clearing/reselecting the current page.
+    page.add_script_tag(content="dyDmSelected.set('MS4wLjABotherPage',{user_sec_uid:'MS4wLjABotherPage'});dyDmSyncComments()")
+    modal.get_by_role('button',name='取消本页选择',exact=True).click()
+    assert page.locator('[data-dm-select]:checked').count()==0
+    expect(modal.locator('[data-dm-selected]')).to_have_text('已选 1 人')
+    page_control.check()
+    expect(modal.locator('[data-dm-selected]')).to_have_text('已选 3 人')
+    page.add_script_tag(content="dyDmSelected.delete('MS4wLjABotherPage');dyDmSyncComments()")
+    capture(page,'comment-dm-select-all')
     modal.get_by_role('button',name='批量加入私信名单',exact=True).click()
     expect(modal).to_contain_text('重复 1 人')
     assert page.locator('html').get_attribute('data-posts') in (None, '0')
@@ -91,6 +105,14 @@ def test_workbench_comment_dm_walkthrough(ui):
     page.locator('#dy-dm-preview-button').click()
     expect(page.locator('#dy-dm-preview')).to_contain_text('有效 0 人')
     expect(page.locator('#dy-dm-submit')).to_be_disabled()
+    dialog.get_by_role('button',name='返回评论',exact=True).click()
+    # Empty and invalid-only pages disable select-all without discarding other-page users.
+    for rows in ([], [{'user_sec_uid':'12345'}, {'user_sec_uid':''}]):
+        page.add_script_tag(content="dyDmCommentRows="+json.dumps(rows)+";document.querySelector('#collection-comments-list').innerHTML=dyDmCommentToolbar()+dyDmCommentRows.map(collectionCommentMarkup).join('');dyDmSyncComments()")
+        expect(page.locator('[data-dm-select-page]')).to_be_disabled()
+        expect(page.locator('[data-dm-select-page]')).not_to_be_checked()
+        assert not page.locator('[data-dm-select-page]').evaluate('(e)=>e.indeterminate')
+        expect(modal.locator('[data-dm-selected]')).to_have_text('已选 2 人')
     assert errors==[]
 
 

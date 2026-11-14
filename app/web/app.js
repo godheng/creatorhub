@@ -5987,6 +5987,7 @@ async function loadCollectionComments(page = COLLECTION_COMMENT_PAGE) {
     $("collection-comments-count").textContent = `共 ${fmtNum(payload.total || 0)} 条符合条件的评论`;
     dyDmCommentRows = payload.items || [];
     list.innerHTML = dyDmCommentToolbar() + ((payload.items || []).map(collectionCommentMarkup).join("") || `<div class="empty"><div class="empty-t">没有符合条件的评论</div><div class="empty-sub">调整筛选条件后重试</div></div>`);
+    dyDmSyncComments();
     const pager = $("collection-comments-pager");
     if (pager) {
       pager.hidden = Number(payload.pages || 1) <= 1;
