@@ -516,7 +516,7 @@ class Launcher:
     def diagnostics(self):
         from tkinter import filedialog, messagebox
         import platform
-        path = filedialog.asksaveasfilename(title="导出不含账号数据的诊断摘要", defaultextension=".json", initialfile="creatorhub-diagnostics.json")
+        path = filedialog.asksaveasfilename(title="导出不含账号数据的诊断摘要", defaultextension=".json", initialfile="aispace-diagnostics.json")
         if path:
             # Allowlist only: no raw logs, paths, config, tokens, accounts or DB.
             data = {"app_version": version(), "os": platform.system(), "os_release": platform.release(),

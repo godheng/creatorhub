@@ -38,10 +38,10 @@ async def local_request(base: str, method: str, path: str, arguments=None):
                                      follow_redirects=False, trust_env=False) as client:
             response = await client.request(method, path, json=arguments)
         if response.status_code != 200:
-            raise ValueError(f"CreatorHub 返回 HTTP {response.status_code}；检查本地服务、MCP 开关和工具参数")
+            raise ValueError(f"aispace 返回 HTTP {response.status_code}；检查本地服务、MCP 开关和工具参数")
         return response.json()
     except httpx.HTTPError as exc:
-        raise ValueError("连接本地 CreatorHub 失败，请先启动工作台服务") from exc
+        raise ValueError("连接本地 aispace 失败，请先启动工作台服务") from exc
 
 
 def build_server(base: str):

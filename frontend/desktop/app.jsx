@@ -82,7 +82,7 @@ function App() {
       if (!response.ok || !result.ok) throw new Error(result.error || "操作未完成，请稍后重试。");
       if (result.download) {
         const url = URL.createObjectURL(new Blob([JSON.stringify(result.download, null, 2)], { type: "application/json" }));
-        const link = document.createElement("a"); link.href = url; link.download = "creatorhub-diagnostics.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        const link = document.createElement("a"); link.href = url; link.download = "aispace-diagnostics.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
       if (successMessage || result.message) toast(result.message || successMessage);
       await refresh(); return true;

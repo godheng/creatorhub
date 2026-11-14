@@ -224,7 +224,7 @@ def restart_app(data):
 
 def notify_user(message):
     if os.name == "nt":
-        ctypes.windll.user32.MessageBoxW(None, message, "CreatorHub 更新", 0x30)
+        ctypes.windll.user32.MessageBoxW(None, message, "aispace 更新", 0x30)
 
 
 def apply_update(filename):
@@ -286,7 +286,7 @@ def apply_update(filename):
             # Persist the result even if the GUI is damaged or a reboot is needed.
             result.update(status="install_error", reason="restart")
             atomic_json(data["home"] / "runtime" / "update-result.json", result)
-            notify_user("更新后的启动中心尚未打开。请重新启动 CreatorHub；如仍未打开，使用安装包修复安装。账号与备份保留在用户目录。")
+            notify_user("更新后的启动中心尚未打开。请重新启动 aispace；如仍未打开，使用安装包修复安装。账号与备份保留在用户目录。")
     return 0 if result["status"] in {"installed", "restart_required"} else 1
 
 
