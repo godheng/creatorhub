@@ -9,7 +9,7 @@ def test_workbench_comment_dm_walkthrough(ui):
     page, errors = ui
     page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / "app/web/douyin-dm.js"))
     page.add_script_tag(content="""(() => {
-      window.fixturePosts=[];
+      window.fixturePosts=[]; window.fixtureDeferred=false; window.fixturePreviewCalls=0;
       const old=window.fetch;
       window.fetch=async (url, options={})=>{
         const path=new URL(String(url),location.origin).pathname;
@@ -21,8 +21,13 @@ def test_workbench_comment_dm_walkthrough(ui):
           {id:4,user_sec_uid:'12345',user_nickname:'历史用户',text:'只有数字身份',content_id:7}],total:4,page:1,pages:1});
         if(path==='/api/dm/conversations') return response([]);
         if(path==='/api/douyin/dm/preview') {
+          document.documentElement.dataset.previewCalls=++window.fixturePreviewCalls;
           const b=JSON.parse(options.body); if((b.links||[]).includes('invalid')) return response({recipients:[],duplicates:0,invalid:[{input:'invalid',error:'无法解析接收人'}]}); const ids=[...(b.comment_sec_uids||[]),...(b.links||[]).map(x=>x.split('/').pop())];
-          return response({recipients:[...new Set(ids)].map((id,i)=>({target_uid:String(100+i),target_sec_uid:id,target_nick:id.endsWith('A')?'评论者小林':'评论者小陈'})),duplicates:ids.length-new Set(ids).size,invalid:[]});
+          if(!window.fixtureDeferred && !b.links.length && ids.length>1) {
+            window.fixtureDeferred=true;
+            return response({recipients:[{target_uid:ids[0].endsWith('A')?'100':'101',target_sec_uid:ids[0],target_nick:ids[0].endsWith('A')?'评论者小林':'评论者小陈'}],invalid:[],duplicates:0,pending:[{input:ids[1],kind:'comment',reason:'尚未达到该操作最小间隔',next_allowed_at:new Date(Date.now()+1000).toISOString()}]});
+          }
+          return response({recipients:[...new Set(ids)].map((id,i)=>({target_uid:id.endsWith('A')?'100':'101',target_sec_uid:id,target_nick:id.endsWith('A')?'评论者小林':'评论者小陈'})),duplicates:ids.length-new Set(ids).size,invalid:[]});
         }
         if(path.startsWith('/api/douyin/dm/batches')) {
           if(options.method==='POST') {fixturePosts.push(JSON.parse(options.body)); document.documentElement.dataset.posts=fixturePosts.length; document.documentElement.dataset.lastPost=JSON.stringify(fixturePosts.at(-1));}
@@ -81,6 +86,20 @@ def test_workbench_comment_dm_walkthrough(ui):
     expect(page.locator('#collection-comments-q')).to_have_value('体验')
     modal.get_by_role('button',name='查看名单 / 去编辑私信',exact=False).click()
     expect(page.locator('#dy-dm-content')).not_to_be_empty()
+    page.locator('#dy-dm-preview-button').click()
+    expect(page.locator('#dy-dm-error')).to_contain_text('等待')
+    calls=page.locator('html').get_attribute('data-preview-calls')
+    dialog.get_by_role('button',name='关闭',exact=True).click()
+    page.wait_for_timeout(1300)
+    assert page.locator('html').get_attribute('data-preview-calls')==calls
+    assert page.locator('html').get_attribute('data-posts') in (None,'0')
+    page.add_script_tag(content='window.fixtureDeferred=false;')
+    modal.get_by_role('button',name='查看名单 / 去编辑私信',exact=False).click()
+    page.locator('#dy-dm-preview-button').click()
+    expect(page.locator('#dy-dm-error')).to_contain_text('等待')
+    assert page.locator('#dy-dm-submit').count()==0
+    capture(page,'comment-dm-risk-waiting')
+    expect(page.locator('#dy-dm-preview')).to_contain_text('有效 2 人', timeout=5000)
     page.locator('#dy-dm-links').fill('invalid')
     page.locator('#dy-dm-preview-button').click()
     expect(page.locator('#dy-dm-preview')).to_contain_text('无法解析接收人')

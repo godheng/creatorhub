@@ -60,15 +60,18 @@ function dyDmRenderDraft() {
 }
 function dyDmRemoveDraft(key) {dyDmDraft.delete(key);dyDmState.payload=null;$('dy-dm-preview').innerHTML='';dyDmRenderDraft();dyDmSyncComments();}
 // Explicit preview/confirmation; all writes remain in the existing serialized queue.
+let dyDmWaitTimer, dyDmWaitResolve;
+function dyDmCancelWait() {clearTimeout(dyDmWaitTimer); if(dyDmWaitResolve) dyDmWaitResolve(); dyDmWaitResolve=null;}
 let dyDmDialog, dyDmState, dyDmTimer, dyDmGeneration = 0, dyDmContactRequest = 0;
 const dyDmCurrent = generation => generation === dyDmGeneration && dyDmDialog?.open;
 function dyDmShell(title) {
+  dyDmCancelWait();
   ++dyDmGeneration;
   if (!dyDmDialog) {
     dyDmDialog = document.createElement('dialog');
     dyDmDialog.id = 'douyin-dm-dialog';
     dyDmDialog.style.cssText = 'width:min(720px,94vw);max-height:90vh;overflow:auto;padding:24px;border:1px solid var(--border,#ddd);border-radius:12px;background:var(--bg,#fff);color:var(--text,#222)';
-    dyDmDialog.addEventListener('close', () => { if (!dyDmDialog.open) { dyDmSaveCompose(); ++dyDmGeneration; clearInterval(dyDmTimer); } });
+    dyDmDialog.addEventListener('close', () => { if (!dyDmDialog.open) { dyDmSaveCompose(); ++dyDmGeneration; dyDmCancelWait(); clearInterval(dyDmTimer); } });
     document.body.appendChild(dyDmDialog);
   }
   clearInterval(dyDmTimer);
@@ -104,6 +107,32 @@ async function dyDmContacts() {
     $('dy-dm-contacts').innerHTML = rows.map(c => `<label style="display:block"><input type="${dyDmState.batch ? 'checkbox' : 'radio'}" name="dy-dm-contact" value="${c.id}"> ${esc(c.peer_nickname || c.peer_uid)}</label>`).join('') || '暂无联系人，可粘贴主页链接';
   } catch(e) { if (dyDmCurrent(generation)) dyDmError(e); }
 }
+async function dyDmResolvePreview(body, generation) {
+  const result={recipients:[],invalid:[],duplicates:0};
+  let request=body;
+  while (dyDmCurrent(generation)) {
+    const part=await api('/api/douyin/dm/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)});
+    if(!dyDmCurrent(generation)) throw new Error('预览已关闭');
+    result.recipients.push(...part.recipients); result.invalid.push(...part.invalid); result.duplicates+=part.duplicates;
+    const pending=part.pending||[];
+    if(!pending.length) {
+      const unique=[];
+      for(const row of result.recipients) {
+        if(unique.some(r=>(r.target_uid && r.target_uid===row.target_uid)||(r.target_sec_uid && r.target_sec_uid===row.target_sec_uid))) result.duplicates++;
+        else unique.push(row);
+      }
+      result.recipients=unique; return result;
+    }
+    request={account_id:body.account_id,contact_ids:[],comment_sec_uids:pending.filter(p=>p.kind==='comment').map(p=>p.input),links:pending.filter(p=>p.kind==='link').map(p=>p.input)};
+    const times=pending.map(p=>Date.parse(p.next_allowed_at));
+    const delay=Math.max(...times)-Date.now();
+    $('dy-dm-error').textContent=`已解析 ${result.recipients.length} 人，${pending.length} 人等待：${pending[0].reason}。尚未完成预览，不能创建任务。`;
+    if(times.some(t=>!Number.isFinite(t)) || delay<=0) throw new Error(`解析暂缓：${pending[0].reason}。请处理账号状态后重新解析；名单已保留，尚未创建任务。`);
+    $('dy-dm-preview').textContent=`等待至 ${new Date(Math.max(...times)).toLocaleTimeString()} 后自动继续；关闭窗口可停止等待。`;
+    await new Promise(resolve=>{dyDmWaitResolve=resolve;dyDmWaitTimer=setTimeout(()=>{dyDmWaitResolve=null;resolve();},Math.min(delay+100,2147483647));});
+  }
+  throw new Error('预览已关闭');
+}
 async function dyDmPreview() {
   const generation = dyDmGeneration, state = dyDmState;
   if (dyDmState.busy) return;
@@ -114,7 +143,7 @@ async function dyDmPreview() {
   dyDmSaveCompose();
   dyDmState.busy=true; $('dy-dm-body').querySelectorAll('input,textarea,select,button').forEach(e=>e.disabled=true);
   try {
-    const result = await api('/api/douyin/dm/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const result = await dyDmResolvePreview(body, generation);
     if (!dyDmCurrent(generation)) return;
     if (!dyDmState.batch && result.recipients.length > 1) throw new Error('单发仅允许一个接收人，请使用批量私信');
     dyDmState.payload={account_id:body.account_id,recipients:result.recipients,content};
