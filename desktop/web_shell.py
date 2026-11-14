@@ -127,7 +127,7 @@ def run_desktop(home, *, autostart=False, install_browser=True):
             tray.run_detached()
         window.hide()
     def export(summary):
-        selected = window.create_file_dialog(webview.FileDialog.SAVE, save_filename="creatorhub-diagnostics.json", file_types=("JSON (*.json)",))
+        selected = window.create_file_dialog(webview.FileDialog.SAVE, save_filename="aispace-diagnostics.json", file_types=("JSON (*.json)",))
         if not selected:
             return False
         path = selected if isinstance(selected, str) else selected[0]

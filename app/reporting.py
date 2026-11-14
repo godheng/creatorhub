@@ -475,7 +475,7 @@ def build_module_report(
     workbook = Workbook()
     _configure_workbook(workbook)
     generated_at = generated_at or datetime.now()
-    workbook.properties.creator = "CreatorHub"
+    workbook.properties.creator = "aispace"
     workbook.properties.title = report_title
     workbook.properties.subject = f"{module_name} Excel 导出"
     _write_module_summary(
@@ -700,7 +700,7 @@ def build_contents_report(
 ) -> bytes:
     target_names = _target_map(targets)
     return build_module_report(
-        report_title="CreatorHub 作品数据报告",
+        report_title="aispace 作品数据报告",
         module_name="作品数据",
         sheet_title="作品数据",
         headers=_CONTENT_HEADERS,
@@ -727,7 +727,7 @@ def build_comments_report(
 ) -> bytes:
     watch_names = _watch_map(watches)
     return build_module_report(
-        report_title="CreatorHub 评论数据报告",
+        report_title="aispace 评论数据报告",
         module_name="评论数据",
         sheet_title="评论数据",
         headers=_COMMENT_HEADERS,
@@ -753,7 +753,7 @@ def build_danmaku_report(
 ) -> bytes:
     watch_names = _watch_map(watches)
     return build_module_report(
-        report_title="CreatorHub 弹幕数据报告",
+        report_title="aispace 弹幕数据报告",
         module_name="弹幕数据",
         sheet_title="弹幕数据",
         headers=_DANMAKU_HEADERS,
@@ -779,7 +779,7 @@ def build_targets_report(
 ) -> bytes:
     counts = Counter(_value(row, "target_id") for row in contents)
     return build_module_report(
-        report_title="CreatorHub 监控目标报告",
+        report_title="aispace 监控目标报告",
         module_name="监控目标",
         sheet_title="监控目标",
         headers=_TARGET_HEADERS,
@@ -803,7 +803,7 @@ def build_watches_report(
     generated_at: datetime | None = None,
 ) -> bytes:
     return build_module_report(
-        report_title="CreatorHub 评论监控配置报告",
+        report_title="aispace 评论监控配置报告",
         module_name="评论监控",
         sheet_title="评论监控",
         headers=_WATCH_HEADERS,
@@ -827,7 +827,7 @@ def build_danmaku_watches_report(
     generated_at: datetime | None = None,
 ) -> bytes:
     return build_module_report(
-        report_title="CreatorHub 弹幕监控配置报告",
+        report_title="aispace 弹幕监控配置报告",
         module_name="弹幕监控",
         sheet_title="弹幕监控",
         headers=_DANMAKU_WATCH_HEADERS,
@@ -851,7 +851,7 @@ def build_share_history_report(
     generated_at: datetime | None = None,
 ) -> bytes:
     return build_module_report(
-        report_title="CreatorHub 链接下载历史报告",
+        report_title="aispace 链接下载历史报告",
         module_name="链接下载历史",
         sheet_title="链接下载历史",
         headers=_SHARE_HISTORY_HEADERS,
@@ -932,7 +932,7 @@ def build_keyword_collection_report(job: Any, contents: Sequence[Any],
     generated_at = generated_at or datetime.now()
     workbook = Workbook()
     _configure_workbook(workbook)
-    workbook.properties.creator = "CreatorHub"
+    workbook.properties.creator = "aispace"
     source_type = _text(_value(job, "source_type", "keyword")) or "keyword"
     source_name = _text(_value(job, "source_name"))
     source_ref = _text(_value(job, "source_ref"))
@@ -942,11 +942,11 @@ def build_keyword_collection_report(job: Any, contents: Sequence[Any],
     except (TypeError, ValueError, json.JSONDecodeError):
         keyword_text = _text(keyword_value)
     if source_type == "keyword":
-        report_title = "CreatorHub 关键词采集报告"
+        report_title = "aispace 关键词采集报告"
         source_label = "关键词"
         source_text = keyword_text
     else:
-        report_title = "CreatorHub 内容采集报告"
+        report_title = "aispace 内容采集报告"
         source_label = "采集来源"
         source_text = source_name or source_ref or source_type
     workbook.properties.title = report_title
@@ -1062,7 +1062,7 @@ def _write_summary(
     worksheet.sheet_format.defaultRowHeight = 22
     worksheet.merge_cells("A1:F1")
     title = worksheet["A1"]
-    title.value = "CreatorHub 监控数据报告"
+    title.value = "aispace 监控数据报告"
     title.fill = _TITLE_FILL
     title.font = _TITLE_FONT
     title.alignment = Alignment(horizontal="left", vertical="center")
@@ -1220,8 +1220,8 @@ def build_monitor_report(
     _configure_workbook(workbook)
     workbook.remove(workbook.active)
     generated_at = generated_at or datetime.now()
-    workbook.properties.creator = "CreatorHub"
-    workbook.properties.title = "CreatorHub 监控数据报告"
+    workbook.properties.creator = "aispace"
+    workbook.properties.title = "aispace 监控数据报告"
     workbook.properties.subject = "跨模块监控数据 Excel 导出"
 
     _write_summary(

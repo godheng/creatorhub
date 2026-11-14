@@ -881,7 +881,7 @@ async function exportMonitorReport(explicitBtn = null) {
       const disposition = response.headers.get("content-disposition") || "";
       const matched = disposition.match(/filename="?([^";]+)"?/i);
       const filename = matched ? matched[1] :
-        `creatorhub_monitor_report_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.xlsx`;
+        `aispace_monitor_report_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.xlsx`;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -1029,7 +1029,7 @@ async function exportModuleReport(module, full = false, explicitBtn = null) {
     try {
       await _downloadExcelReport(
         path + "?" + params.toString(),
-        "creatorhub_" + module + "_report.xlsx",
+        "aispace_" + module + "_report.xlsx",
       );
       const count = $( _reportCountIds[module] )?.textContent?.trim();
       const scope = full ? "全量" : "筛选结果";
@@ -5099,7 +5099,7 @@ async function exportShareHistoryReport(full = false, explicitBtn = null) {
     try {
       await _downloadExcelReport(
         "/api/reports/share-download-history.xlsx?" + _shareHistoryReportParams(full).toString(),
-        "creatorhub_share_download_history.xlsx",
+        "aispace_share_download_history.xlsx",
       );
       const count = $("sd-history-filter-count")?.textContent?.trim();
       toast(`链接下载历史 ${full ? "全量" : "筛选结果"} Excel 已导出${!full && count ? `（${count}）` : ""}`, "ok");

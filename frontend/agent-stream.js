@@ -13,7 +13,7 @@ export async function watchRun(id, onSnapshot, signal) {
       credentials: "same-origin", cache: "no-store", headers: { Accept: "text/event-stream" }, signal: connection.signal,
     });
     if (!response.ok) {
-      const error = new Error(response.status === 404 ? "本地后端缺少流式接口或记录，请重启 CreatorHub 后刷新页面。" : `流式订阅读取失败（${response.status}）`);
+      const error = new Error(response.status === 404 ? "本地后端缺少流式接口或记录，请重启 aispace 后刷新页面。" : `流式订阅读取失败（${response.status}）`);
       error.retryable = ![401, 403, 404].includes(response.status);
       throw error;
     }

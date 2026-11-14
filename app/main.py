@@ -6763,7 +6763,7 @@ def _share_history_local_path(
 
 
 def _require_local_action(request: Request, action: str = "reveal") -> None:
-    """仅允许本机 CreatorHub 页面触发文件管理器操作。"""
+    """仅允许本机 aispace 页面触发文件管理器操作。"""
     def is_loopback(host: str) -> bool:
         host = host.split("%", 1)[0].casefold()
         if host == "localhost":
@@ -6785,7 +6785,7 @@ def _require_local_action(request: Request, action: str = "reveal") -> None:
     local_action = request.headers.get("x-creatorhub-local-action") == action
     if not is_loopback(client_host) or not is_loopback(page_host) or \
             not same_origin or not local_action:
-        raise HTTPException(403, "仅允许从本机 CreatorHub 页面执行文件操作")
+        raise HTTPException(403, "仅允许从本机 aispace 页面执行文件操作")
 
 
 @app.get("/api/share-download/history/{record_id}/media/{media_index}")
@@ -8526,7 +8526,7 @@ async def export_monitor_report(
         danmaku=danmaku,
         generated_at=datetime.now(),
     )
-    filename = f"creatorhub_monitor_report_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    filename = f"aispace_monitor_report_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
     return StreamingResponse(
         iter([payload]),
         media_type=REPORT_MIME,
@@ -8562,7 +8562,7 @@ def _report_window(stmt, model, start: datetime | None, end: datetime | None):
 def _report_download(payload: bytes, prefix: str):
     from .reporting import REPORT_MIME
 
-    filename = f"creatorhub_{prefix}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    filename = f"aispace_{prefix}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
     return StreamingResponse(
         iter([payload]),
         media_type=REPORT_MIME,
@@ -11789,7 +11789,7 @@ async def test_channel(cid: int):
         if not c:
             raise HTTPException(404)
         ch_type, cfg = c.type, json.loads(c.config or "{}")
-    ok, detail = await send_one(ch_type, cfg, "CreatorHub · 测试通知",
+    ok, detail = await send_one(ch_type, cfg, "aispace · 测试通知",
                                 "这是一条测试消息,收到说明渠道配置正常 ✓")
     return {"ok": ok, "detail": redact_detail(ch_type, cfg, detail)}
 
