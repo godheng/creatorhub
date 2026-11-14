@@ -60,3 +60,6 @@ docs/
 
 /DEVICE-LICENSE-DELIVERY.md
 /output/
+
+# Isolated local test dependencies
+/.test-deps/
