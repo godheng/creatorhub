@@ -1673,7 +1673,7 @@ async def fetch_dm_history(mgr: BrowserManager, identity, platform: str,
             mgr, identity, conv_id, peer_uid=peer_uid or conv_id,
             self_uid=self_uid, count=count)
     import base64 as _b64
-    from .douyin_im_pb import build_history_request, parse_messages, GET_BY_CONV_URL
+    from .douyin_im_pb import build_history_request, parse_messages, parse_send_response, GET_BY_CONV_URL
     if platform != "douyin":
         return {}, "仅抖音已支持"
     if not conv_id or not conv_short_id:
@@ -1689,6 +1689,9 @@ async def fetch_dm_history(mgr: BrowserManager, identity, platform: str,
             headers={"content-type": "application/x-protobuf",
                      "referer": "https://www.douyin.com/"})
         body = await resp.body()
+        envelope = parse_send_response(body)
+        if resp.status == 200 and (not envelope.get("ok") or envelope.get("cmd") != 301):
+            return {}, f"imapi_history_rejected:cmd={envelope.get('cmd', 0)}:code={envelope.get('error_code', 0)}"
         parsed = parse_messages(body)
         if debug:
             print(f"[dm-hist] conv={conv_id} status={resp.status} "

@@ -807,7 +807,7 @@ class WriteGateTests(unittest.TestCase):
 
             async def create_dm_conversation(self, *args, **kwargs):
                 calls.append("create")
-                return None, "write_uncertain:network:TimeoutError"
+                return None, "write_uncertain:imapi_create:network:TimeoutError:phase=unknown"
 
             async def fetch_dm_conversations(self):
                 calls.append("sync")
@@ -924,7 +924,7 @@ class WriteGateTests(unittest.TestCase):
                 yield self
 
             async def create_dm_conversation(self, *args, **kwargs):
-                return None, "write_uncertain:network:TimeoutError"
+                return None, "write_uncertain:imapi_create:network:TimeoutError:phase=unknown"
 
             async def fetch_dm_conversations(self):
                 return []
@@ -940,7 +940,7 @@ class WriteGateTests(unittest.TestCase):
             task = session.get(AccountActionTask, task_id)
             self.assertEqual(task.status, "uncertain")
             self.assertEqual(task.error,
-                             "write_uncertain:network:TimeoutError")
+                             "write_uncertain:imapi_create:network:TimeoutError:phase=unknown")
             self.assertIsNone(task.scheduled_at)
 
     def test_douyin_api_dm_json_receipt_marks_task_done_without_browser(self):

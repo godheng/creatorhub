@@ -1,9 +1,10 @@
 // Session-only comment recipient draft. Adding never creates a task.
 const dyDmDraft = new Map(), dyDmSelected = new Map();
 let dyDmCommentRows = [];
-const dyDmCompose = {account:'', links:'', content:''};
+const dyDmCompose = {account:'', links:'', content:'', uid:'', sec:'', nickname:''};
 function dyDmSaveCompose() {
   if (!$('dy-dm-content')) return;
+  dyDmCompose.uid=$('dy-dm-uid').value; dyDmCompose.sec=$('dy-dm-sec').value; dyDmCompose.nickname=$('dy-dm-nickname').value;
   dyDmCompose.account=$('dy-dm-account').value; dyDmCompose.links=$('dy-dm-links').value; dyDmCompose.content=$('dy-dm-content').value;
 }
 function dyDmSec(comment) {
@@ -56,9 +57,9 @@ function dyDmAddComments(keys) {
 }
 function dyDmRenderDraft() {
   const el=$('dy-dm-draft'); if(!el)return;
-  el.innerHTML=!dyDmState.batch?'单发模式：请手动输入一个主页链接或选择一个联系人':dyDmDraft.size?[...dyDmDraft].map(([key,r])=>`<div><b>${esc(r.user_nickname||'匿名用户')}</b><p>${esc(r.source_desc||r.source_keyword||'来源素材 #'+(r.content_id||''))}</p><p>${esc(r.text||'（空评论）')}</p><button data-key="${esc(key)}" onclick="dyDmRemoveDraft(this.dataset.key)">移除</button></div>`).join(''):'私信名单为空，可返回评论选择用户或手动输入主页链接';
+  el.innerHTML=!dyDmState.batch?'单发模式：可填写一组 UID + sec_uid、一个主页链接，或选择一个联系人':dyDmDraft.size?[...dyDmDraft].map(([key,r])=>`<div><b>${esc(r.user_nickname||'匿名用户')}</b><p>${esc(r.source_desc||r.source_keyword||'来源素材 #'+(r.content_id||''))}</p><p>${esc(r.text||'（空评论）')}</p><button data-key="${esc(key)}" onclick="dyDmRemoveDraft(this.dataset.key)">移除</button></div>`).join(''):'私信名单为空，可返回评论选择用户或手动输入主页链接';
 }
-function dyDmRemoveDraft(key) {dyDmDraft.delete(key);dyDmState.payload=null;$('dy-dm-preview').innerHTML='';dyDmRenderDraft();dyDmSyncComments();}
+function dyDmRemoveDraft(key) {dyDmDraft.delete(key);dyDmState.retry=null;dyDmState.payload=null;$('dy-dm-preview').innerHTML='';dyDmRenderDraft();dyDmSyncComments();}
 // Explicit preview/confirmation; all writes remain in the existing serialized queue.
 let dyDmWaitTimer, dyDmWaitResolve;
 function dyDmCancelWait() {clearTimeout(dyDmWaitTimer); if(dyDmWaitResolve) dyDmWaitResolve(); dyDmWaitResolve=null;}
@@ -87,18 +88,20 @@ async function openDouyinDm(batch) {
   const accounts = ACCOUNTS.filter(a => (!a.platform || a.platform === 'douyin') && a.status === 'active');
   $('dy-dm-body').innerHTML = `<label>发送账号<select id="dy-dm-account" onchange="dyDmContacts()">${accounts.map(a => `<option value="${a.id}">${esc(a.nickname || '账号#'+a.id)}</option>`).join('')}</select></label>
     <section><h3>评论用户私信名单</h3><div id="dy-dm-draft"></div><button onclick="dyDmDialog.close()">返回评论</button></section><p><label>用户主页链接（${batch ? '每行一个' : '一个接收人'}）<textarea id="dy-dm-links" rows="3" style="width:100%" placeholder="https://www.douyin.com/user/..."></textarea></label></p>
+    <fieldset><legend>或手工提供 UID + sec_uid</legend><p>请确认两个标识属于同一用户；这里只检查格式，不查询或核验身份绑定。</p><label>数字 UID<input id="dy-dm-uid" inputmode="numeric" maxlength="64"></label><label>sec_uid（不是主页链接）<input id="dy-dm-sec" maxlength="128"></label><label>昵称（可选）<input id="dy-dm-nickname" maxlength="100"></label></fieldset>
     <fieldset><legend>或选择已有联系人</legend><div id="dy-dm-contacts" style="max-height:160px;overflow:auto"></div></fieldset>
     <p><label>文字内容<textarea id="dy-dm-content" rows="4" style="width:100%"></textarea></label></p><button class="btn" id="dy-dm-preview-button" onclick="dyDmPreview()">解析并预览</button><div id="dy-dm-preview"></div>`;
   if (accounts.some(a => String(a.id) === HUB_ACC)) $('dy-dm-account').value = HUB_ACC;
   if(accounts.some(a=>String(a.id)===dyDmCompose.account)) $('dy-dm-account').value=dyDmCompose.account;
+  $('dy-dm-uid').value=dyDmCompose.uid; $('dy-dm-sec').value=dyDmCompose.sec; $('dy-dm-nickname').value=dyDmCompose.nickname;
   $('dy-dm-links').value=dyDmCompose.links; $('dy-dm-content').value=dyDmCompose.content;
-  $('dy-dm-body').addEventListener('input', () => { dyDmSaveCompose(); if (!dyDmState.busy) { dyDmState.payload = null; $('dy-dm-preview').innerHTML = ''; } });
+  $('dy-dm-body').addEventListener('input', () => { dyDmSaveCompose(); if (!dyDmState.busy) { $('dy-dm-error').textContent=''; dyDmState.retry=null; dyDmState.payload = null; $('dy-dm-preview').innerHTML = ''; } });
   dyDmRenderDraft();
   await dyDmContacts();
 }
 async function dyDmContacts() {
   const generation = dyDmGeneration, request = ++dyDmContactRequest;
-  dyDmState.payload = null; $('dy-dm-preview').innerHTML = '';
+  dyDmState.retry=null; dyDmState.payload = null; $('dy-dm-preview').innerHTML = '';
   const id = $('dy-dm-account').value;
   if (!id) { $('dy-dm-contacts').textContent = '无可用账号，请先登录'; return; }
   try {
@@ -108,16 +111,29 @@ async function dyDmContacts() {
   } catch(e) { if (dyDmCurrent(generation)) dyDmError(e); }
 }
 async function dyDmResolvePreview(body, generation) {
-  const result={recipients:[],invalid:[],duplicates:0};
-  let request=body;
+  const signature=JSON.stringify(body);
+  const saved=dyDmState.retry?.signature===signature?dyDmState.retry:null;
+  const result=saved?.result||{recipients:[],invalid:[],duplicates:0};
+  let request=saved?.request||body;
+  dyDmState.retry=null;
   while (dyDmCurrent(generation)) {
-    const part=await api('/api/douyin/dm/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)});
+    let part;
+    try {part=await api('/api/douyin/dm/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)});}
+    catch(e) {if(dyDmCurrent(generation)) dyDmState.retry={signature,result,request}; throw e;}
     if(!dyDmCurrent(generation)) throw new Error('预览已关闭');
     result.recipients.push(...part.recipients); result.invalid.push(...part.invalid); result.duplicates+=part.duplicates;
     const pending=part.pending||[];
+    const temporary=part.temporary_failures||[];
+    if(temporary.length) {
+      const unfinished=[...pending,...temporary];
+      dyDmState.retry={signature,result,request:{account_id:body.account_id,contact_ids:[],comment_sec_uids:unfinished.filter(p=>p.kind==='comment').map(p=>p.input),links:unfinished.filter(p=>p.kind==='link').map(p=>p.input)}};
+      $('dy-dm-preview').innerHTML=`<p>已保留 ${result.recipients.length} 位已解析接收人；${unfinished.length} 项尚未验证，不能创建任务。</p><ul>${temporary.map(p=>`<li>${esc(p.input)}：${esc(p.error)}</li>`).join('')}</ul><button onclick="dyDmPreview()">仅重试未完成接收人</button>`;
+      throw new Error('网络或账号状态导致解析未完成，不代表用户无效。可重试未完成接收人，或修改名单后重新预览。');
+    }
     if(!pending.length) {
       const unique=[];
       for(const row of result.recipients) {
+        if(unique.some(r=>(r.target_uid && r.target_uid===row.target_uid && r.target_sec_uid && row.target_sec_uid && r.target_sec_uid!==row.target_sec_uid)||(r.target_sec_uid && r.target_sec_uid===row.target_sec_uid && r.target_uid && row.target_uid && r.target_uid!==row.target_uid))) throw new Error('接收人 UID 与 sec_uid 冲突，请核对名单后重新预览');
         if(unique.some(r=>(r.target_uid && r.target_uid===row.target_uid)||(r.target_sec_uid && r.target_sec_uid===row.target_sec_uid))) result.duplicates++;
         else unique.push(row);
       }
@@ -127,7 +143,7 @@ async function dyDmResolvePreview(body, generation) {
     const times=pending.map(p=>Date.parse(p.next_allowed_at));
     const delay=Math.max(...times)-Date.now();
     $('dy-dm-error').textContent=`已解析 ${result.recipients.length} 人，${pending.length} 人等待：${pending[0].reason}。尚未完成预览，不能创建任务。`;
-    if(times.some(t=>!Number.isFinite(t)) || delay<=0) throw new Error(`解析暂缓：${pending[0].reason}。请处理账号状态后重新解析；名单已保留，尚未创建任务。`);
+    if(times.some(t=>!Number.isFinite(t)) || delay<=0) {dyDmState.retry={signature,result,request}; throw new Error(`解析暂缓：${pending[0].reason}。请处理账号状态后重新解析；名单已保留，尚未创建任务。`);}
     $('dy-dm-preview').textContent=`等待至 ${new Date(Math.max(...times)).toLocaleTimeString()} 后自动继续；关闭窗口可停止等待。`;
     await new Promise(resolve=>{dyDmWaitResolve=resolve;dyDmWaitTimer=setTimeout(()=>{dyDmWaitResolve=null;resolve();},Math.min(delay+100,2147483647));});
   }
@@ -139,7 +155,11 @@ async function dyDmPreview() {
   dyDmState.payload=null; $('dy-dm-preview').innerHTML='';
   const content = $('dy-dm-content').value.trim();
   if (!content) return dyDmError('请填写文字内容');
-  const body = {account_id:Number($('dy-dm-account').value),comment_sec_uids:dyDmState.batch?[...dyDmDraft.keys()]:[],links:$('dy-dm-links').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean),contact_ids:[...document.querySelectorAll('[name="dy-dm-contact"]:checked')].map(e=>Number(e.value))};
+  const uid=$('dy-dm-uid').value.trim(), sec=$('dy-dm-sec').value.trim(), nickname=$('dy-dm-nickname').value.trim();
+  if((uid||sec||nickname) && (!uid||!sec)) return dyDmError('请同时填写数字 UID 和 sec_uid，或清空手工身份输入');
+  if(uid && !/^[1-9][0-9]*$/.test(uid)) return dyDmError('UID 必须是正整数，不能填写主页链接或抖音号');
+  if(sec && (!/^[A-Za-z0-9_-]+$/.test(sec)||/^\d+$/.test(sec))) return dyDmError('sec_uid 不能是数字 UID 或主页链接，请填写原始 sec_uid');
+  const body = {direct_recipients:uid?[{uid,sec_uid:sec,nickname}]:[],account_id:Number($('dy-dm-account').value),comment_refs:dyDmState.batch?[...dyDmDraft.values()].map(r=>({id:r.id,job_id:r.job_id})):[],links:$('dy-dm-links').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean),contact_ids:[...document.querySelectorAll('[name="dy-dm-contact"]:checked')].map(e=>Number(e.value))};
   dyDmSaveCompose();
   dyDmState.busy=true; $('dy-dm-body').querySelectorAll('input,textarea,select,button').forEach(e=>e.disabled=true);
   try {
@@ -148,7 +168,7 @@ async function dyDmPreview() {
     if (!dyDmState.batch && result.recipients.length > 1) throw new Error('单发仅允许一个接收人，请使用批量私信');
     dyDmState.payload={account_id:body.account_id,recipients:result.recipients,content};
     $('dy-dm-error').textContent='';
-    $('dy-dm-preview').innerHTML=`<h3>确认创建发送任务</h3><p>发送账号：${esc($('dy-dm-account').selectedOptions[0]?.textContent || '未选择')}</p><p>有效 ${result.recipients.length} 人 · 重复 ${result.duplicates} 项 · 无效 ${result.invalid.length} 项</p><ul>${result.recipients.map(r=>`<li>${esc(r.target_nick || r.target_uid)} (${esc(r.target_uid)})</li>`).join('')}</ul><ul>${result.invalid.map(r=>`<li>${esc(r.input)}：${esc(r.error)}</li>`).join('')}</ul><pre style="white-space:pre-wrap">${esc(content)}</pre><button class="btn" id="dy-dm-submit" onclick="dyDmSubmit()" ${result.recipients.length?'':'disabled'}>确认创建发送任务</button>`;
+    $('dy-dm-preview').innerHTML=`<h3>确认创建发送任务</h3>${uid?`<p>手工提供：UID ${esc(uid)} · <a href="https://www.douyin.com/user/${encodeURIComponent(sec)}" target="_blank" rel="noopener noreferrer">查看主页</a>（未核验身份绑定）</p>`:""}<p>发送账号：${esc($('dy-dm-account').selectedOptions[0]?.textContent || '未选择')}</p><p>有效 ${result.recipients.length} 人 · 重复 ${result.duplicates} 项 · 无效 ${result.invalid.length} 项</p><ul>${result.recipients.map(r=>`<li>${esc(r.target_nick || r.target_uid)} (${esc(r.target_uid)})</li>`).join('')}</ul><ul>${result.invalid.map(r=>`<li>${esc(r.input)}：${esc(r.error)}</li>`).join('')}</ul><pre style="white-space:pre-wrap">${esc(content)}</pre><button class="btn" id="dy-dm-submit" onclick="dyDmSubmit()" ${result.recipients.length?'':'disabled'}>确认创建发送任务</button>`;
   } catch(e) { if (dyDmCurrent(generation)) dyDmError(e); }
   finally { state.busy=false; if (dyDmCurrent(generation)) { $('dy-dm-body').querySelectorAll('input,textarea,select,button').forEach(e=>e.disabled=false); $('dy-dm-preview-button').disabled=false; if($('dy-dm-submit')) $('dy-dm-submit').disabled=!dyDmState.payload?.recipients.length; } }
 }

@@ -139,6 +139,7 @@ def parse_comment(raw: dict) -> Optional[dict]:
         "comment_id": cid,
         "text": (raw.get("text") or "").strip(),
         "user_nickname": user.get("nickname") or "",
+        "user_uid": str(user.get("uid") or "") if str(user.get("uid") or "").isascii() and str(user.get("uid") or "").isdigit() else "",
         "user_sec_uid": str(_first_value(
             user, "sec_uid", "secUid", "sec_user_id", "secUserId", default="") or ""),
         "ip_label": _comment_ip_label(raw, user),
@@ -289,6 +290,7 @@ def parse_creator_comment(raw: dict) -> Optional[dict]:
         "comment_id": cid,
         "text": str(_first(raw, "text", "content", "comment_text", default="")).strip(),
         "user_nickname": _first(user, "nickname", "name", "user_name", default="") or "",
+        "user_uid": str(user.get("uid") or "") if str(user.get("uid") or "").isascii() and str(user.get("uid") or "").isdigit() else "",
         "user_sec_uid": str(_first(
             user, "sec_uid", "secUid", "sec_user_id", "secUserId", default="") or ""),
         "ip_label": _comment_ip_label(raw, user),

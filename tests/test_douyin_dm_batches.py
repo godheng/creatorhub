@@ -19,7 +19,7 @@ def active(local_project, monkeypatch):
 def test_preview_deduplicates_contacts_links_and_reports_invalid(active, monkeypatch):
     contact = store(DmConversation(account_id=active, conv_id="conv", peer_uid="1", peer_nickname="A"))
     async def resolve(account, link):
-        if link == "invalid": raise ValueError("无效链接")
+        if link == "invalid": raise dm.InvalidRecipient("无效链接")
         return dm.Recipient(target_uid="1", target_sec_uid="sec", target_nick="A")
     monkeypatch.setattr(dm, "resolve_profile", resolve)
     async def scenario():
@@ -223,7 +223,8 @@ def test_comment_identity_mapping_rejects_numeric_mismatch_and_errors(active, mo
     assert len(result["recipients"]) == 1
     assert result["recipients"][0]["target_sec_uid"] == "valid"
     assert result["duplicates"] == 1
-    assert len(result["invalid"]) == 4
+    assert len(result["invalid"]) == 3
+    assert len(result["temporary_failures"]) == 1
     assert "123" not in calls and "" not in calls
     with db.get_session() as session:
         assert not session.exec(select(AccountActionTask)).all()

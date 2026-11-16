@@ -7401,7 +7401,7 @@ def _collection_comment_dict(row: KeywordCollectionComment, content=None) -> dic
         "id": row.id, "job_id": row.job_id, "content_id": row.content_id,
         "aweme_id": row.aweme_id, "comment_id": row.comment_id,
         "text": row.text, "user_nickname": row.user_nickname,
-        "user_sec_uid": row.user_sec_uid, "ip_label": row.ip_label,
+        "user_uid": row.user_uid, "user_sec_uid": row.user_sec_uid, "ip_label": row.ip_label,
         "like_count": row.like_count, "create_time": row.create_time,
         "reply_to": row.reply_to,
     }
@@ -11801,17 +11801,32 @@ async def index():
     if os.environ.get("CREATORHUB_DESKTOP") == "1":
         html = html.replace('data-guide-base="https://3441293738.github.io/creatorhub/guide/"',
                             'data-guide-base="/guide/"')
-    # Version all local UI assets, including pre-paint appearance boot and CSS.
-    try:
-        for asset in ("app.js", "submissions.js", "appearance.js", "appearance.css", "workspace-ui.js", "workbench.js", "workbench.css", "agent.css"):
-            ver = int((WEB_DIR / asset).stat().st_mtime)
-            html = html.replace(f"/static/{asset}", f"/static/{asset}?v={ver}")
-    except Exception:
-        pass
+    from .ui_version import ui_manifest, version_html
+    html = version_html(html, ui_manifest(WEB_DIR))
     # 首页(含内联 CSS)禁缓存:否则 webview 缓存旧 HTML,改了样式也不生效
     return HTMLResponse(html, headers={
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache", "Expires": "0"})
+
+
+@app.get("/api/ui-version")
+async def ui_version():
+    from .ui_version import ui_manifest
+    from fastapi.responses import JSONResponse
+    return JSONResponse(ui_manifest(WEB_DIR), headers={"Cache-Control": "no-store"})
+
+
+@app.middleware("http")
+async def guard_ui_version(request, call_next):
+    if request.url.path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"}:
+        supplied = request.headers.get("X-CreatorHub-UI-Version")
+        if supplied is not None or request.headers.get("X-CreatorHub-Actor") == "creatorhub-web":
+            from .ui_version import ui_manifest
+            if supplied != ui_manifest(WEB_DIR)["version"]:
+                from fastapi.responses import JSONResponse
+                return JSONResponse({"detail": "应用已更新，请保存草稿并刷新页面后再提交"}, status_code=409,
+                                    headers={"X-CreatorHub-UI-Stale": "1", "Cache-Control": "no-store"})
+    return await call_next(request)
 
 
 from .douyin_dm_batches import router as douyin_dm_router
