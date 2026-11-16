@@ -666,7 +666,7 @@ class DouyinClientSearchTests(unittest.IsolatedAsyncioTestCase):
             conversation, error = await client.create_dm_conversation(
                 "123456", "987654")
         self.assertIsNone(conversation)
-        self.assertEqual(error, "write_uncertain:network:TimeoutError")
+        self.assertEqual(error, "write_uncertain:imapi_create:network:TimeoutError:phase=unknown")
         self.assertTrue(client.last_write_uncertain)
 
     async def test_send_dm_posts_existing_conversation_protocol(self):
@@ -715,7 +715,9 @@ class DouyinClientSearchTests(unittest.IsolatedAsyncioTestCase):
                 ok, error = await client.send_dm("conv-1", "42", "ticket-1", "hello")
 
         self.assertFalse(ok)
-        self.assertEqual(error, "write_uncertain:invalid_response")
+        self.assertTrue(error.startswith("write_uncertain:imapi_send:http=200:bytes=18:ctype=other:"))
+        self.assertIn("body_shape=", error)
+        self.assertTrue(error.endswith(":cmd=0:error_code=0:invalid_response"))
         self.assertTrue(client.last_write_uncertain)
 
 

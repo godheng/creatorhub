@@ -377,7 +377,7 @@ class KeywordCollectionPipelineTests(unittest.IsolatedAsyncioTestCase):
         }
         comments = [
             {"comment_id": "c-1", "text": "想要链接", "user_nickname": "用户甲",
-             "user_sec_uid": "MS4wLj-user-a", "ip_label": "北京",
+             "user_uid": "123456", "user_sec_uid": "MS4wLj-user-a", "ip_label": "北京",
              "like_count": 3, "create_time": 1_700_000_001, "reply_to": ""},
             {"comment_id": "c-2", "text": "已收藏", "user_nickname": "用户乙",
              "user_sec_uid": "MS4wLj-user-b", "ip_label": "上海",
@@ -399,6 +399,10 @@ class KeywordCollectionPipelineTests(unittest.IsolatedAsyncioTestCase):
         collector._douyin_comments = AsyncMock(return_value=(comments, ""))
 
         first = await collector.run(self.job_id, self.account)
+        with db.get_session() as session:
+            legacy = session.exec(select(KeywordCollectionComment).where(KeywordCollectionComment.comment_id == "c-1")).first()
+            legacy.user_uid = ""
+            session.add(legacy); session.commit()
         second = await collector.run(self.job_id, self.account)
 
         self.assertEqual(first["contents"], 1)
@@ -412,6 +416,7 @@ class KeywordCollectionPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(contents), 1)
         self.assertEqual(len(saved_comments), 2)
         saved_by_id = {row.comment_id: row for row in saved_comments}
+        self.assertEqual(saved_by_id["c-1"].user_uid, "123456")
         self.assertEqual(saved_by_id["c-1"].user_sec_uid, "MS4wLj-user-a")
         self.assertEqual(saved_by_id["c-1"].ip_label, "北京")
         self.assertEqual(contents[0].author_id, "author-1")

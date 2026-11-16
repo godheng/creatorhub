@@ -422,6 +422,13 @@ def parse_send_response(resp: bytes) -> dict:
             # HTTP 200 alone is not a send receipt; require an IM command and
             # an explicit business status before classifying a JSON response.
             cmd, code = env.get("cmd"), env.get("status_code")
+            # Preserve a numeric business status for diagnosis even without a
+            # command. It is not an IM receipt and must never become success.
+            if cmd is None and not isinstance(code, bool) and isinstance(code, (int, str)):
+                try:
+                    invalid = {**invalid, "error_code": int(code)}
+                except ValueError:
+                    pass
             if (isinstance(cmd, bool) or isinstance(code, bool)
                     or not isinstance(cmd, (int, str))
                     or not isinstance(code, (int, str))):

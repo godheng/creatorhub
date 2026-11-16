@@ -696,6 +696,38 @@ class DouyinClient:
         return self._write_result(
             data, self._write_error("follow_no_response"))
 
+    @staticmethod
+    def _im_diagnostic(stage, *, response=None, parsed=None, exception=None):
+        """Whitelist-only diagnostics: never include URLs, payloads or credentials."""
+        fields = [stage]
+        if response is not None:
+            fields += [f"http={int(response.status_code)}", f"bytes={len(response.content)}"]
+            content_type = str(getattr(response, "headers", {}).get("content-type", "")).split(";", 1)[0].lower()
+            fields.append("ctype=" + (content_type if content_type in {
+                "application/x-protobuf", "application/json", "text/html", "text/plain",
+                "application/octet-stream"} else "other"))
+        if parsed is not None and response is not None:
+            from ...im_diagnostics import im_response_shape
+            fields.append("body_shape=" + json.dumps(im_response_shape(response.content), separators=(",", ":")))
+        if parsed is not None:
+            for key in ("cmd", "error_code"):
+                value = parsed.get(key)
+                if isinstance(value, int) and not isinstance(value, bool): fields.append(f"{key}={value}")
+        if exception is not None:
+            name = re.sub(r"[^A-Za-z0-9_]", "", type(exception).__name__)[:40]
+            fields.append("network:" + name)
+            message = str(exception).lower()
+            code = getattr(exception, "code", None)
+            if isinstance(code, int): fields.append(f"curl_errno={int(code)}")
+            else:
+                match = re.search(r"curl:\s*\((\d{1,3})\)", message)
+                if match: fields.append("curl_errno=" + match.group(1))
+            phase = ("dns" if "resolving timed out" in message or "could not resolve" in message else
+                     "connect" if "connection timed out" in message or "failed to connect" in message else
+                     "read" if "read timed out" in message or "recv failure" in message else "unknown")
+            fields.append("phase=" + phase)
+        return ":".join(fields)
+
     async def create_dm_conversation(
             self, target_uid: str, self_uid: str, *, target_sec_uid: str = ""
     ) -> tuple[Optional[dict], str]:
@@ -716,6 +748,7 @@ class DouyinClient:
         owned = self._session is None
         cli = self._session or AsyncSession(impersonate=self.impersonate)
         referer = f"{BASE}/user/{target_sec_uid or target_uid}"
+        response = None
         try:
             body = build_create_conversation_request(
                 target_uid, self_uid,
@@ -732,8 +765,7 @@ class DouyinClient:
                 proxy=self.proxy or None)
             raw = response.content
             if response.status_code != 200 or not raw:
-                self.last_error = (f"http_{response.status_code}"
-                                   if response.status_code != 200 else "empty_body")
+                self.last_error = self._im_diagnostic("imapi_create", response=response) + ":no_response"
                 self.last_write_uncertain = (
                     response.status_code >= 500 or response.status_code == 200)
                 return None, self._write_error("imapi_create_no_response")
@@ -743,12 +775,12 @@ class DouyinClient:
             message = str(parsed.get("msg") or "")
             error_code = int(parsed.get("error_code") or 0)
             if not error_code and message in {"", "OK"}:
-                self.last_error = "invalid_response"
+                self.last_error = self._im_diagnostic("imapi_create", response=response, parsed=parsed) + ":invalid_response"
                 self.last_write_uncertain = True
                 return None, self._write_error("imapi_create_invalid_response")
-            return None, self._im_rejection(parsed)
+            return None, self._im_rejection(parsed) + ";" + self._im_diagnostic("imapi_create", response=response, parsed=parsed)
         except Exception as exc:
-            self.last_error = f"network:{type(exc).__name__}"
+            self.last_error = self._im_diagnostic("imapi_create", response=response, exception=exc)
             self.last_write_uncertain = True
             return None, self._write_error("imapi_create_network")
         finally:
@@ -770,6 +802,7 @@ class DouyinClient:
         self.last_write_uncertain = False
         owned = self._session is None
         cli = self._session or AsyncSession(impersonate=self.impersonate)
+        response = None
         try:
             body = build_send_request(
                 str(conv_id), int(conv_type or 1), int(conv_short_id), str(ticket),
@@ -787,22 +820,21 @@ class DouyinClient:
                 proxy=self.proxy or None)
             raw = response.content
             if response.status_code != 200 or not raw:
-                self.last_error = (f"http_{response.status_code}"
-                                   if response.status_code != 200 else "empty_body")
+                self.last_error = self._im_diagnostic("imapi_send", response=response) + ":no_response"
                 self.last_write_uncertain = (
                     response.status_code >= 500 or response.status_code == 200)
                 return False, self._write_error("imapi_no_response")
             parsed = parse_send_response(raw)
             if parsed.get("ok") and parsed.get("cmd") == 100:
                 return True, ""
-            if (parsed.get("ok") or
+            if (parsed.get("cmd") != 100 or parsed.get("ok") or
                     (not parsed.get("msg") and not parsed.get("error_code"))):
-                self.last_error = "invalid_response"
+                self.last_error = self._im_diagnostic("imapi_send", response=response, parsed=parsed) + ":invalid_response"
                 self.last_write_uncertain = True
                 return False, self._write_error("imapi_invalid_response")
-            return False, self._im_rejection(parsed)
+            return False, self._im_rejection(parsed) + ";" + self._im_diagnostic("imapi_send", response=response, parsed=parsed)
         except Exception as exc:
-            self.last_error = f"network:{type(exc).__name__}"
+            self.last_error = self._im_diagnostic("imapi_send", response=response, exception=exc)
             self.last_write_uncertain = True
             return False, self._write_error("imapi_network")
         finally:

@@ -4,20 +4,47 @@ import re
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import update
 from sqlmodel import select
 
 from .db import get_session
-from .models import DouyinAccount, DmConversation, AccountActionTask, TaskSubmission
+from .models import DouyinAccount, DmConversation, AccountActionTask, TaskSubmission, KeywordCollectionComment, KeywordCollectionJob, KeywordCollectionContent
 from .submissions import submit_once
 
 router = APIRouter(prefix="/api/douyin/dm")
 
 
+class CommentRef(BaseModel):
+    id: int
+    job_id: int
+
+
+class DirectRecipient(BaseModel):
+    uid: str = Field(min_length=1, max_length=64)
+    sec_uid: str = Field(min_length=1, max_length=128)
+    nickname: str = Field(default="", max_length=100)
+
+    @field_validator("uid")
+    @classmethod
+    def valid_uid(cls, value):
+        if not re.fullmatch(r"[1-9][0-9]*", value):
+            raise ValueError("UID 必须是正整数字符串，不能填写抖音号或主页链接")
+        return value
+
+    @field_validator("sec_uid")
+    @classmethod
+    def valid_sec(cls, value):
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", value) or value.isdigit():
+            raise ValueError("sec_uid 必须是用户标识，不能是数字 UID 或主页链接")
+        return value
+
+
 class PreviewIn(BaseModel):
     account_id: int
+    direct_recipients: list[DirectRecipient] = Field(default_factory=list, max_length=1)
     links: list[str] = Field(default_factory=list, max_length=200)
+    comment_refs: list[CommentRef] = Field(default_factory=list, max_length=200)
     comment_sec_uids: list[str] = Field(default_factory=list, max_length=200)
     contact_ids: list[int] = Field(default_factory=list, max_length=200)
 
@@ -65,6 +92,10 @@ def deduplicate(recipients):
 
 
 
+class InvalidRecipient(ValueError):
+    pass
+
+
 class PreviewDeferred(Exception):
     def __init__(self, reason, next_allowed_at=None):
         super().__init__(reason)
@@ -77,7 +108,7 @@ async def resolve_profile(account, link):
     if (parsed.scheme not in {"https", "http"}
             or parsed.hostname not in {"douyin.com", "www.douyin.com"}
             or not re.fullmatch(r"/user/[A-Za-z0-9_-]+/?", parsed.path)):
-        raise ValueError("请输入完整抖音用户主页链接 https://www.douyin.com/user/…")
+        raise InvalidRecipient("请输入完整抖音用户主页链接 https://www.douyin.com/user/…")
     from . import main
     cookie = main.douyin_cookie_from_state(
         account.storage_state or account.creator_storage_state or "")
@@ -107,10 +138,38 @@ async def resolve_profile(account, link):
 
 @router.post("/preview")
 async def preview(body: PreviewIn):
-    rows, invalid, pending = [], [], []
+    rows, invalid, pending, temporary = [], [], [], []
+    historical_sec_uids = []
+    def failure(input_value, kind, exc):
+        from .risk import classify_platform_error
+        category, _ = classify_platform_error(exc)
+        if isinstance(exc, InvalidRecipient):
+            invalid.append({"input": input_value, "error": str(exc)})
+        else:
+            temporary.append({"input": input_value, "kind": kind,
+                              "error": str(exc), "category": category.value})
     with get_session() as session:
         account = account_for_send(session, body.account_id)
         session.expunge(account)
+        for ref in body.comment_refs:
+            comment = session.get(KeywordCollectionComment, ref.id)
+            job = session.get(KeywordCollectionJob, ref.job_id)
+            content = session.get(KeywordCollectionContent, comment.content_id) if comment else None
+            if (not comment or not job or not content or comment.job_id != ref.job_id
+                    or content.job_id != ref.job_id or comment.aweme_id != content.aweme_id or comment.platform != "douyin"
+                    or job.platform != "douyin" or content.platform != "douyin"):
+                invalid.append({"input": str(ref.id), "error": "评论不存在或不属于所选抖音采集任务"})
+                continue
+            sec = str(comment.user_sec_uid or "").strip()
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", sec) or sec.isdigit():
+                invalid.append({"input": str(ref.id), "error": "评论缺少有效 sec_uid"})
+                continue
+            uid = str(comment.user_uid or "")
+            if re.fullmatch(r"[0-9]+", uid) and int(uid) > 0:
+                rows.append(Recipient(target_uid=uid, target_sec_uid=sec,
+                                      target_nick=comment.user_nickname))
+            else:
+                historical_sec_uids.append(sec)
         for contact_id in body.contact_ids:
             row = session.get(DmConversation, contact_id)
             if not row or row.account_id != body.account_id or row.platform != "douyin":
@@ -127,34 +186,40 @@ async def preview(body: PreviewIn):
         if key not in resolved:
             resolved[key] = await resolve_profile(account, link)
         return resolved[key]
-    for sec_uid in body.comment_sec_uids:
+    for sec_uid in [*historical_sec_uids, *body.comment_sec_uids]:
         try:
             if not re.fullmatch(r"[A-Za-z0-9_-]+", sec_uid) or sec_uid.isdigit():
-                raise ValueError("评论用户缺少有效 sec_uid，不能使用数字 UID 代替")
+                raise InvalidRecipient("评论用户缺少有效 sec_uid，不能使用数字 UID 代替")
             recipient = await resolve_once("https://www.douyin.com/user/" + sec_uid)
             if recipient.target_sec_uid != sec_uid:
-                raise ValueError("解析身份与评论用户不一致，请重新采集或核对")
+                raise InvalidRecipient("解析身份与评论用户不一致，请重新采集或核对")
             rows.append(recipient)
         except PreviewDeferred as exc:
             pending.append({"input": sec_uid, "kind": "comment", "reason": str(exc), "next_allowed_at": exc.next_allowed_at})
         except Exception as exc:
-            invalid.append({"input": sec_uid, "error": str(exc)})
+            failure(sec_uid, "comment", exc)
     for link in body.links:
         try:
             rows.append(await resolve_once(link))
         except PreviewDeferred as exc:
             pending.append({"input": link, "kind": "link", "reason": str(exc), "next_allowed_at": exc.next_allowed_at})
         except Exception as exc:
-            invalid.append({"input": link, "error": str(exc)})
+            failure(link, "link", exc)
     valid = []
     for row in rows:
         if row.target_uid or row.target_sec_uid:
             valid.append(row)
         else:
             invalid.append({"input": row.target_nick, "error": "接收人缺少用户标识"})
+    for direct in body.direct_recipients:
+        for existing in valid:
+            if ((existing.target_uid == direct.uid and existing.target_sec_uid and existing.target_sec_uid != direct.sec_uid)
+                    or (existing.target_sec_uid == direct.sec_uid and existing.target_uid and existing.target_uid != direct.uid)):
+                raise HTTPException(422, "手工 UID 与 sec_uid 和其他接收人身份冲突，请核对后重新预览")
+        valid.append(Recipient(target_uid=direct.uid, target_sec_uid=direct.sec_uid, target_nick=direct.nickname))
     unique = deduplicate(valid)
     return {"recipients": [r.model_dump() for r in unique], "invalid": invalid,
-            "duplicates": len(valid) - len(unique), "pending": pending}
+            "duplicates": len(valid) - len(unique), "pending": pending, "temporary_failures": temporary}
 
 
 def batch_view(session, receipt):

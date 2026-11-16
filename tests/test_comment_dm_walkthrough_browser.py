@@ -15,14 +15,14 @@ def test_workbench_comment_dm_walkthrough(ui):
         const path=new URL(String(url),location.origin).pathname;
         const response=v=>Promise.resolve(new Response(JSON.stringify(v),{headers:{'Content-Type':'application/json'}}));
         if(path.includes('/comments') && path.includes('/collections/')) return response({items:[
-          {id:1,user_sec_uid:'MS4wLjABdemoA',user_nickname:'评论者小林',text:'请问怎么体验？',source_desc:'露营装备素材',content_id:7},
-          {id:2,user_sec_uid:'MS4wLjABdemoA',user_nickname:'评论者小林',text:'补充咨询',source_desc:'露营装备素材',content_id:7},
-          {id:3,user_sec_uid:'MS4wLjABdemoB',user_nickname:'评论者小陈',text:'想了解价格',source_desc:'露营装备素材',content_id:7},
+          {id:1,job_id:1,user_uid:'100',user_sec_uid:'MS4wLjABdemoA',user_nickname:'评论者小林',text:'请问怎么体验？',source_desc:'露营装备素材',content_id:7},
+          {id:2,job_id:1,user_uid:'100',user_sec_uid:'MS4wLjABdemoA',user_nickname:'评论者小林',text:'补充咨询',source_desc:'露营装备素材',content_id:7},
+          {id:3,job_id:1,user_uid:'',user_sec_uid:'MS4wLjABdemoB',user_nickname:'评论者小陈',text:'想了解价格',source_desc:'露营装备素材',content_id:7},
           {id:4,user_sec_uid:'12345',user_nickname:'历史用户',text:'只有数字身份',content_id:7}],total:4,page:1,pages:1});
         if(path==='/api/dm/conversations') return response([]);
         if(path==='/api/douyin/dm/preview') {
           document.documentElement.dataset.previewCalls=++window.fixturePreviewCalls;
-          const b=JSON.parse(options.body); if((b.links||[]).includes('invalid')) return response({recipients:[],duplicates:0,invalid:[{input:'invalid',error:'无法解析接收人'}]}); const ids=[...(b.comment_sec_uids||[]),...(b.links||[]).map(x=>x.split('/').pop())];
+          const b=JSON.parse(options.body); if((b.links||[]).includes('invalid')) return response({recipients:[],duplicates:0,invalid:[{input:'invalid',error:'无法解析接收人'}]}); document.documentElement.dataset.previewBody=JSON.stringify(b); const ids=[...(b.comment_refs||[]).map(r=>r.id===3?'MS4wLjABdemoB':'MS4wLjABdemoA'),...(b.comment_sec_uids||[]),...(b.links||[]).map(x=>x.split('/').pop())];
           if(!window.fixtureDeferred && !b.links.length && ids.length>1) {
             window.fixtureDeferred=true;
             return response({recipients:[{target_uid:ids[0].endsWith('A')?'100':'101',target_sec_uid:ids[0],target_nick:ids[0].endsWith('A')?'评论者小林':'评论者小陈'}],invalid:[],duplicates:0,pending:[{input:ids[1],kind:'comment',reason:'尚未达到该操作最小间隔',next_allowed_at:new Date(Date.now()+1000).toISOString()}]});
@@ -49,6 +49,18 @@ def test_workbench_comment_dm_walkthrough(ui):
     expect(modal).to_contain_text('请先选择')
     page.locator('[data-dm-add="MS4wLjABdemoA"]').first.click()
     expect(page.locator('[data-dm-add="MS4wLjABdemoA"]').last).to_have_text('已加入')
+    modal.get_by_role('button',name='查看名单 / 去编辑私信',exact=False).click()
+    page.locator('#dy-dm-content').fill('本地完整身份预览模拟')
+    page.locator('#dy-dm-preview-button').click()
+    expect(page.locator('#dy-dm-preview')).to_contain_text('有效 1 人')
+    expect(page.locator('#dy-dm-error')).not_to_contain_text('等待')
+    local_body=json.loads(page.locator('html').get_attribute('data-preview-body'))
+    assert local_body['comment_refs']==[{'id':1,'job_id':1}]
+    assert page.locator('html').get_attribute('data-preview-calls')=='1'
+    page.locator('#dy-dm-submit').scroll_into_view_if_needed()
+    capture(page,'comment-identity-local-preview')
+    page.locator('#dy-dm-content').fill('')
+    page.locator('#douyin-dm-dialog').get_by_role('button',name='返回评论',exact=True).click()
     page.locator('[data-dm-select="MS4wLjABdemoA"]').first.check()
     page_control=page.locator('[data-dm-select-page]')
     assert page_control.evaluate('(e)=>e.indeterminate')
@@ -88,6 +100,9 @@ def test_workbench_comment_dm_walkthrough(ui):
     expect(page.locator('#dy-dm-content')).not_to_be_empty()
     page.locator('#dy-dm-preview-button').click()
     expect(page.locator('#dy-dm-error')).to_contain_text('等待')
+    preview_body=json.loads(page.locator('html').get_attribute('data-preview-body'))
+    assert sorted(preview_body['comment_refs'],key=lambda r:r['id'])==[{'id':2,'job_id':1},{'id':3,'job_id':1}]
+    assert not preview_body.get('comment_sec_uids')
     calls=page.locator('html').get_attribute('data-preview-calls')
     dialog.get_by_role('button',name='关闭',exact=True).click()
     page.wait_for_timeout(1300)
@@ -97,6 +112,9 @@ def test_workbench_comment_dm_walkthrough(ui):
     modal.get_by_role('button',name='查看名单 / 去编辑私信',exact=False).click()
     page.locator('#dy-dm-preview-button').click()
     expect(page.locator('#dy-dm-error')).to_contain_text('等待')
+    preview_body=json.loads(page.locator('html').get_attribute('data-preview-body'))
+    assert sorted(preview_body['comment_refs'],key=lambda r:r['id'])==[{'id':2,'job_id':1},{'id':3,'job_id':1}]
+    assert not preview_body.get('comment_sec_uids')
     assert page.locator('#dy-dm-submit').count()==0
     capture(page,'comment-dm-risk-waiting')
     expect(page.locator('#dy-dm-preview')).to_contain_text('有效 2 人', timeout=5000)
@@ -134,8 +152,48 @@ def test_workbench_comment_dm_walkthrough(ui):
         expect(modal.locator('[data-dm-selected]')).to_have_text('已选 2 人')
     assert errors==[]
 
-
-
-
-
-
+def test_workbench_comment_dm_temporary_retry(ui):
+    page, errors=ui
+    page.add_script_tag(path=str(Path(__file__).resolve().parents[1] / 'app/web/douyin-dm.js'))
+    page.add_script_tag(content="""(() => {
+      window.retryCalls=[];window.retryPosts=[];
+      const old=fetch;
+      window.fetch=async(url,options={})=>{
+        const path=new URL(String(url),location.origin).pathname;
+        const response=v=>Promise.resolve(new Response(JSON.stringify(v),{headers:{'Content-Type':'application/json'}}));
+        if(path==='/api/dm/conversations') return response([]);
+        if(path==='/api/douyin/dm/preview') {
+          const b=JSON.parse(options.body);retryCalls.push(b);document.documentElement.dataset.retryCalls=JSON.stringify(retryCalls);
+          if(retryCalls.length===1) return response({recipients:[{target_uid:'100',target_sec_uid:'MS4wLjABlocal',target_nick:'已核验小林'}],invalid:[],duplicates:0,temporary_failures:[{input:'MS4wLjABhistorical',kind:'comment',error:'请求超时，暂无法核验',category:'network'}]});
+          return response({recipients:[{target_uid:'101',target_sec_uid:'MS4wLjABhistorical',target_nick:'历史小陈'}],invalid:[],duplicates:0,temporary_failures:[]});
+        }
+        if(path.startsWith('/api/douyin/dm/batches')) {if(options.method==='POST')retryPosts.push(JSON.parse(options.body));return response({batch_id:'mock-only',total:2,counts:{pending:2},tasks:[]});}
+        return old(url,options);
+      };
+      dyDmDraft.set('MS4wLjABlocal',{id:1,job_id:1,user_uid:'100',user_sec_uid:'MS4wLjABlocal',user_nickname:'已核验小林',text:'合成评论'});
+      dyDmDraft.set('MS4wLjABhistorical',{id:2,job_id:1,user_uid:'',user_sec_uid:'MS4wLjABhistorical',user_nickname:'历史小陈',text:'合成历史评论'});
+      openDouyinDm(true);
+    })();""")
+    page.locator('#dy-dm-content').fill('仅模拟重试，不真实发送')
+    page.locator('#dy-dm-preview-button').click()
+    dialog=page.locator('#douyin-dm-dialog')
+    retry=dialog.get_by_role('button',name='仅重试未完成接收人',exact=True)
+    expect(retry).to_be_visible()
+    expect(dialog).to_contain_text('尚未验证')
+    expect(dialog).to_contain_text('暂无法核验')
+    assert page.locator('#dy-dm-submit').count()==0
+    retry.scroll_into_view_if_needed()
+    capture(page,'comment-identity-timeout-retry')
+    retry.click()
+    expect(page.locator('#dy-dm-preview')).to_contain_text('有效 2 人')
+    expect(page.locator('#dy-dm-preview')).to_contain_text('已核验小林')
+    expect(page.locator('#dy-dm-preview')).to_contain_text('历史小陈')
+    calls=json.loads(page.locator('html').get_attribute('data-retry-calls'))
+    assert len(calls)==2
+    assert calls[1]['comment_sec_uids']==['MS4wLjABhistorical']
+    assert not calls[1].get('comment_refs') and not calls[1]['contact_ids'] and not calls[1]['links']
+    page.locator('#dy-dm-submit').scroll_into_view_if_needed()
+    capture(page,'comment-identity-retry-confirmation')
+    page.locator('#dy-dm-content').fill('修改后的消息必须重新预览')
+    assert page.locator('#dy-dm-submit').count()==0
+    assert errors==[]

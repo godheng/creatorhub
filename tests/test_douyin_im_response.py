@@ -82,7 +82,8 @@ def test_client_send_rejects_success_envelope_for_wrong_command():
 
     ok, error = asyncio.run(run())
     assert not ok
-    assert error == "write_uncertain:invalid_response"
+    assert error.startswith("write_uncertain:imapi_send:http=200:")
+    assert error.endswith(":invalid_response")
 
 
 def test_create_request_matches_current_web_envelope_and_participant_order():
@@ -198,7 +199,27 @@ def test_send_dm_decodes_real_response_without_parser_mock(raw, expected):
     session.post.return_value = SimpleNamespace(status_code=200, content=raw)
     with patch("app.platforms.douyin.client.AsyncSession", return_value=session):
         client = DouyinClient("sid_tt=fixture", "Mozilla/5.0 Chrome/130.0.0.0")
-        assert asyncio.run(client.send_dm("conversation", "42", "ticket", "hello")) == expected
+        ok,error = asyncio.run(client.send_dm("conversation", "42", "ticket", "hello"))
+        assert ok == expected[0]
+        if expected[1] == "write_uncertain:invalid_response":
+            assert error.startswith("write_uncertain:imapi_send:http=200:") and error.endswith(":invalid_response")
+        elif expected[1]: assert error.startswith(expected[1] + ";imapi_send:")
+        else: assert error == ""
     assert session.post.await_count == 1
     assert session.post.await_args.kwargs["headers"]["Accept"] == "application/x-protobuf"
     assert client.last_write_uncertain == expected[1].startswith("write_uncertain:")
+
+
+@pytest.mark.parametrize("code", [1234, "1234", 0])
+def test_missing_command_retains_numeric_code_but_is_not_receipt(code):
+    raw=json.dumps({"status_code":code}).encode()
+    parsed=parse_send_response(raw)
+    assert parsed['cmd']==0 and parsed['error_code']==int(code) and not parsed['ok']
+    session=AsyncMock()
+    session.post.return_value=SimpleNamespace(status_code=200,content=raw,headers={'content-type':'application/x-protobuf'})
+    with patch('app.licensing.require_active'),patch('app.platforms.douyin.client.AsyncSession',return_value=session):
+        client=DouyinClient('sid_tt=fixture','Mozilla/5.0')
+        ok,error=asyncio.run(client.send_dm('c','42','ticket','test'))
+    assert not ok and error.startswith('write_uncertain:imapi_send:')
+    assert f'cmd=0:error_code={int(code)}:invalid_response' in error
+    assert session.post.await_count==1

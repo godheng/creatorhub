@@ -954,15 +954,27 @@ class KeywordCollector:
     def _persist_comments(job_id: int, content_id: int, platform: str,
                           aweme_id: str, comments: list[dict]) -> int:
         with get_session() as session:
-            known = set(session.exec(
-                select(KeywordCollectionComment.comment_id)
+            existing = session.exec(
+                select(KeywordCollectionComment)
                 .where(KeywordCollectionComment.job_id == job_id)
                 .where(KeywordCollectionComment.content_id == content_id)
-            ).all())
+            ).all()
+            by_id = {row.comment_id: row for row in existing}
+            known = set(by_id)
             added = 0
             for item in comments:
                 cid = str(item.get("comment_id") or "")
-                if not cid or cid in known:
+                if cid in known:
+                    row = by_id.get(cid)
+                    uid = str(item.get("user_uid") or "")
+                    sec = str(item.get("user_sec_uid") or "")
+                    if (row and not row.user_uid and uid.isascii() and uid.isdigit()
+                            and int(uid) > 0 and sec and row.user_sec_uid == sec
+                            and row.platform == platform and row.aweme_id == aweme_id):
+                        row.user_uid = uid
+                        session.add(row)
+                    continue
+                if not cid:
                     continue
                 known.add(cid)
                 session.add(KeywordCollectionComment(
@@ -970,6 +982,7 @@ class KeywordCollector:
                     aweme_id=aweme_id, comment_id=cid,
                     text=item.get("text") or "",
                     user_nickname=item.get("user_nickname") or "",
+                    user_uid=item.get("user_uid") or "",
                     user_sec_uid=item.get("user_sec_uid") or "",
                     ip_label=item.get("ip_label") or "",
                     like_count=int(item.get("like_count") or 0),

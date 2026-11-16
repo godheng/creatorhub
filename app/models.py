@@ -479,6 +479,7 @@ class KeywordCollectionComment(SQLModel, table=True):
     comment_id: str = Field(index=True)
     text: str = ""
     user_nickname: str = ""
+    user_uid: str = ""
     user_sec_uid: str = ""
     ip_label: str = ""
     like_count: int = 0
