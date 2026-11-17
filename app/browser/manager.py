@@ -305,6 +305,7 @@ class BrowserManager:
         # 优先使用机器上安装的稳定版 Chrome；没有时回退到 Patchright
         # 附带的 Chrome for Testing。登录窗口因此更接近用户日常浏览器环境。
         self._browser_channel: Optional[str] = None
+        self._browser_executable: Optional[str] = None
 
     def register_fingerprint_runtime(
             self, runtime_id: str, executable_path: str, *,
@@ -513,18 +514,28 @@ class BrowserManager:
         账号 UA 池写死了 Chrome 版本,但真实内核可能是另一版本 —— 二者不一致时,
         Sec-CH-UA 请求头 / navigator.userAgentData 由真实内核发出,会和 UA 字符串对不上,
         成为自动化特征。这里读一次真实 UA,后续把账号 UA 的版本号归一到它。"""
-        for channel in ("chrome", None):
+        from .cdp import ChromeLocator
+        installed = ChromeLocator().find()
+        candidates = [("chrome", None)]
+        if installed:
+            candidates.append(("chrome", str(installed)))
+        candidates.append((None, None))
+        self._browser_executable = None
+        for channel, executable in candidates:
             launch_kwargs: Dict[str, Any] = {
                 "headless": True,
                 "timeout": 8000,
             }
-            if channel:
+            if executable:
+                launch_kwargs["executable_path"] = executable
+            elif channel:
                 launch_kwargs["channel"] = channel
             try:
                 browser = await self._pw.chromium.launch(**launch_kwargs)
             except Exception:
                 continue
             self._browser_channel = channel
+            self._browser_executable = executable
             try:
                 pg = await browser.new_page()
                 ua = await pg.evaluate("navigator.userAgent")
@@ -1040,6 +1051,8 @@ class BrowserManager:
             kwargs["ignore_default_args"] = [
                 "--disable-blink-features=AutomationControlled",
             ]
+        elif self._browser_executable:
+            kwargs["executable_path"] = self._browser_executable
         elif self._browser_channel:
             kwargs["channel"] = self._browser_channel
         # Engine-level fingerprint runtimes own the entire identity surface;
