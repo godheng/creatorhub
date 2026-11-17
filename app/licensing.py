@@ -15,10 +15,11 @@ from .license_platform import device_digest, clock
 
 KEY = 'device_license_credential'
 PUBLIC_KEY = Path(__file__).with_name('license_public.pem')
-SERVICE_URL = os.environ.get('CREATORHUB_LICENSE_URL', 'http://3.38.149.16:8088').rstrip('/')
+SERVICE_URL = os.environ.get('CREATORHUB_LICENSE_URL', 'https://license.aispacekit.com').rstrip('/')
 
 def transport(path, body):
-    req = urllib.request.Request(SERVICE_URL + path, json.dumps(body).encode(), {'Content-Type': 'application/json'})
+    req = urllib.request.Request(SERVICE_URL + path, json.dumps(body).encode(),
+                                 {'Content-Type': 'application/json', 'User-Agent': 'aispace-license-client/1.0'})
     with urllib.request.urlopen(req, timeout=10) as response:
         return json.loads(response.read(32768))
 
