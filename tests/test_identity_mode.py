@@ -1215,12 +1215,34 @@ class IdentityModeTests(unittest.TestCase):
         chromium.launch.side_effect = [RuntimeError("no stable chrome"), browser]
         manager._pw = SimpleNamespace(chromium=chromium)
 
-        major = asyncio.run(manager._detect_chrome_major())
+        with patch("app.browser.cdp.ChromeLocator.find", return_value=None):
+            major = asyncio.run(manager._detect_chrome_major())
 
         self.assertEqual(major, 149)
         self.assertIsNone(manager._browser_channel)
         self.assertEqual(chromium.launch.await_count, 2)
         self.assertNotIn("channel", chromium.launch.await_args.kwargs)
+
+    def test_browser_probe_reuses_located_chrome_when_channel_fails(self):
+        manager = BrowserManager("DEFAULT_UA", self.cfg.engine.profiles_dir)
+        browser = AsyncMock()
+        browser.new_page.return_value.evaluate.return_value = "Chrome/150.0.0.0"
+        chromium = AsyncMock()
+        chromium.launch.side_effect = [RuntimeError("channel missing"), browser]
+        manager._pw = SimpleNamespace(chromium=chromium)
+        executable = str(Path("C:/Users/test/AppData/Local/Google/Chrome/Application/chrome.exe"))
+        with patch("app.browser.cdp.ChromeLocator.find", return_value=Path(executable)):
+            major = asyncio.run(manager._detect_chrome_major())
+        self.assertEqual(major, 150)
+        self.assertEqual(manager._browser_channel, "chrome")
+        self.assertEqual(manager._browser_executable, executable)
+        self.assertEqual(chromium.launch.await_args.kwargs["executable_path"], executable)
+        self.assertNotIn("channel", chromium.launch.await_args.kwargs)
+        manager._pw = _PatchrightStub()
+        identity = Identity(account_id=1, profile_dir=str(Path(self.tmp.name) / "located-chrome"), identity_mode="native")
+        asyncio.run(manager._launch_persistent(identity, headless=False))
+        self.assertEqual(manager._pw.chromium.kwargs["executable_path"], executable)
+        manager._release_profile_lock(identity.key)
 
     def test_persistent_context_uses_selected_browser_channel(self):
         manager = BrowserManager("DEFAULT_UA", self.cfg.engine.profiles_dir)
