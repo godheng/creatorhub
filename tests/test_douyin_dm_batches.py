@@ -208,3 +208,86 @@ def test_api_batch_executes_new_conversations_and_continues_after_recipient_reje
             assert not (await engine.execute_action_task(batch['task_ids'][1]))['ok']
     asyncio.run(scenario())
     assert calls==[('create','101'),('send','conv-101'),('create','102'),('send','conv-102')]
+
+
+def test_comment_identity_mapping_rejects_numeric_mismatch_and_errors(active, monkeypatch):
+    calls = []
+    async def resolve(account, link):
+        sec = link.rsplit("/", 1)[-1]
+        calls.append(sec)
+        if sec == "failed": raise ValueError("解析失败")
+        return dm.Recipient(target_uid="42", target_sec_uid="other" if sec == "mismatch" else sec, target_nick="评论者")
+    monkeypatch.setattr(dm, "resolve_profile", resolve)
+    result = asyncio.run(dm.preview(dm.PreviewIn(account_id=active,
+        comment_sec_uids=["123", "", "valid", "valid", "mismatch", "failed"])))
+    assert len(result["recipients"]) == 1
+    assert result["recipients"][0]["target_sec_uid"] == "valid"
+    assert result["duplicates"] == 1
+    assert len(result["invalid"]) == 4
+    assert "123" not in calls and "" not in calls
+    with db.get_session() as session:
+        assert not session.exec(select(AccountActionTask)).all()
+
+def test_preview_real_risk_gap_resumes_only_pending(active, local_project, monkeypatch):
+    from contextlib import asynccontextmanager
+    from datetime import datetime, timedelta
+    from app.engine.monitor import MonitorEngine
+    from test_write_gates import _BrowserStub
+    clock = [datetime(2026, 1, 1, 12)]
+    monkeypatch.setattr('app.risk._utcnow', lambda: clock[0])
+    calls = []
+    class Platform:
+        def __init__(self, *args, **kwargs): pass
+        @asynccontextmanager
+        async def session_scope(self): yield self
+        async def resolve_user_identifier(self, value):
+            calls.append(value)
+            return {'uid': '1' if value == 'secA' else '2', 'sec_uid': value, 'nickname': value}, ''
+    monkeypatch.setattr(main, 'DouyinClient', Platform)
+    monkeypatch.setattr(main, 'douyin_cookie_from_state', lambda state: 'isolated-cookie')
+    engine = MonitorEngine(local_project.cfg, _BrowserStub())
+    monkeypatch.setattr(main, 'engine', engine)
+    first = asyncio.run(dm.preview(dm.PreviewIn(account_id=active, comment_sec_uids=['secA','secA','secB'], links=['https://www.douyin.com/user/secA'])))
+    assert calls == ['secA']
+    assert len(first['recipients']) == 1 and first['duplicates'] == 2
+    assert first['invalid'] == []
+    assert [p['input'] for p in first['pending']] == ['secB']
+    assert first['pending'][0]['next_allowed_at']
+    clock[0] += timedelta(seconds=local_project.cfg.risk_control.read_heavy_gap_seconds + 1)
+    second = asyncio.run(dm.preview(dm.PreviewIn(account_id=active, comment_sec_uids=['secB'])))
+    assert calls == ['secA', 'secB']
+    assert second['pending'] == [] and len(second['recipients']) == 1
+    with db.get_session() as session:
+        assert not session.exec(select(AccountActionTask)).all()
+
+def test_preview_real_manual_hold_is_pending_not_invalid(active, local_project, monkeypatch):
+    from app.engine.monitor import MonitorEngine
+    from app.models import AccountRiskState
+    from test_write_gates import _BrowserStub
+    monkeypatch.setattr(main, 'engine', MonitorEngine(local_project.cfg, _BrowserStub()))
+    monkeypatch.setattr(main, 'douyin_cookie_from_state', lambda state: 'isolated-cookie')
+    with db.get_session() as session:
+        session.add(AccountRiskState(account_id=active, manual_review_required=True))
+        session.commit()
+    result = asyncio.run(dm.preview(dm.PreviewIn(account_id=active, comment_sec_uids=['secA'])))
+    assert result['recipients'] == [] and result['invalid'] == []
+    assert result['pending'][0]['next_allowed_at'] is None
+    assert '人工' in result['pending'][0]['reason']
+
+
+def test_preview_cache_does_not_bypass_url_scheme(active, monkeypatch):
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+    class Platform:
+        def __init__(self, *args, **kwargs): pass
+        @asynccontextmanager
+        async def session_scope(self): yield self
+        async def resolve_user_identifier(self, value):
+            return {'uid':'1','sec_uid':value}, ''
+    async def guarded(*args, **kwargs): return await args[3]()
+    monkeypatch.setattr(main, 'DouyinClient', Platform)
+    monkeypatch.setattr(main, 'engine', SimpleNamespace(guarded_read_pair=guarded))
+    monkeypatch.setattr(main, 'douyin_cookie_from_state', lambda state: 'isolated-cookie')
+    result = asyncio.run(dm.preview(dm.PreviewIn(account_id=active, comment_sec_uids=['secA'], links=['ftp://www.douyin.com/user/secA'])))
+    assert len(result['recipients']) == 1
+    assert len(result['invalid']) == 1 and '主页链接' in result['invalid'][0]['error']

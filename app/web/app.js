@@ -5965,9 +5965,10 @@ function collectionCommentParams({ exportMode = false } = {}) {
   return params;
 }
 function collectionCommentMarkup(comment) {
+  const dmActions = dyDmCommentActions(comment);
   const source = [comment.source_keyword ? `#${comment.source_keyword}` : "", comment.source_desc || ""]
     .filter(Boolean).join(" · ");
-  return `<article class="collection-comment"><div class="collection-comment-head"><div><b>${esc(comment.user_nickname || "匿名用户")}</b>${comment.ip_label ? ` · ${esc(comment.ip_label)}` : ""}${comment.user_sec_uid ? `<div class="comment-user-sec" title="${esc(comment.user_sec_uid)}">sec_uid: ${esc(comment.user_sec_uid)}</div>` : ""}${source ? `<div class="collection-comment-source">${esc(source)}</div>` : ""}</div><span>${fmtTime(comment.create_time)} · ${fmtNum(comment.like_count)} 赞${comment.reply_to ? " · 回复" : ""}</span></div><p>${esc(comment.text || "（空评论）")}</p></article>`;
+  return `<article class="collection-comment"><div class="collection-comment-head"><div><b>${esc(comment.user_nickname || "匿名用户")}</b>${comment.ip_label ? ` · ${esc(comment.ip_label)}` : ""}${comment.user_sec_uid ? `<div class="comment-user-sec" title="${esc(comment.user_sec_uid)}">sec_uid: ${esc(comment.user_sec_uid)}</div>` : ""}${source ? `<div class="collection-comment-source">${esc(source)}</div>` : ""}</div><span>${fmtTime(comment.create_time)} · ${fmtNum(comment.like_count)} 赞${comment.reply_to ? " · 回复" : ""}</span></div><p>${esc(comment.text || "（空评论）")}</p>${dmActions}</article>`;
 }
 async function loadCollectionComments(page = COLLECTION_COMMENT_PAGE) {
   const modal = $("collection-comments-modal");
@@ -5984,7 +5985,9 @@ async function loadCollectionComments(page = COLLECTION_COMMENT_PAGE) {
       : result;
     COLLECTION_COMMENT_PAGE = Number(payload.page || 1);
     $("collection-comments-count").textContent = `共 ${fmtNum(payload.total || 0)} 条符合条件的评论`;
-    list.innerHTML = (payload.items || []).map(collectionCommentMarkup).join("") || `<div class="empty"><div class="empty-t">没有符合条件的评论</div><div class="empty-sub">调整筛选条件后重试</div></div>`;
+    dyDmCommentRows = payload.items || [];
+    list.innerHTML = dyDmCommentToolbar() + ((payload.items || []).map(collectionCommentMarkup).join("") || `<div class="empty"><div class="empty-t">没有符合条件的评论</div><div class="empty-sub">调整筛选条件后重试</div></div>`);
+    dyDmSyncComments();
     const pager = $("collection-comments-pager");
     if (pager) {
       pager.hidden = Number(payload.pages || 1) <= 1;

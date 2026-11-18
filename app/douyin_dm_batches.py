@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/douyin/dm")
 class PreviewIn(BaseModel):
     account_id: int
     links: list[str] = Field(default_factory=list, max_length=200)
+    comment_sec_uids: list[str] = Field(default_factory=list, max_length=200)
     contact_ids: list[int] = Field(default_factory=list, max_length=200)
 
 
@@ -64,6 +65,12 @@ def deduplicate(recipients):
 
 
 
+class PreviewDeferred(Exception):
+    def __init__(self, reason, next_allowed_at=None):
+        super().__init__(reason)
+        self.next_allowed_at = next_allowed_at
+
+
 async def resolve_profile(account, link):
     # Only canonical user pages: no arbitrary URL fetches or redirect following.
     parsed = urlsplit(link.strip())
@@ -87,6 +94,10 @@ async def resolve_profile(account, link):
         raise ValueError("引擎未就绪")
     profile, error = await main.engine.guarded_read_pair(
         account.id, main.OperationKind.READ_HEAVY, f"dm-preview:{account.id}", read, empty_result=None)
+    if str(error or "").startswith("risk_deferred:"):
+        decision = main.engine.risk.preflight(account.id, main.OperationKind.READ_HEAVY)
+        raise PreviewDeferred(str(error).partition(":")[2],
+            decision.next_allowed_at.isoformat() + "Z" if decision.next_allowed_at else None)
     if not profile:
         raise ValueError(error or "无法解析接收人")
     return Recipient(target_uid=str(profile.get("uid") or profile.get("user_id") or ""),
@@ -96,7 +107,7 @@ async def resolve_profile(account, link):
 
 @router.post("/preview")
 async def preview(body: PreviewIn):
-    rows, invalid = [], []
+    rows, invalid, pending = [], [], []
     with get_session() as session:
         account = account_for_send(session, body.account_id)
         session.expunge(account)
@@ -107,9 +118,32 @@ async def preview(body: PreviewIn):
                 continue
             rows.append(Recipient(target_uid=row.peer_uid, target_sec_uid=row.peer_sec_uid,
                 target_nick=row.peer_nickname, conv_id=row.conv_id))
+    resolved = {}
+    async def resolve_once(link):
+        parsed = urlsplit(link.strip())
+        key = (parsed.path.rstrip("/") if parsed.scheme in {"http", "https"}
+               and parsed.hostname in {"douyin.com", "www.douyin.com"}
+               and re.fullmatch(r"/user/[A-Za-z0-9_-]+/?", parsed.path) else link)
+        if key not in resolved:
+            resolved[key] = await resolve_profile(account, link)
+        return resolved[key]
+    for sec_uid in body.comment_sec_uids:
+        try:
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", sec_uid) or sec_uid.isdigit():
+                raise ValueError("评论用户缺少有效 sec_uid，不能使用数字 UID 代替")
+            recipient = await resolve_once("https://www.douyin.com/user/" + sec_uid)
+            if recipient.target_sec_uid != sec_uid:
+                raise ValueError("解析身份与评论用户不一致，请重新采集或核对")
+            rows.append(recipient)
+        except PreviewDeferred as exc:
+            pending.append({"input": sec_uid, "kind": "comment", "reason": str(exc), "next_allowed_at": exc.next_allowed_at})
+        except Exception as exc:
+            invalid.append({"input": sec_uid, "error": str(exc)})
     for link in body.links:
         try:
-            rows.append(await resolve_profile(account, link))
+            rows.append(await resolve_once(link))
+        except PreviewDeferred as exc:
+            pending.append({"input": link, "kind": "link", "reason": str(exc), "next_allowed_at": exc.next_allowed_at})
         except Exception as exc:
             invalid.append({"input": link, "error": str(exc)})
     valid = []
@@ -120,7 +154,7 @@ async def preview(body: PreviewIn):
             invalid.append({"input": row.target_nick, "error": "接收人缺少用户标识"})
     unique = deduplicate(valid)
     return {"recipients": [r.model_dump() for r in unique], "invalid": invalid,
-            "duplicates": len(valid) - len(unique)}
+            "duplicates": len(valid) - len(unique), "pending": pending}
 
 
 def batch_view(session, receipt):
