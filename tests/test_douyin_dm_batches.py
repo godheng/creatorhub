@@ -208,3 +208,25 @@ def test_api_batch_executes_new_conversations_and_continues_after_recipient_reje
             assert not (await engine.execute_action_task(batch['task_ids'][1]))['ok']
     asyncio.run(scenario())
     assert calls==[('create','101'),('send','conv-101'),('create','102'),('send','conv-102')]
+
+
+def test_export_import_leads_roundtrip():
+    from app.reporting import build_keyword_collection_report
+    comments = [dict(id=i, content_id=1, platform="douyin", user_sec_uid="MS4w-user", user_nickname="A") for i in (1, 2)]
+    data = build_keyword_collection_report({}, [dict(id=1)], comments)
+    assert dm.import_lead_links(data) == ["https://www.douyin.com/user/MS4w-user"]
+
+
+def test_import_rejects_invalid_and_oversized_workbook():
+    from io import BytesIO
+    from openpyxl import Workbook
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException):
+        dm.import_lead_links(b"invalid")
+    workbook = Workbook(); sheet = workbook.active; sheet.title = "用户线索"
+    sheet.append(["用户主页链接"])
+    for i in range(201):
+        sheet.append([f"https://www.douyin.com/user/MS4w-{i}"])
+    output = BytesIO(); workbook.save(output)
+    with pytest.raises(HTTPException, match="200"):
+        dm.import_lead_links(output.getvalue())

@@ -1,9 +1,11 @@
 """Text DM composition and durable batches over the existing action queue."""
+from io import BytesIO
+
 import json
 import re
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy import update
 from sqlmodel import select
@@ -13,6 +15,36 @@ from .models import DouyinAccount, DmConversation, AccountActionTask, TaskSubmis
 from .submissions import submit_once
 
 router = APIRouter(prefix="/api/douyin/dm")
+
+
+def import_lead_links(data: bytes):
+    from openpyxl import load_workbook
+    try:
+        workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(422, "无法读取 Excel，请导入关键词采集导出的 .xlsx 文件") from exc
+    try:
+        if "用户线索" not in workbook.sheetnames:
+            raise HTTPException(422, "Excel 缺少“用户线索”工作表")
+        rows = workbook["用户线索"].iter_rows(values_only=True)
+        headers = list(next(rows, ()))
+        if "用户主页链接" not in headers:
+            raise HTTPException(422, "缺少用户主页链接列，请重新导出名单")
+        column = headers.index("用户主页链接")
+        links = list(dict.fromkeys(str(row[column]).strip() for row in rows
+                    if len(row) > column and row[column] and str(row[column]).strip()))
+        if not links:
+            raise HTTPException(422, "名单中没有用户主页链接")
+        if len(links) > 200:
+            raise HTTPException(422, "每批最多 200 人，请将名单分批后导入")
+        return links
+    finally:
+        workbook.close()
+
+
+@router.post("/import")
+async def import_recipients(file: UploadFile = File(...)):
+    return {"links": import_lead_links(await file.read())}
 
 
 class PreviewIn(BaseModel):

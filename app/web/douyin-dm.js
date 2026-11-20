@@ -21,11 +21,36 @@ async function openDouyinDm(batch) {
   const accounts = ACCOUNTS.filter(a => (!a.platform || a.platform === 'douyin') && a.status === 'active');
   $('dy-dm-body').innerHTML = `<label>发送账号<select id="dy-dm-account" onchange="dyDmContacts()">${accounts.map(a => `<option value="${a.id}">${esc(a.nickname || '账号#'+a.id)}</option>`).join('')}</select></label>
     <p><label>用户主页链接（${batch ? '每行一个' : '一个接收人'}）<textarea id="dy-dm-links" rows="3" style="width:100%" placeholder="https://www.douyin.com/user/..."></textarea></label></p>
+    ${batch ? `<p><label>导入评论用户名单（.xlsx，最多 200 人）<input type="file" accept=".xlsx" onchange="dyDmImport(this)"></label></p>` : ''}
     <fieldset><legend>或选择已有联系人</legend><div id="dy-dm-contacts" style="max-height:160px;overflow:auto"></div></fieldset>
     <p><label>文字内容<textarea id="dy-dm-content" rows="4" style="width:100%"></textarea></label></p><button id="dy-dm-preview-button" onclick="dyDmPreview()">解析并预览</button><div id="dy-dm-preview"></div>`;
   if (accounts.some(a => String(a.id) === HUB_ACC)) $('dy-dm-account').value = HUB_ACC;
   $('dy-dm-body').addEventListener('input', () => { if (!dyDmState.busy) { dyDmState.payload = null; $('dy-dm-preview').innerHTML = ''; } });
   await dyDmContacts();
+}
+async function dyDmImport(input) {
+  const file = input.files?.[0], generation = dyDmGeneration, state = dyDmState;
+  if (!file || state.busy) return;
+  state.busy = true;
+  state.payload = null;
+  $('dy-dm-preview').innerHTML = '';
+  $('dy-dm-body').querySelectorAll('input,textarea,select,button').forEach(e => e.disabled = true);
+  try {
+    const body = new FormData(); body.append('file', file);
+    const result = await api('/api/douyin/dm/import', {method:'POST', body});
+    if (!dyDmCurrent(generation)) return;
+    const links = [...new Set([...$('dy-dm-links').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean), ...result.links])];
+    if (links.length > 200) throw new Error('合并后超过 200 人，请分批导入');
+    $('dy-dm-links').value = links.join('\n');
+    $('dy-dm-error').textContent = '';
+  } catch(e) { if (dyDmCurrent(generation)) dyDmError(e); }
+  finally {
+    state.busy = false;
+    if (dyDmCurrent(generation)) {
+      input.value = '';
+      $('dy-dm-body').querySelectorAll('input,textarea,select,button').forEach(e => e.disabled = false);
+    }
+  }
 }
 async function dyDmContacts() {
   const generation = dyDmGeneration, request = ++dyDmContactRequest;

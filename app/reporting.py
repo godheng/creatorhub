@@ -880,6 +880,7 @@ def _collection_lead_rows(comments: Sequence[Any], content_by_id: Mapping[Any, A
         content = content_by_id.get(_value(row, "content_id"))
         entry = leads.setdefault(uid, {
             "nickname": "", "region": "", "comments": 0,
+            "platform": _value(row, "platform"),
             "content_ids": set(), "likes": 0, "latest_key": (-1, -1),
             "latest_time": 0, "sample": "", "keywords": [],
         })
@@ -915,6 +916,7 @@ def _collection_lead_rows(comments: Sequence[Any], content_by_id: Mapping[Any, A
             entry["comments"], len(entry["content_ids"]), entry["likes"],
             _timestamp(entry["latest_time"]),
             _text("、".join(entry["keywords"])), _text(entry["sample"]),
+            f"https://www.douyin.com/user/{uid}" if entry["platform"] == "douyin" else "",
         )
         for uid, entry in sorted(
             leads.items(),
@@ -1028,9 +1030,10 @@ def build_keyword_collection_report(job: Any, contents: Sequence[Any],
     _write_table(
         workbook, "用户线索",
         ("用户sec_uid", "用户昵称", "地区", "评论数", "涉及作品数",
-         "总获赞", "最近评论时间", "来源关键词", "示例评论"),
+         "总获赞", "最近评论时间", "来源关键词", "示例评论", "用户主页链接"),
         _collection_lead_rows(lead_comments, content_by_id),
-        widths=(38, 22, 16, 12, 14, 12, 20, 26, 58),
+        widths=(38, 22, 16, 12, 14, 12, 20, 26, 58, 60),
+        link_columns={10},
         date_columns={7}, number_columns={4, 5, 6},
         number_formats={4: "#,##0", 5: "#,##0", 6: "#,##0"},
         tab_color="F59E0B", freeze_panes="D2", row_height=36,
