@@ -1,0 +1,23 @@
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const nodes = new Map();
+const $ = id => { if (!nodes.has(id)) nodes.set(id, {value:'',innerHTML:'',textContent:'',querySelectorAll:()=>[]}); return nodes.get(id); };
+const requests=[];
+let result={links:['https://www.douyin.com/user/A']};
+const context=vm.createContext({$,FormData:class {append(){}},api:async(path,opts)=>{requests.push(path);return result;}});
+vm.runInContext(fs.readFileSync('app/web/douyin-dm.js','utf8')+'\ndyDmDialog={open:true};dyDmState={busy:false,batch:true};',context);
+(async()=>{
+ const input={files:[{}],value:'file'};
+ await context.dyDmImport(input);
+ assert.equal($('dy-dm-links').value,result.links[0]);
+ assert.deepEqual(requests,['/api/douyin/dm/import']);
+ await context.dyDmImport(input);
+ assert.equal($('dy-dm-links').value,result.links[0]);
+ result={links:Array.from({length:201},(_,i)=>'https://www.douyin.com/user/'+i)};
+ await context.dyDmImport(input);
+ assert.match($('dy-dm-error').textContent,/200/);
+ assert.equal($('dy-dm-links').value,'https://www.douyin.com/user/A');
+ assert.equal(vm.runInContext('dyDmState.payload',context),null);
+ console.log('DM import tests passed');
+})().catch(e=>{console.error(e);process.exitCode=1;});
