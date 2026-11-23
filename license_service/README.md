@@ -25,10 +25,10 @@ Create prints the code once. Protect that terminal output. The public applicatio
 
 Unbind increments binding generation and removes the previous bearer credential. Same-device activation returns the existing credential. Disable immediately rejects subsequent checks. Existing signed runtime permission can last up to its original 30-minute/expiry deadline if offline. Renewal does not re-enable disabled licenses; issue a new code if needed.
 
-Rollback: stop the unit, restore the previous code directory/version while retaining the protected persistent directory and restart. Existing license records are preserved by the compatible schema migration documented below. Before opening port 8088, limit its security-group/firewall source to test public IPs and preserve SSH. Confirm NTP and `/health` from the test machine.
+Rollback: stop the unit, restore the previous code directory/version while retaining the protected persistent directory and restart. Existing license records are preserved by the compatible schema migration documented below. Keep 8088 bound to 127.0.0.1 during rollback. Confirm NTP and `https://license.aispacekit.com/health` from the client machine.
 
 ## First installation commands (after SSH/preflight succeeds)
-These commands have not been executed on the target server. Upload only the license_service source directory to a staging directory first.
+Use these commands for a new installation only. Upload only the license_service source directory to a staging directory first.
 ```sh
 cat /etc/os-release
 sudo ss -lntp
@@ -53,7 +53,23 @@ curl --fail http://127.0.0.1:8088/health
 sudo systemctl is-enabled aispace-license
 sudo systemctl is-active aispace-license
 ```
-If python3-venv is unavailable, install that OS package after inspecting the OS. Do not change firewall until its current rules and SSH path are confirmed. Permit TCP8088 only from tester public /32 addresses. Do not overwrite pre-existing directories or keys.
+If python3-venv is unavailable, install that OS package after inspecting the OS. Preserve SSH access. Expose the HTTPS reverse proxy on TCP443; keep 8088 and 8089 local-only. Do not overwrite pre-existing directories or keys.
+
+## HTTPS reverse proxy
+
+The client endpoint is `https://license.aispacekit.com`, proxied to `127.0.0.1:8088`.
+The administrator endpoint is `https://admin.aispacekit.com`, proxied to `127.0.0.1:8089`.
+Install Nginx and provision a certificate covering both names at `/etc/nginx/ssl/aispace/certificate.pem` and its root-readable private key at `/etc/nginx/ssl/aispace/private.key` (mode 0600). Certificate contents, private keys, passwords and databases must remain outside Git.
+For Cloudflare Origin CA, enable proxying for both DNS records, use Full (strict), and enable Always Use HTTPS. Back up any existing virtual-host configurations before installing these templates. From `/opt/aispace-license`:
+
+```sh
+sudo install -m 0644 license_service/license-https.conf /etc/nginx/conf.d/license-https.conf
+sudo install -m 0644 license_service/admin-https.conf /etc/nginx/conf.d/admin-https.conf
+sudo nginx -t && sudo systemctl reload nginx
+curl --fail https://license.aispacekit.com/health
+```
+
+The administrator service must be installed and configured as described below. Verify that its HTTPS login page loads and unauthenticated `/api/licenses` requests return 401. If proxy validation fails, restore the backed-up configuration, run `nginx -t` and reload; do not restore an old database or reopen 8088.
 
 ## Client platform identity and runtime checks
 Windows keeps the existing MachineGuid digest unchanged. macOS uses IOPlatformUUID; Linux uses /etc/machine-id with /var/lib/dbus/machine-id as fallback. Only application-specific hashes are sent; failed reads never produce a shared default. Successful identity reads are cached for the process.
