@@ -12,7 +12,7 @@ class AdminTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name);self.key=Ed25519PrivateKey.generate()
         self.store=Store(self.root/'db',self.key,lambda:1000)
-        self.client=TestClient(create_admin_app(self.store,self.root))
+        self.client=TestClient(create_admin_app(self.store,self.root),base_url='https://admin.aispacekit.com')
     def login(self):
         salt='ab'*16
         (self.root/'admin-password.json').write_text(json.dumps(dict(salt=salt,hash=hashlib.scrypt(b'test-password-only',salt=bytes.fromhex(salt),n=16384,r=8,p=1).hex())))
@@ -35,6 +35,13 @@ class AdminTests(unittest.TestCase):
     def test_auth_csrf_logout_public(self):
         self.assertEqual(self.client.get('/').status_code,503)
         self.login()
+        response=self.client.post('/login',headers={'x-admin-login':'1'},json={'password':'test-password-only'})
+        cookie=response.headers['set-cookie']
+        self.assertIn('Secure',cookie)
+        self.assertIn('HttpOnly',cookie)
+        self.assertIn('SameSite=strict',cookie)
+        self.assertNotIn('Domain=',cookie)
+        self.headers={'x-csrf-token':self.client.get('/api/licenses').json()['csrf']}
         self.assertEqual(self.client.post('/api/licenses',json={}).status_code,403)
         self.assertEqual(self.client.post('/logout',headers=self.headers).status_code,200)
         self.assertEqual(self.client.get('/api/licenses').status_code,401)

@@ -49,7 +49,7 @@ def create_admin_app(store, root):
         actual=hashlib.scrypt(password.encode(),salt=bytes.fromhex(record['salt']),n=16384,r=8,p=1).hex()
         if not secrets.compare_digest(actual,record['hash']): raise HTTPException(401,'Incorrect password')
         token=secrets.token_urlsafe(32);sessions[token]={'csrf':secrets.token_urlsafe(32),'until':now+28800,'config':cfg}
-        response=JSONResponse({'ok':True});response.set_cookie('admin_session',token,httponly=True,samesite='strict',max_age=28800);return response
+        response=JSONResponse({'ok':True});response.set_cookie('admin_session',token,secure=True,httponly=True,samesite='strict',max_age=28800);return response
     @app.get('/api/licenses')
     def listing(request:Request):
         session=auth(request)
@@ -57,7 +57,7 @@ def create_admin_app(store, root):
     @app.post('/logout')
     def logout(request:Request):
         auth(request);sessions.pop(request.cookies.get('admin_session'),None)
-        response=JSONResponse({'ok':True});response.delete_cookie('admin_session');return response
+        response=JSONResponse({'ok':True});response.delete_cookie('admin_session',secure=True,httponly=True,samesite='strict');return response
     @app.post('/api/licenses')
     async def create(request:Request):
         auth(request);body=await request.json()
