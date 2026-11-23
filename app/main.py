@@ -3818,6 +3818,7 @@ async def _sync_follows_impl(account_id: int, direction: str = "following",
         identity = (None if platform == "douyin" and effective_mode == "api"
                     else browser.identity_for(acc))
         known: set[str] = set()
+        expected_total = (acc.following_count if direction == "following" else acc.follower_count) or 0
     # API-only/browser-only are hard routing decisions. Hybrid's API attempt and
     # page fallback share one READ_HEAVY guard so the fallback is not blocked by
     # the API attempt's own minimum interval.
@@ -3826,7 +3827,7 @@ async def _sync_follows_impl(account_id: int, direction: str = "following",
 
     async def _fetch_follow_snapshot():
         nonlocal source
-        direct_err = ""
+        direct_users, direct_err = [], ""
         if platform == "douyin" and effective_mode in {"api", "hybrid"}:
             report(phase="fetching", source="api")
             try:
@@ -3844,21 +3845,33 @@ async def _sync_follows_impl(account_id: int, direction: str = "following",
             except Exception as e:
                 direct_users, direct_err = [], repr(e)
             # “empty”表示结构有效的空列表；empty_body/网络/解析错误不是有效快照。
-            if direct_users or direct_err == "empty":
+            if (direct_users and not direct_err) or direct_err == "empty":
                 source = "api"
                 return direct_users, direct_err
             if effective_mode == "api":
                 source = "api"
-                return [], direct_err or "empty_response"
+                return direct_users, direct_err or "empty_response"
             print(f"[follow] douyin direct 空({direct_err}),回退浏览器拦截")
 
         source = "browser_fallback" if effective_mode == "hybrid" else "browser"
-        report(phase="fetching", source=source)
+        report(phase="fetching", source=source, pages=0, fetched=0,
+               expected_total=expected_total)
+
+        def browser_progress(update):
+            report(phase="fetching", source=source, **update)
+
+        browser_options = {"progress": browser_progress} if progress is not None else {}
         browser_users, browser_err = await fetch_follows(
-            browser, identity, platform, uid, direction, known)
-        if browser_users:
-            return browser_users, ""
-        return browser_users, (browser_err or direct_err)
+            browser, identity, platform, uid, direction, known, **browser_options)
+        if direct_err.startswith("platform_cap:"):
+            _, _, total = direct_err.partition(",total=")
+            if not total.isdecimal() or len(browser_users) < int(total):
+                return browser_users, direct_err
+        if direct_users and len(browser_users) < len(direct_users):
+            return browser_users, direct_err or "browser_pagination_incomplete"
+        if browser_err or browser_users:
+            return browser_users, browser_err
+        return [], direct_err or "empty_response"
 
     if engine is not None:
         users, err = await engine.guarded_read_pair(
@@ -3906,6 +3919,8 @@ def _follow_sync_job_view(job: dict) -> dict:
     fetched = max(0, int(view.get("fetched") or 0))
     if view.get("status") == "completed":
         percent = 100
+    elif view.get("phase") == "saving" and fetched:
+        percent = min(99, int(max(0, int(view.get("saved") or 0)) * 100 / fetched))
     elif expected:
         percent = min(99, int(fetched * 100 / expected))
     else:
@@ -4019,8 +4034,12 @@ async def cancel_follow_sync_job(job_id: str):
         return _follow_sync_job_view(job)
     if job.get("phase") == "saving":
         raise HTTPException(409, "数据正在提交，不能中途取消")
-    job["status"] = "canceling"
-    job["updated_at"] = datetime.utcnow().isoformat()
+    now = datetime.utcnow().isoformat()
+    if job["status"] == "queued":
+        job.update(status="canceled", phase="canceled", completed_at=now)
+    else:
+        job["status"] = "canceling"
+    job["updated_at"] = now
     task = _follow_sync_tasks.get(job_id)
     if task:
         task.cancel()

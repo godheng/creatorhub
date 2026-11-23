@@ -3051,7 +3051,7 @@ class MonitorEngine:
 
         async def receive_page(rows: list[dict], meta: dict):
             for row in rows:
-                normalized = _norm_follow_user(row, direction)
+                normalized = _norm_follow_user(row, direction, douyin=True)
                 if normalized:
                     out.append(normalized)
             if progress is not None:
@@ -3074,7 +3074,11 @@ class MonitorEngine:
               f"complete={meta.get('complete', False)}")
         # HTTP 200 + 空 body、非法 JSON 等是传输/风控失败，不是“有效空列表”。
         # 保留 DouyinClient 的分类，让上层决定是否回退浏览器且不清空旧快照。
-        return out, (client.last_error or ("" if out else "empty"))
+        if not meta.get("complete"):
+            return out, client.last_error or meta.get("stop_reason") or "pagination_incomplete"
+        if meta.get("fetched") != len(out):
+            return out, "invalid_follow_user"
+        return out, ("" if out else "empty")
 
     async def scan_comment_watch(self, watch_id: int) -> dict:
         from ..licensing import is_active

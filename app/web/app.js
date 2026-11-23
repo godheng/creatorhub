@@ -3369,7 +3369,7 @@ function renderFollowPager(direction, payload) {
   if (buttons[1]) buttons[1].disabled = state.page >= state.pages;
   const synced = $(`${prefix}-synced-at`);
   if (synced) synced.textContent = payload.synced_at ? `同步于 ${fmtTime(payload.synced_at)}` : "";
-  pager.hidden = state.total <= FOLLOW_PAGE_SIZE;
+  pager.hidden = state.total <= 0;
 }
 function changeFollowPage(direction, delta) {
   const state = FOLLOW_STATE[direction];
@@ -3408,6 +3408,7 @@ async function pollFollowSync(direction, jobId) {
   try {
     while (FOLLOW_JOB_IDS[direction] === jobId && HUB_ACC === accountId) {
       const job = await api(`/api/follow-sync-jobs/${encodeURIComponent(jobId)}`);
+      if (HUB_ACC !== accountId || FOLLOW_JOB_IDS[direction] !== jobId) return;
       renderFollowSyncStatus(direction, job);
       if (["completed", "failed", "canceled", "deferred"].includes(job.status)) {
         if (job.status === "completed") {
@@ -3428,8 +3429,10 @@ async function pollFollowSync(direction, jobId) {
 }
 async function refreshFollowSyncJob(direction) {
   if (!HUB_ACC) return;
+  const isCurrent = beginViewRequest("follow-job:" + direction, () => String(HUB_ACC));
   try {
     const job = await api(`/api/accounts/${HUB_ACC}/follows/sync-job?direction=${direction}`);
+    if (!isCurrent()) return;
     renderFollowSyncStatus(direction, job);
     if (["queued", "running", "canceling"].includes(job.status)) pollFollowSync(direction, job.id);
   } catch (e) {}
@@ -3482,22 +3485,25 @@ function followRow(f, direction) {
 async function syncFollows(direction) {
   if (PLATFORM === "xhs") { toast(XHS_FOLLOW_NA, "info", 6000); return; }
   if (!HUB_ACC) { toast("请先选择账号", "err"); return; }
+  const accountId = HUB_ACC;
   let job = null;
   try {
     await withBusy(evtBtn(), "启动中", async () => {
-      job = await api(`/api/accounts/${HUB_ACC}/follows/sync-jobs?direction=${direction}`, { method: "POST" });
+      job = await api(`/api/accounts/${accountId}/follows/sync-jobs?direction=${direction}`, { method: "POST" });
     });
-  } catch (e) { toast("同步失败:" + e.message, "err"); return; }
+  } catch (e) { if (HUB_ACC === accountId) toast("同步失败:" + e.message, "err"); return; }
+  if (HUB_ACC !== accountId) return;
   renderFollowSyncStatus(direction, job);
   toast(job.status === "queued" ? "同步任务已创建" : "同步任务正在运行", "info");
   pollFollowSync(direction, job.id);
 }
 async function cancelFollowSync(direction) {
+  const accountId = HUB_ACC;
   const jobId = FOLLOW_JOB_IDS[direction]; if (!jobId) return;
   try {
     const job = await api(`/api/follow-sync-jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
-    renderFollowSyncStatus(direction, job);
-  } catch (e) { toast("取消失败:" + e.message, "err"); }
+    if (HUB_ACC === accountId && FOLLOW_JOB_IDS[direction] === jobId) renderFollowSyncStatus(direction, job);
+  } catch (e) { if (HUB_ACC === accountId) toast("取消失败:" + e.message, "err"); }
 }
 async function actFollow(action, edgeId) {
   // 取该行 follow 边的目标信息(从已渲染列表里拿)

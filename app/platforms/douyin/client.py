@@ -1380,6 +1380,51 @@ class DouyinClient:
         )
         return data or {}
 
+    @staticmethod
+    def _pos_int(value: Any) -> int:
+        if value is None or isinstance(value, bool):
+            return 0
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return 0
+        return parsed if parsed > 0 else 0
+
+    @staticmethod
+    def _non_neg_int(value: Any) -> Optional[int]:
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
+
+    @classmethod
+    def _next_follow_cursor(cls, page: dict, current_max_time: int,
+                            current_offset: int) -> tuple[int, int, bool]:
+        # following/list 与 follower/list 按关注时间倒序分页：
+        # 响应里的 max_time 是本页上界，min_time 才是下一页继续向下翻页的上界游标；
+        # 若错取 max_time 搭配服务端返回的同秒 tie-breaker offset=1，会导致每页仅滑动 1 条
+        # 并在遇到同秒记录或边界时陷入重复死循环(pagination_stalled)。
+        min_t = cls._pos_int(page.get("min_time"))
+        max_t = cls._pos_int(page.get("max_time"))
+        if min_t > 0 and max_t > 0:
+            candidate_time = min(min_t, max_t)
+        elif min_t > 0:
+            candidate_time = min_t
+        elif max_t > 0:
+            candidate_time = max_t
+        else:
+            candidate_time = current_max_time
+
+        resp_offset = cls._non_neg_int(page.get("offset"))
+        if 0 < candidate_time < current_max_time:
+            return candidate_time, resp_offset or 0, True
+        if candidate_time == current_max_time and resp_offset is not None and resp_offset > current_offset:
+            return current_max_time, resp_offset, True
+        return current_max_time, current_offset, False
+
     async def fetch_all_follows(
             self, user_id: str, sec_uid: str, direction: str,
             max_pages: int = FOLLOW_MAX_PAGES, count: int = 20,
@@ -1404,50 +1449,92 @@ class DouyinClient:
             "pages": 0, "fetched": 0, "has_more": False,
             "complete": False, "stop_reason": "starting",
         }
-        # The fan endpoint expects the first page's upper time cursor. The web
-        # client uses the current Unix timestamp; zero yields HTTP 200 + empty
-        # body even with a valid current signature.
-        max_time = int(time.time()) if not following else 0
+        # Both endpoints paginate backward in time under source_type=1 and
+        # expect the first page's upper time cursor as the current Unix timestamp.
+        max_time = int(time.time())
+        reported_total = 0
+        stagnant_pages = 0
         for page_index in range(page_limit):
-            page = await self._follow_page(path, user_id, sec_uid, offset, max_time,
-                                           count, source_type=1)
-            users = page.get(list_key) or []
-            new = 0
+            page = await self._follow_page(
+                path, user_id, sec_uid, offset, max_time, count, source_type=1)
+            if not page and self.last_error == "empty_body" and page_index > 0:
+                if page_delay > 0:
+                    await asyncio.sleep(page_delay)
+                page = await self._follow_page(
+                    path, user_id, sec_uid, offset, max_time, count, source_type=1)
+
+            if not page:
+                self.last_error = self.last_error or "empty_response"
+                break
+            status_code = page.get("status_code")
+            if status_code not in (None, 0, "0"):
+                self.last_error = f"api_status_{status_code}"
+                if not following and status_code in (2096, "2096") and page_index >= 200:
+                    self.last_error = f"platform_cap:{self.last_error}"
+                break
+
+            users = page.get(list_key)
+            more = page.get("has_more")
+            if not isinstance(users, list) or more not in (0, 1, "0", "1"):
+                self.last_error = "invalid_follow_page"
+                break
+            reported_total = max(reported_total, self._pos_int(page.get("total")))
             fresh: List[dict] = []
-            for u in users:
-                uid = str(u.get("uid") or u.get("sec_uid") or "")
-                if uid and uid not in seen:
+            for user in users:
+                if not isinstance(user, dict):
+                    self.last_error = "invalid_follow_user"
+                    break
+                uid = str(user.get("uid") or "")
+                if uid in ("", "0"):
+                    uid = str(user.get("sec_uid") or user.get("secUid") or "")
+                if not uid:
+                    self.last_error = "invalid_follow_user"
+                    break
+                if uid not in seen:
                     seen.add(uid)
-                    fresh.append(u)
-                    if collect:
-                        out.append(u)
-                    new += 1
-            has_more = bool(page.get("has_more"))
+                    fresh.append(user)
+            if self.last_error:
+                break
+
+            has_more = more in (1, "1")
+            # A stale continuation flag is only harmless on an empty tail when
+            # we already have the full total reported by the list endpoint.
+            if has_more and not users and reported_total and len(seen) >= reported_total:
+                has_more = False
+            if collect:
+                out.extend(fresh)
             meta = {
-                "pages": page_index + 1,
-                "fetched": len(seen),
-                "has_more": has_more,
-                "complete": not has_more,
-                "stop_reason": "complete" if not has_more else "paging",
+                "pages": page_index + 1, "fetched": len(seen),
+                "has_more": has_more, "complete": False, "stop_reason": "paging",
             }
+            if reported_total:
+                meta["expected_total"] = reported_total
             self.last_follow_meta = meta
+            if not has_more:
+                if users and not fresh:
+                    self.last_error = "pagination_stalled"
+                elif reported_total > len(seen):
+                    self.last_error = (
+                        f"platform_cap:got={len(seen)},total={reported_total}")
+                else:
+                    meta.update(complete=True, stop_reason="complete")
+            else:
+                max_time, offset, advanced = self._next_follow_cursor(page, max_time, offset)
+                stagnant_pages = 0 if fresh else stagnant_pages + 1
+                if not advanced or stagnant_pages >= 3:
+                    self.last_error = "pagination_stalled"
+
             if on_page is not None:
                 callback_result = on_page(fresh, dict(meta))
                 if inspect.isawaitable(callback_result):
                     await callback_result
-            if not has_more:
+            if self.last_error or meta["complete"]:
                 break
-            if not users or new == 0:
-                self.last_error = "pagination_stalled"
-                self.last_follow_meta.update(
-                    complete=False, stop_reason="pagination_stalled")
-                break
-            offset = page.get("offset") or (offset + count)
-            max_time = page.get("max_time") or max_time
-            if page_delay > 0:
+            if page_delay > 0 and page_index + 1 < page_limit:
                 await asyncio.sleep(page_delay)
         else:
             self.last_error = f"page_limit:{page_limit}"
-            self.last_follow_meta.update(
-                has_more=True, complete=False, stop_reason="page_limit")
+        if self.last_error:
+            stop_reason = "page_limit" if self.last_error.startswith("page_limit:") else self.last_error
+            self.last_follow_meta.update(complete=False, stop_reason=stop_reason)
         return out
