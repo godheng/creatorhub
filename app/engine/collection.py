@@ -1,226 +1,38 @@
-"""抖音 / 小红书 / 快手 / 视频号批量采集流水线。"""
+"""九平台关键词与创作者批量作品采集主调度器。"""
 from __future__ import annotations
 
 import asyncio
-import json
-import math
 import random
-import time
-from pathlib import Path
 
 from sqlalchemy import func
 from sqlmodel import select
 
-from ..browser import (
-    fetch_comments,
-    fetch_channels_comments,
-    fetch_channels_works,
-    fetch_douyin_search,
-    fetch_ks_comments,
-    fetch_ks_search,
-    fetch_ks_videos,
-    fetch_videos,
-    fetch_xhs_comments,
-    fetch_xhs_favorites,
-    fetch_xhs_note_detail,
-    fetch_xhs_notes,
-    fetch_xhs_search,
-)
-from ..browser.tiktok_fetcher import fetch_tiktok_comments, fetch_tiktok_search
-from ..db import get_session
-from ..models import (
-    KeywordCollectionComment,
-    KeywordCollectionContent,
-    KeywordCollectionJob,
-)
-from ..platforms.douyin import (
-    DouyinClient,
-    cookie_from_state as douyin_cookie_from_state,
-    parse_aweme,
-    parse_comment,
-    safe_title,
-)
-from ..platforms.douyin.extract import Aweme
-from ..platforms.kuaishou import (
-    flatten_ks_comments,
-    parse_ks_comment,
-    parse_ks_feed,
-)
-from ..platforms.tiktok import parse_tiktok_aweme, parse_tiktok_comment
-from ..platforms.tiktok.client import TikTokNativeClient
-from ..platforms.channels import (
-    flatten_channels_comments,
-    parse_channels_comment,
-    parse_channels_feed,
-)
-from ..platforms.xhs import (
-    XhsApiClient,
-    cookie_str_from_state,
-    flatten_comments as flatten_xhs_comments,
-    has_a1,
-    parse_comment as parse_xhs_comment,
-    parse_note_brief,
-    parse_note_detail,
-)
-from ..risk import classify_platform_error, RiskCategory
-from ..transport_matrix import douyin_client_environment
+from app.db import get_session
+from app.engine.collection_helpers import _author_id, _collection_content_matches, _loads_keywords, _sort_ks_search_items, _xhs_count
+from app.models import KeywordCollectionComment, KeywordCollectionContent, KeywordCollectionJob
+from app.platforms.bilibili import BilibiliClient, parse_bili_aweme
+from app.platforms.channels import ChannelsProtocolClient, parse_channels_feed
+from app.platforms.douyin import DouyinClient, cookie_from_state as douyin_cookie_from_state, parse_aweme
+from app.platforms.douyin.extract import Aweme
+from app.platforms.instagram import InstagramClient, parse_ig_aweme
+from app.platforms.kuaishou import parse_ks_feed
+from app.platforms.rednote import RednoteApiClient, cookie_str_from_state as rednote_cookie_str_from_state, has_a1 as rednote_has_a1
+from app.platforms.tiktok import parse_tiktok_aweme
+from app.platforms.twitter import TwitterClient, parse_twitter_aweme
+from app.platforms.xhs import XhsApiClient, cookie_str_from_state, has_a1
+from app.profiles import pick_ephemeral_proxy
+from app.risk import RiskCategory, classify_platform_error
+from app.transport_matrix import douyin_client_environment
+from app.engine.collection_comments import CollectionCommentsMixin
+from app.engine.collection_discover import CollectionDiscoverMixin
+from app.engine.collection_social import CollectionSocialMixin
 
 
-def _loads_keywords(raw: str) -> list[str]:
-    try:
-        values = json.loads(raw or "[]")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return []
-    return [str(value).strip() for value in values if str(value).strip()]
-
-
-def _media_json(aweme: Aweme) -> str:
-    return json.dumps([
-        {"url": media.url, "kind": media.kind, "ext": media.ext,
-         "index": media.index}
-        for media in aweme.medias
-    ], ensure_ascii=False)
-
-
-def _tiktok_download_session(account, identity, default_user_agent: str) \
-        -> tuple[str, dict[str, str]]:
-    """Return the exact account UA and TikTok cookies for CDN downloads.
-
-    A visible login normally lives in ``storage_state``.  Keep the creator
-    state as an additive fallback so imported/legacy accounts do not lose a
-    valid TikTok session merely because it was stored in the alternate field.
-    Cookie extraction remains domain-scoped inside ``TikTokNativeClient``.
-    """
-    user_agent = str(
-        getattr(identity, "ua", "")
-        or getattr(account, "ua", "")
-        or default_user_agent
-        or ""
-    )
-    cookies: dict[str, str] = {}
-    for field in ("storage_state", "creator_storage_state"):
-        state = getattr(account, field, "") or ""
-        if not state:
-            continue
-        cookies.update(TikTokNativeClient(
-            storage_state=state,
-            user_agent=user_agent,
-        ).cookies)
-    return user_agent, cookies
-
-
-def _content_error_after_download(value: str, error: str) -> str:
-    """Replace stale downloader errors while preserving unrelated detail errors."""
-    parts = [
-        part.strip() for part in str(value or "").split(";")
-        if part.strip() and not part.strip().startswith("下载失败(")
-    ]
-    if error:
-        parts.append(str(error).strip())
-    return "; ".join(parts)
-
-
-def _author_id(raw: dict, platform: str) -> str:
-    if platform == "douyin":
-        author = raw.get("author") or {}
-        return str(author.get("sec_uid") or author.get("uid") or "")
-    if platform == "kuaishou":
-        photo = raw.get("photo") or {}
-        author = raw.get("author") or photo.get("author") or {}
-        return str(author.get("id") or author.get("userId")
-                   or author.get("user_id") or author.get("eid") or "")
-    if platform == "shipinhao":
-        author = raw.get("author") or raw.get("finderUser") or {}
-        return str(author.get("username") or author.get("finderUsername")
-                   or raw.get("username") or raw.get("finderUsername") or "")
-    if platform == "tiktok":
-        item = raw.get("item") or raw.get("aweme_info") or raw.get("itemStruct") or raw
-        author = item.get("author") or {}
-        return str(author.get("secUid") or author.get("sec_uid")
-                   or author.get("id") or author.get("uid") or "")
-    return str((parse_note_brief(raw) or {}).get("author_id") or "")
-
-
-_XHS_SEARCH_SORT = {
-    "general": "general",
-    "latest": "time_descending",
-    "most_liked": "popularity_descending",
-}
-_XHS_NOTE_TYPE = {"all": 0, "video": 1, "images": 2}
-_XHS_TIME_SECONDS = {
-    "day": 86400,
-    "week": 7 * 86400,
-    "half_year": 180 * 86400,
-}
-
-
-def _xhs_count(value) -> int:
-    text = str(value or "").strip().replace("+", "")
-    try:
-        if "万" in text:
-            return int(float(text.replace("万", "")) * 10_000)
-        if "亿" in text:
-            return int(float(text.replace("亿", "")) * 100_000_000)
-        return int(float(text))
-    except (TypeError, ValueError):
-        return 0
-
-
-def _sort_xhs_search_items(items: list[dict], search_sort: str) -> list[dict]:
-    """Keep general ranking stable and make explicit XHS sorts deterministic."""
-    if search_sort == "latest":
-        return sorted(
-            items,
-            key=lambda item: int((parse_note_brief(item) or {}).get("create_time") or 0),
-            reverse=True,
-        )
-    if search_sort == "most_liked":
-        def likes(item: dict) -> int:
-            card = item.get("note_card") or item
-            interact = card.get("interact_info") or {}
-            return _xhs_count(interact.get("liked_count") or interact.get("likedCount"))
-        return sorted(items, key=likes, reverse=True)
-    return list(items)
-
-
-def _sort_ks_search_items(items: list[dict], search_sort: str) -> list[dict]:
-    """快手搜索排序参数不稳定，按响应字段在本地保持确定性。"""
-    if search_sort not in {"latest", "most_liked"}:
-        return list(items)
-
-    def sort_value(item: dict) -> int:
-        photo = item.get("photo") or item
-        if search_sort == "latest":
-            value = photo.get("timestamp") or photo.get("createTime") or 0
-        else:
-            value = photo.get("realLikeCount") or photo.get("likeCount") or 0
-        return _xhs_count(value)
-
-    return sorted(items, key=sort_value, reverse=True)
-
-
-def _collection_content_matches(aweme: Aweme, job: KeywordCollectionJob,
-                                *, now: int | None = None) -> bool:
-    if job.content_type != "all" and aweme.media_type != job.content_type:
-        return False
-    if aweme.like_count < max(0, int(job.min_likes or 0)):
-        return False
-    if aweme.comment_count < max(0, int(job.min_comments or 0)):
-        return False
-    window = _XHS_TIME_SECONDS.get(job.publish_time)
-    if window and aweme.create_time:
-        if aweme.create_time < int(now or time.time()) - window:
-            return False
-    return True
-
-
-def _xhs_content_matches(aweme: Aweme, job: KeywordCollectionJob,
-                         *, now: int | None = None) -> bool:
-    """保留既有测试/调用名；筛选规则同样适用于已归一化的快手作品。"""
-    return _collection_content_matches(aweme, job, now=now)
-
-
-class KeywordCollector:
+class KeywordCollector(
+    CollectionDiscoverMixin,
+    CollectionCommentsMixin,
+    CollectionSocialMixin,
+):
     """执行单个持久化采集任务；调度与账号风控由 MonitorEngine 负责。"""
 
     def __init__(self, cfg, browser, downloader):
@@ -241,6 +53,19 @@ class KeywordCollector:
             self.cfg.engine.xhs_read_mode == "browser"
             and callable(getattr(self.browser, "visible_page", None))
         )
+
+    def _rednote_read_mode(self) -> str:
+        mode = str(getattr(self.cfg.engine, "rednote_read_mode", "hybrid") or "hybrid").lower()
+        return mode if mode in {"browser", "hybrid", "api"} else "hybrid"
+
+    def _channels_read_mode(self) -> str:
+        mode = str(getattr(self.cfg.engine, "channels_read_mode", "auto") or "auto").lower()
+        return mode if mode in {"auto", "protocol", "browser"} else "auto"
+
+    def _channels_protocol_client(self) -> ChannelsProtocolClient | None:
+        if self._channels_read_mode() not in {"auto", "protocol"}:
+            return None
+        return ChannelsProtocolClient.from_config(self.cfg)
 
     def _direct_request_ua(self, identity) -> str:
         resolver = getattr(self.browser, "direct_request_user_agent", None)
@@ -277,7 +102,7 @@ class KeywordCollector:
                   current_item_total: int | None = None) -> None:
         with get_session() as session:
             job = session.get(KeywordCollectionJob, job_id)
-            if not job:
+            if not job or job.cancel_requested or job.status == "canceled":
                 return
             if keyword is not None:
                 job.current_keyword = keyword
@@ -313,7 +138,7 @@ class KeywordCollector:
     @staticmethod
     def _mark_account_invalid(account_id: int) -> None:
         """搜索页明确出现登录墙时同步账号状态，避免继续把旧 Cookie 当作可用。"""
-        from ..models import DouyinAccount
+        from app.models import DouyinAccount
         with get_session() as session:
             account = session.get(DouyinAccount, account_id)
             if account and account.status != "invalid":
@@ -340,650 +165,6 @@ class KeywordCollector:
                 session.commit()
         return contents, comments
 
-    async def _discover_douyin(self, account, keyword: str,
-                               job: KeywordCollectionJob,
-                               client: DouyinClient | None = None,
-                               context=None) -> tuple[list[dict], str]:
-        mode = str(getattr(self.cfg.engine, "douyin_read_mode", "hybrid") or "hybrid")
-        if mode in {"api", "hybrid"} and client is not None:
-            items, error = [], ""
-            api_compatibility_failure = False
-            try:
-                print("[dy-search] HTTP search/single API 请求")
-                items, error = await client.search_awemes(
-                    keyword,
-                    max_results=job.max_contents_per_keyword,
-                    max_pages=job.max_pages_per_keyword,
-                    search_sort=job.search_sort,
-                    publish_time=job.publish_time,
-                    content_type=job.content_type,
-                    min_likes=job.min_likes,
-                    min_comments=job.min_comments,
-                )
-            except Exception as exc:
-                message = f"抖音搜索接口异常: {exc!r}"
-                category, _ = classify_platform_error(exc)
-                if mode == "api" or category in {
-                        RiskCategory.RISK, RiskCategory.AUTH, RiskCategory.NETWORK}:
-                    return [], message
-                print(f"[dy-search] API 兼容性异常，浏览器回退: {type(exc).__name__}")
-                api_compatibility_failure = True
-            if items:
-                return items, ("抖音搜索接口失败: " + error if error else "")
-            if not error and not api_compatibility_failure:
-                return [], ""
-            if error:
-                message = f"抖音搜索接口失败: {error}"
-                category, _ = classify_platform_error(message)
-                if error == "verification_required" or category in {
-                        RiskCategory.RISK, RiskCategory.AUTH, RiskCategory.NETWORK}:
-                    print("[dy-search] API 返回验证/风控信号，进入冷却，不打开浏览器")
-                    return [], message
-                if mode == "api":
-                    return [], message
-                print(f"[dy-search] API 兼容性失败，浏览器回退: {error}")
-        elif mode == "api":
-            return [], "抖音搜索接口异常: API 客户端不可用"
-        identity = self.browser.identity_for(account)
-        return await fetch_douyin_search(
-            self.browser, identity, keyword,
-            max_results=job.max_contents_per_keyword,
-            max_scrolls=job.max_pages_per_keyword,
-            stagnant_limit=job.stagnant_pages,
-            search_sort=job.search_sort,
-            publish_time=job.publish_time,
-            content_type=job.content_type,
-            min_likes=job.min_likes,
-            min_comments=job.min_comments,
-            captcha_wait_seconds=self.cfg.engine.douyin_captcha_wait_seconds,
-            block_media=self.cfg.engine.block_media_resources,
-            context=context,
-        )
-
-    async def _discover_douyin_creator(
-            self, account, job: KeywordCollectionJob,
-            client: DouyinClient | None) -> tuple[list[dict], str]:
-        mode = str(getattr(self.cfg.engine, "douyin_read_mode", "hybrid") or "hybrid")
-        if mode in {"api", "hybrid"} and client is not None:
-            try:
-                values = await client.fetch_all_video_list(
-                    job.source_ref,
-                    max_pages=job.max_pages_per_keyword,
-                    count=min(20, job.max_contents_per_keyword))
-                if values or mode == "api":
-                    return values[:job.max_contents_per_keyword], ""
-            except Exception as exc:
-                if mode == "api":
-                    return [], f"抖音创作者作品读取失败: {exc}"
-        values, _author, error = await fetch_videos(
-            self.browser, self.browser.identity_for(account), job.source_ref, set(),
-            max_scrolls=job.max_pages_per_keyword,
-            block_media=self.cfg.engine.block_media_resources)
-        return values[:job.max_contents_per_keyword], error
-
-    async def _discover_ks(self, account, keyword: str,
-                           job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        return await fetch_ks_search(
-            self.browser,
-            self.browser.identity_for(account),
-            keyword,
-            set(),
-            max_scrolls=max(1, min(40, int(job.max_pages_per_keyword or 1))),
-            stagnant_limit=max(1, min(8, int(job.stagnant_pages or 1))),
-            block_media=self.cfg.engine.block_media_resources,
-        )
-
-    async def _discover_tiktok(self, account, identity, keyword: str,
-                               job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        mode = str(getattr(self.cfg.engine, "tiktok_read_mode", "native") or "native")
-        if mode in {"auto", "native"}:
-            client = TikTokNativeClient(
-                storage_state=getattr(account, "storage_state", "") or "",
-                user_agent=identity.ua,
-                proxy=identity.proxy,
-                locale=identity.locale,
-                timezone=identity.timezone_id,
-                viewport=(identity.viewport_w, identity.viewport_h),
-                region="US",
-                device_seed=identity.fp_seed or str(identity.account_id or "creatorhub"),
-                timeout=max(10, int(self.cfg.engine.request_timeout_seconds)),
-            )
-            native = await client.search(
-                keyword, count=job.max_contents_per_keyword, offset=0)
-            if native.items or mode == "native":
-                return native.items, native.error
-            if native.category == "empty_valid":
-                return [], ""
-            print(
-                f"[tiktok-search] 离线接口兼容失败，页面回退: "
-                f"{native.category}; HTTP={native.http_status}; "
-                f"bytes={native.body_length}; tt_orcas_res={native.tt_orcas_res!r}"
-            )
-        if mode == "auto":
-            async with self.browser.temporary_headed_context(identity):
-                return await fetch_tiktok_search(
-                    self.browser, identity, keyword,
-                    max_results=job.max_contents_per_keyword,
-                    max_scrolls=job.max_pages_per_keyword,
-                    stagnant_limit=job.stagnant_pages,
-                    block_media=self.cfg.engine.block_media_resources,
-                )
-        return await fetch_tiktok_search(
-            self.browser, identity, keyword,
-            max_results=job.max_contents_per_keyword,
-            max_scrolls=job.max_pages_per_keyword,
-            stagnant_limit=job.stagnant_pages,
-            block_media=self.cfg.engine.block_media_resources,
-        )
-
-    async def _discover_ks_creator(
-            self, account, job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        values, _author, error = await fetch_ks_videos(
-            self.browser,
-            self.browser.identity_for(account),
-            job.source_ref,
-            set(),
-            max_scrolls=max(1, min(40, int(job.max_pages_per_keyword or 1))),
-            block_media=self.cfg.engine.block_media_resources,
-        )
-        return values[:job.max_contents_per_keyword], error
-
-    async def _discover_channels_account(
-            self, identity, job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        values, _author, error = await fetch_channels_works(
-            self.browser,
-            identity,
-            set(),
-            max_scrolls=max(1, min(40, int(job.max_pages_per_keyword or 1))),
-            block_media=self.cfg.engine.block_media_resources,
-        )
-        return values, error
-
-    async def _discover_xhs(self, client: XhsApiClient, keyword: str,
-                            job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        found: dict[str, dict] = {}
-        pages = max(1, min(40, int(job.max_pages_per_keyword or 1)))
-        needs_local_filter = bool(
-            job.publish_time != "all" or job.min_likes or job.min_comments)
-        candidate_limit = (pages * 20 if needs_local_filter
-                           else job.max_contents_per_keyword)
-        stagnant = 0
-        try:
-            for page in range(1, pages + 1):
-                raw_items = await client.search_notes(
-                    keyword,
-                    page=page,
-                    page_size=20,
-                    sort=_XHS_SEARCH_SORT.get(job.search_sort, "general"),
-                    note_type=_XHS_NOTE_TYPE.get(job.content_type, 0),
-                )
-                before = len(found)
-                for raw in raw_items:
-                    brief = parse_note_brief(raw)
-                    if brief:
-                        found.setdefault(brief["note_id"], raw)
-                    if len(found) >= candidate_limit:
-                        break
-                stagnant = stagnant + 1 if len(found) == before else 0
-                if len(found) >= candidate_limit:
-                    break
-                if not raw_items or stagnant >= max(1, int(job.stagnant_pages or 1)):
-                    break
-                await self._xhs_gap(0.6)
-        except Exception as exc:
-            return _sort_xhs_search_items(
-                list(found.values()), job.search_sort), f"小红书搜索失败: {exc}"
-        return _sort_xhs_search_items(list(found.values()), job.search_sort), ""
-
-    async def _discover_xhs_browser(
-            self, identity, keyword: str, job: KeywordCollectionJob
-            ) -> tuple[list[dict], str]:
-        values, error = await fetch_xhs_search(
-            self.browser,
-            identity,
-            keyword,
-            set(),
-            max_scrolls=max(1, min(40, int(job.max_pages_per_keyword or 1))),
-            stagnant_limit=max(1, min(8, int(job.stagnant_pages or 1))),
-            search_sort=job.search_sort,
-            content_type=job.content_type,
-            block_media=self.cfg.engine.block_media_resources,
-        )
-        return _sort_xhs_search_items(values, job.search_sort), error
-
-    async def _discover_xhs_favorites_browser(
-            self, identity, account,
-            job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        values, error = await fetch_xhs_favorites(
-            self.browser, identity, str(getattr(account, "sec_uid", "") or ""),
-            board_id=job.source_ref if job.source_type == "favorite_board" else "",
-            board_name=job.source_name,
-            max_scrolls=max(1, min(40, int(job.max_pages_per_keyword or 1))),
-            stagnant_limit=max(1, min(8, int(job.stagnant_pages or 1))),
-        )
-        return values, error
-
-    async def _discover_xhs_favorites_api(
-            self, client: XhsApiClient, job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        found: dict[str, dict] = {}
-        cursor = ""
-        pages = max(1, min(40, int(job.max_pages_per_keyword or 1)))
-        try:
-            for page in range(pages):
-                data = await client.favorite_notes(
-                    board_id=(job.source_ref if job.source_type == "favorite_board" else ""),
-                    cursor=cursor, page_size=min(50, job.max_contents_per_keyword))
-                values = data.get("notes") or data.get("items") or []
-                before = len(found)
-                for raw in values:
-                    brief = parse_note_brief(raw)
-                    if brief:
-                        raw.setdefault("xsec_source", "pc_user")
-                        found.setdefault(brief["note_id"], raw)
-                    if len(found) >= job.max_contents_per_keyword:
-                        break
-                if len(found) >= job.max_contents_per_keyword:
-                    break
-                next_cursor = str(data.get("cursor") or data.get("next_cursor") or "")
-                has_more = bool(data.get("has_more"))
-                if len(found) == before or not has_more or not next_cursor or next_cursor == cursor:
-                    break
-                cursor = next_cursor
-                if page + 1 < pages:
-                    await self._xhs_gap(0.6)
-        except Exception as exc:
-            return list(found.values()), f"小红书收藏读取失败: {exc}"
-        return list(found.values()), ""
-
-    async def _discover_xhs_creator_browser(
-            self, identity, job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        values, _author, error = await fetch_xhs_notes(
-            self.browser, identity, job.source_ref, set(),
-            max_scrolls=max(1, min(40, job.max_pages_per_keyword)),
-            block_media=self.cfg.engine.block_media_resources,
-            ssr_fallback=True)
-        return values[:job.max_contents_per_keyword], error
-
-    async def _discover_xhs_creator_api(
-            self, client: XhsApiClient, job: KeywordCollectionJob) -> tuple[list[dict], str]:
-        found: dict[str, dict] = {}
-        cursor = ""
-        try:
-            for page in range(max(1, min(40, job.max_pages_per_keyword))):
-                data = await client.notes_by_creator(
-                    job.source_ref, cursor=cursor,
-                    page_size=min(30, job.max_contents_per_keyword),
-                    xsec_source="pc_feed")
-                values = data.get("notes") or []
-                for raw in values:
-                    brief = parse_note_brief(raw)
-                    if brief:
-                        raw.setdefault("xsec_source", "pc_feed")
-                        found.setdefault(brief["note_id"], raw)
-                    if len(found) >= job.max_contents_per_keyword:
-                        break
-                next_cursor = str(data.get("cursor") or data.get("next_cursor") or "")
-                if (len(found) >= job.max_contents_per_keyword or not data.get("has_more")
-                        or not next_cursor or next_cursor == cursor):
-                    break
-                cursor = next_cursor
-                if page + 1 < job.max_pages_per_keyword:
-                    await self._xhs_gap(0.6)
-        except Exception as exc:
-            return list(found.values()), f"小红书创作者作品读取失败: {exc}"
-        return list(found.values()), ""
-
-    async def _materialize_xhs(self, client: XhsApiClient, raw: dict) \
-            -> tuple[Aweme | None, dict, str]:
-        brief = parse_note_brief(raw)
-        if not brief:
-            return None, {}, "搜索结果缺少 note_id"
-        card = {}
-        error = ""
-        try:
-            card = await client.note_detail(
-                brief["note_id"], xsec_token=brief.get("xsec_token", ""),
-                xsec_source=brief.get("xsec_source") or "pc_search")
-        except Exception as exc:
-            error = f"详情抓取失败: {exc}"
-        # Media absence is a download failure, not a reason to erase the
-        # detail's author/title/counts (or the list metadata if detail failed).
-        aweme = parse_note_detail(
-            card if isinstance(card, dict) else {}, brief, require_media=False)
-        return aweme, {"brief": brief, "card": card}, error
-
-    async def _materialize_xhs_browser(self, identity, raw: dict) \
-            -> tuple[Aweme | None, dict, str]:
-        brief = parse_note_brief(raw)
-        if not brief:
-            return None, {}, "搜索结果缺少 note_id"
-        card, error = await fetch_xhs_note_detail(
-            self.browser,
-            identity,
-            brief["note_id"],
-            xsec_token=brief.get("xsec_token", ""),
-            xsec_source=brief.get("xsec_source") or "pc_search",
-            block_media=self.cfg.engine.block_media_resources,
-        )
-        aweme = parse_note_detail(
-            card if isinstance(card, dict) else {}, brief, require_media=False)
-        return aweme, {"brief": brief, "card": card or {}}, error
-
-    @staticmethod
-    def _upsert_content(job: KeywordCollectionJob, keyword: str, aweme: Aweme,
-                        author_id: str, xsec_token: str, xsec_source: str,
-                        detail_error: str) \
-            -> KeywordCollectionContent:
-        with get_session() as session:
-            row = session.exec(
-                select(KeywordCollectionContent)
-                .where(KeywordCollectionContent.job_id == job.id)
-                .where(KeywordCollectionContent.keyword == keyword)
-                .where(KeywordCollectionContent.aweme_id == aweme.aweme_id)
-            ).first()
-            if row is None:
-                row = KeywordCollectionContent(
-                    job_id=job.id, platform=job.platform, keyword=keyword,
-                    aweme_id=aweme.aweme_id,
-                )
-            row.desc = aweme.desc
-            row.author_name = aweme.author_name
-            row.author_id = author_id
-            row.source_url = aweme.source_url
-            row.media_type = aweme.media_type
-            row.create_time = aweme.create_time
-            row.cover_url = aweme.cover or ""
-            row.like_count = aweme.like_count
-            row.comment_count = aweme.comment_count
-            row.media_json = _media_json(aweme)
-            row.xsec_token = xsec_token
-            row.xsec_source = xsec_source
-            row.error = detail_error
-            if job.download_media and aweme.medias and row.download_status != "done":
-                row.download_status = "pending"
-            elif (job.download_media and not aweme.medias
-                  and job.platform == "shipinhao"):
-                row.download_status = "skipped"
-                row.error = detail_error or "视频号未提供可直接下载媒体，仅保存作品元数据"
-            elif job.download_media and not aweme.medias:
-                row.download_status = "failed"
-                row.error = detail_error or "未取得媒体地址"
-            elif not job.download_media:
-                row.download_status = "skipped"
-            session.add(row)
-            session.commit()
-            session.refresh(row)
-            return row
-
-    async def _download(self, job: KeywordCollectionJob,
-                        content: KeywordCollectionContent, aweme: Aweme,
-                        proxy: str, *, account=None, identity=None) -> None:
-        if not job.download_media or not aweme.medias or content.download_status == "done":
-            return
-        with get_session() as session:
-            row = session.get(KeywordCollectionContent, content.id)
-            if row:
-                row.download_status = "downloading"
-                session.add(row)
-                session.commit()
-        root = Path(job.download_dir).expanduser() if job.download_dir else \
-            Path(self.cfg.engine.media_dir) / "keyword-collections"
-        base_dir = root / f"job_{job.id}" / safe_title(content.keyword)
-        routed_proxy = proxy if self.cfg.engine.route_download_via_proxy else ""
-        download_ua = str(getattr(identity, "ua", "") or "")
-        download_cookies = None
-        download_referer = ""
-        if job.platform == "tiktok" and account is not None:
-            download_ua, download_cookies = _tiktok_download_session(
-                account, identity, self.cfg.engine.user_agent)
-            download_referer = aweme.source_url or "https://www.tiktok.com/"
-        ok, local_path, error = await self.downloader.download_aweme(
-            aweme, str(base_dir), routed_proxy,
-            user_agent=download_ua,
-            cookies=download_cookies,
-            referer=download_referer,
-        )
-        with get_session() as session:
-            row = session.get(KeywordCollectionContent, content.id)
-            if row:
-                row.download_status = "done" if ok else "failed"
-                row.local_path = local_path
-                row.error = _content_error_after_download(row.error, error)
-                session.add(row)
-                session.commit()
-        if not ok:
-            self._record_error(
-                job.id,
-                f"{content.keyword}/{content.aweme_id}: 媒体下载失败: "
-                f"{error or '下载器未返回成功状态'}",
-            )
-
-    async def _douyin_comments(self, account, client: DouyinClient,
-                                aweme: Aweme, limit: int,
-                                include_replies: bool,
-                                context=None) -> tuple[list[dict], str]:
-        if limit <= 0:
-            return [], ""
-        mode = str(getattr(
-            self.cfg.engine, "douyin_read_mode", "hybrid") or "hybrid").lower()
-        if mode not in {"api", "hybrid", "browser"}:
-            mode = "hybrid"
-        error = ""
-        raw: list[dict] = []
-        if mode in {"api", "hybrid"}:
-            try:
-                raw = await client.fetch_all_comments(
-                    aweme.aweme_id,
-                    max_pages=max(1, min(20, math.ceil(limit / 20))),
-                    with_replies=include_replies,
-                    max_reply_pages=max(1, min(8, math.ceil(limit / 20))),
-                )
-            except Exception as exc:
-                error = f"评论接口失败: {exc}"
-        parsed = [item for item in (parse_comment(value) for value in raw) if item]
-        if not include_replies:
-            parsed = [item for item in parsed if not item.get("reply_to")]
-
-        if mode == "api":
-            # API-only 必须保持通道纯净：空 body、验证码、网络和解析失败都直接
-            # 返回给任务，绝不偷偷打开页面。作品明确有评论时才把空结果记为异常。
-            if not parsed and aweme.comment_count > 0 and not error:
-                error = ("评论接口失败: "
-                         f"{getattr(client, 'last_error', '') or 'empty_response'}")
-            return self._dedupe_comments(parsed, limit), error
-
-        # browser 模式从第一步就走页面；hybrid 仅在直连接口被静默降级时回退。
-        if mode == "browser" or (not parsed and aweme.comment_count > 0):
-            identity = self.browser.identity_for(account)
-            fallback, browser_error = await fetch_comments(
-                self.browser, identity, aweme.aweme_id, set(),
-                max_scrolls=max(2, min(20, math.ceil(limit / 12))),
-                block_media=self.cfg.engine.block_media_resources,
-                context=context,
-            )
-            parsed = [item for item in (parse_comment(value) for value in fallback) if item]
-            if not include_replies:
-                parsed = [item for item in parsed if not item.get("reply_to")]
-            error = "" if parsed else (browser_error or error)
-        return self._dedupe_comments(parsed, limit), error
-
-    async def _xhs_comments(self, client: XhsApiClient, note_id: str,
-                            xsec_token: str, xsec_source: str, limit: int,
-                            include_replies: bool) -> tuple[list[dict], str]:
-        if limit <= 0:
-            return [], ""
-        parsed: list[dict] = []
-        error = ""
-        try:
-            page = await client.collect_note_comments(
-                note_id, xsec_token=xsec_token,
-                xsec_source=xsec_source or "pc_search",
-                max_comments=limit,
-                max_requests=max(1, min(20, math.ceil(limit / 10) + 1)),
-                include_replies=include_replies,
-                request_interval=max(0.5, self.cfg.engine.xhs_item_gap_seconds))
-            parsed = [item for item in (
-                parse_xhs_comment(value) for value in page["comments"]) if item]
-        except Exception as exc:
-            error = f"评论抓取失败: {exc}"
-        if not include_replies:
-            parsed = [item for item in parsed if not item.get("reply_to")]
-        return self._dedupe_comments(parsed, limit), error
-
-    async def _xhs_comments_browser(
-            self, identity, note_id: str, xsec_token: str, xsec_source: str,
-            limit: int,
-            include_replies: bool) -> tuple[list[dict], str]:
-        if limit <= 0:
-            return [], ""
-        raw, error = await fetch_xhs_comments(
-            self.browser,
-            identity,
-            note_id,
-            set(),
-            xsec_token=xsec_token,
-            xsec_source=xsec_source or "pc_search",
-            max_scrolls=max(1, min(20, math.ceil(limit / 10) + 1)),
-            block_media=self.cfg.engine.block_media_resources,
-        )
-        values = flatten_xhs_comments(raw) if include_replies else raw
-        parsed = [item for item in
-                  (parse_xhs_comment(value) for value in values) if item]
-        if not include_replies:
-            parsed = [item for item in parsed if not item.get("reply_to")]
-        return self._dedupe_comments(parsed, limit), error
-
-    async def _ks_comments(self, identity, photo_id: str, limit: int,
-                           include_replies: bool) -> tuple[list[dict], str]:
-        if limit <= 0:
-            return [], ""
-        raw, error = await fetch_ks_comments(
-            self.browser,
-            identity,
-            photo_id,
-            set(),
-            max_scrolls=max(1, min(20, math.ceil(limit / 10) + 1)),
-            block_media=self.cfg.engine.block_media_resources,
-        )
-        values = flatten_ks_comments(raw) if include_replies else raw
-        parsed = [item for item in
-                  (parse_ks_comment(value) for value in values) if item]
-        if not include_replies:
-            parsed = [item for item in parsed if not item.get("reply_to")]
-        return self._dedupe_comments(parsed, limit), error
-
-    async def _channels_comments(self, identity, object_id: str, limit: int,
-                                 include_replies: bool) -> tuple[list[dict], str]:
-        if limit <= 0:
-            return [], ""
-        raw, error = await fetch_channels_comments(
-            self.browser,
-            identity,
-            object_id,
-            set(),
-            max_scrolls=max(1, min(20, math.ceil(limit / 10) + 1)),
-            block_media=self.cfg.engine.block_media_resources,
-        )
-        values = flatten_channels_comments(raw) if include_replies else raw
-        parsed = [item for item in
-                  (parse_channels_comment(value) for value in values) if item]
-        if not include_replies:
-            parsed = [item for item in parsed if not item.get("reply_to")]
-        return self._dedupe_comments(parsed, limit), error
-
-    async def _tiktok_comments(self, identity, aweme_id: str, limit: int,
-                               include_replies: bool, *, author_unique_id: str = "",
-                               target_url: str = "", account=None) -> tuple[list[dict], str]:
-        if limit <= 0:
-            return [], ""
-        mode = str(getattr(self.cfg.engine, "tiktok_read_mode", "native") or "native")
-        if mode == "native" and account is None:
-            return [], "TikTok 离线评论读取缺少账号会话"
-        if mode in {"auto", "native"} and account is not None:
-            client = TikTokNativeClient(
-                storage_state=getattr(account, "storage_state", "") or "",
-                user_agent=identity.ua,
-                proxy=identity.proxy,
-                locale=identity.locale,
-                timezone=identity.timezone_id,
-                viewport=(identity.viewport_w, identity.viewport_h),
-                region="US",
-                device_seed=identity.fp_seed or str(identity.account_id or "creatorhub"),
-                timeout=max(10, int(self.cfg.engine.request_timeout_seconds)),
-            )
-            native = await client.comments(
-                aweme_id, count=limit, include_replies=include_replies,
-                author_unique_id=author_unique_id, target_url=target_url)
-            if native.items or native.compatible or mode == "native":
-                parsed = [
-                    item for item in
-                    (parse_tiktok_comment(value) for value in native.items)
-                    if item
-                ]
-                if not include_replies:
-                    parsed = [item for item in parsed if not item.get("reply_to")]
-                return self._dedupe_comments(parsed, limit), native.error
-            print(
-                f"[tiktok-comments] 离线接口兼容失败，页面回退: "
-                f"{native.category}; HTTP={native.http_status}; "
-                f"bytes={native.body_length}; tt_orcas_res={native.tt_orcas_res!r}"
-            )
-        raw, error = await fetch_tiktok_comments(
-            self.browser, identity, aweme_id, set(), max_comments=limit,
-            max_scrolls=max(1, min(20, math.ceil(limit / 10) + 1)),
-            include_replies=include_replies,
-            block_media=self.cfg.engine.block_media_resources,
-            author_unique_id=author_unique_id, target_url=target_url)
-        parsed = [item for item in (parse_tiktok_comment(value) for value in raw) if item]
-        if not include_replies:
-            parsed = [item for item in parsed if not item.get("reply_to")]
-        return self._dedupe_comments(parsed, limit), error
-
-    @staticmethod
-    def _dedupe_comments(values: list[dict], limit: int) -> list[dict]:
-        found: dict[str, dict] = {}
-        for value in values:
-            cid = str(value.get("comment_id") or "")
-            if cid:
-                found.setdefault(cid, value)
-            if len(found) >= limit:
-                break
-        return list(found.values())[:limit]
-
-    @staticmethod
-    def _persist_comments(job_id: int, content_id: int, platform: str,
-                          aweme_id: str, comments: list[dict]) -> int:
-        with get_session() as session:
-            known = set(session.exec(
-                select(KeywordCollectionComment.comment_id)
-                .where(KeywordCollectionComment.job_id == job_id)
-                .where(KeywordCollectionComment.content_id == content_id)
-            ).all())
-            added = 0
-            for item in comments:
-                cid = str(item.get("comment_id") or "")
-                if not cid or cid in known:
-                    continue
-                known.add(cid)
-                session.add(KeywordCollectionComment(
-                    job_id=job_id, content_id=content_id, platform=platform,
-                    aweme_id=aweme_id, comment_id=cid,
-                    text=item.get("text") or "",
-                    user_nickname=item.get("user_nickname") or "",
-                    user_sec_uid=item.get("user_sec_uid") or "",
-                    ip_label=item.get("ip_label") or "",
-                    like_count=int(item.get("like_count") or 0),
-                    create_time=int(item.get("create_time") or 0),
-                    reply_to=item.get("reply_to") or "",
-                ))
-                added += 1
-            content = session.get(KeywordCollectionContent, content_id)
-            if content:
-                content.collected_comment_count = len(known)
-                session.add(content)
-            session.commit()
-        return added
-
     async def run(self, job_id: int, account) -> dict:
         job = self._job(job_id)
         if not job:
@@ -999,8 +180,16 @@ class KeywordCollector:
         if not keywords:
             raise RuntimeError("采集任务没有可执行来源")
 
-        identity = self.browser.identity_for(account)
-        proxy = account.proxy or ""
+        if account is not None:
+            identity = self.browser.identity_for(account)
+            proxy = account.proxy or ""
+        else:
+            with get_session() as s:
+                proxy = pick_ephemeral_proxy(s, self.cfg, platform=job.platform)
+            try:
+                identity = self.browser.anon_identity(proxy=proxy, platform=job.platform)
+            except TypeError:
+                identity = self.browser.anon_identity()
         douyin_client = None
         xhs_client = None
         if job.platform == "douyin":
@@ -1014,8 +203,12 @@ class KeywordCollector:
             if not has_a1(cookie):
                 raise RuntimeError("小红书登录态缺少 a1，请重新扫码登录")
             xhs_client = XhsApiClient(
-                cookie, self._direct_request_ua(identity),
-                timeout=self.cfg.engine.request_timeout_seconds, proxy=proxy)
+                cookie,
+                self._direct_request_ua(identity),
+                timeout=self.cfg.engine.request_timeout_seconds,
+                proxy=proxy,
+                storage_state=account.storage_state,
+            )
 
         if job.platform == "douyin":
             mode = str(getattr(
@@ -1058,8 +251,84 @@ class KeywordCollector:
                 job_id, job, account, keywords, proxy,
                 identity=identity, context=None)
         if job.platform == "shipinhao":
+            channels_client = self._channels_protocol_client()
+            try:
+                return await self._run_keywords(
+                    job_id, job, account, keywords, proxy,
+                    identity=identity, channels_client=channels_client)
+            finally:
+                if channels_client is not None:
+                    await channels_client.close()
+        if job.platform == "bilibili":
+            bili_state = (account.storage_state or account.cookie) if account is not None else ""
+            bili_client = BilibiliClient(
+                bili_state,
+                getattr(identity, "ua", "") or self.cfg.engine.user_agent,
+                proxy=proxy,
+                timeout=self.cfg.engine.request_timeout_seconds,
+            )
+            self._progress(job_id, step="启动哔哩哔哩采集任务")
+            async with bili_client.session_scope():
+                return await self._run_keywords(
+                    job_id, job, account, keywords, proxy,
+                    identity=identity, bili_client=bili_client)
+        if job.platform == "rednote":
+            rn_mode = self._rednote_read_mode()
+            rn_state = (
+                (getattr(account, "storage_state", "") or getattr(account, "creator_storage_state", ""))
+                if account is not None
+                else ""
+            )
+            rn_cookie = rednote_cookie_str_from_state(rn_state)
+            rednote_client = None
+            if rn_mode in {"api", "hybrid"}:
+                if rednote_has_a1(rn_cookie):
+                    rednote_client = RednoteApiClient(
+                        rn_cookie,
+                        self._direct_request_ua(identity),
+                        timeout=self.cfg.engine.request_timeout_seconds,
+                        proxy=proxy,
+                        storage_state=rn_state,
+                    )
+                elif rn_mode == "api":
+                    raise RuntimeError("海外小红书登录态缺少 a1，请重新扫码登录或切换为浏览器读取模式")
+            self._progress(job_id, step="启动海外小红书采集任务")
+            if rednote_client is not None:
+                async with rednote_client.session_scope():
+                    return await self._run_keywords(
+                        job_id, job, account, keywords, proxy,
+                        identity=identity, rednote_client=rednote_client)
             return await self._run_keywords(
-                job_id, job, account, keywords, proxy, identity=identity)
+                job_id, job, account, keywords, proxy,
+                identity=identity, rednote_client=None)
+        if job.platform == "instagram":
+            ig_state = (account.storage_state or account.cookie) if account is not None else ""
+            ig_client = InstagramClient(
+                ig_state,
+                getattr(identity, "ua", "") or self.cfg.engine.user_agent,
+                proxy=proxy,
+                timeout=self.cfg.engine.request_timeout_seconds,
+                account_seed=(getattr(account, "fp_seed", "") or str(getattr(account, "id", "") or "")),
+                timezone_id=(getattr(account, "timezone_id", "Asia/Shanghai") if account else "Asia/Shanghai"),
+            )
+            self._progress(job_id, step="启动 Instagram 采集任务")
+            async with ig_client.session_scope():
+                return await self._run_keywords(
+                    job_id, job, account, keywords, proxy,
+                    identity=identity, ig_client=ig_client)
+        if job.platform == "twitter":
+            tw_state = (account.storage_state or account.cookie) if account is not None else ""
+            tw_client = TwitterClient(
+                tw_state,
+                getattr(identity, "ua", "") or self.cfg.engine.user_agent,
+                proxy=proxy,
+                timeout=self.cfg.engine.request_timeout_seconds,
+            )
+            self._progress(job_id, step="启动 X (Twitter) 采集任务")
+            async with tw_client.session_scope():
+                return await self._run_keywords(
+                    job_id, job, account, keywords, proxy,
+                    identity=identity, tw_client=tw_client)
         if xhs_client is not None:
             async with xhs_client.session_scope():
                 return await self._run_keywords(
@@ -1073,6 +342,11 @@ class KeywordCollector:
                             account, keywords: list[str], proxy: str,
                              douyin_client: DouyinClient | None = None,
                              xhs_client: XhsApiClient | None = None,
+                             rednote_client: RednoteApiClient | None = None,
+                             channels_client: ChannelsProtocolClient | None = None,
+                             bili_client: BilibiliClient | None = None,
+                             ig_client: InstagramClient | None = None,
+                             tw_client: TwitterClient | None = None,
                              context=None, identity=None) -> dict:
 
         browser_reads = self._xhs_browser_reads_enabled()
@@ -1089,17 +363,27 @@ class KeywordCollector:
                 gap = max(0.0, float(self.cfg.engine.douyin_keyword_gap_seconds))
                 if gap:
                     await asyncio.sleep(gap * random.uniform(1.0, 1.35))
-            elif job.platform == "xhs" and keyword_index:
+            elif job.platform in {"xhs", "rednote"} and keyword_index:
                 await self._xhs_gap(
                     self.cfg.engine.xhs_keyword_gap_seconds)
-            elif job.platform == "kuaishou" and keyword_index:
+            elif job.platform in {"kuaishou", "shipinhao"} and keyword_index:
                 await asyncio.sleep(0.8 * random.uniform(1.0, 1.35))
             elif job.platform == "tiktok" and keyword_index:
                 await asyncio.sleep(1.0 * random.uniform(1.0, 1.35))
+            elif job.platform == "bilibili" and keyword_index:
+                await asyncio.sleep(0.8 * random.uniform(1.0, 1.35))
+            elif job.platform in {"instagram", "twitter"} and keyword_index:
+                await asyncio.sleep(1.2 * random.uniform(1.0, 1.35))
             self._progress(
                 job_id,
                 keyword=keyword,
-                step=("同步本账号作品" if job.platform == "shipinhao" else "搜索作品"),
+                step=(
+                    "同步本账号作品"
+                    if (job.platform in {"shipinhao", "bilibili", "instagram", "twitter"} and job.source_type == "account_works")
+                    else "读取创作者作品"
+                    if (job.platform in {"shipinhao", "bilibili", "instagram", "twitter"} and job.source_type == "creator")
+                    else "搜索作品"
+                ),
                 processed_keyword_count=keyword_index,
                 current_item_index=0,
                 current_item_total=0,
@@ -1122,9 +406,49 @@ class KeywordCollector:
             elif job.platform == "tiktok":
                 raw_items, search_error = await self._discover_tiktok(
                     account, identity, keyword, job)
+            elif job.platform == "bilibili":
+                if job.source_type == "creator":
+                    raw_items, search_error = await self._discover_bilibili_creator(
+                        job, bili_client=bili_client, identity=identity)
+                elif job.source_type == "account_works":
+                    raw_items, search_error = await self._discover_bilibili_account(
+                        account, job, bili_client=bili_client, identity=identity)
+                else:
+                    raw_items, search_error = await self._discover_bilibili_keyword(
+                        keyword, job, bili_client=bili_client, identity=identity)
+            elif job.platform == "instagram":
+                if job.source_type == "creator":
+                    raw_items, search_error = await self._discover_instagram_creator(
+                        job, ig_client=ig_client, identity=identity)
+                elif job.source_type == "account_works":
+                    raw_items, search_error = await self._discover_instagram_account(
+                        account, job, ig_client=ig_client, identity=identity)
+                else:
+                    raw_items, search_error = await self._discover_instagram_keyword(
+                        keyword, job, ig_client=ig_client, identity=identity)
+            elif job.platform == "twitter":
+                if job.source_type == "creator":
+                    raw_items, search_error = await self._discover_twitter_creator(
+                        job, tw_client=tw_client, identity=identity)
+                elif job.source_type == "account_works":
+                    raw_items, search_error = await self._discover_twitter_account(
+                        account, job, tw_client=tw_client, identity=identity)
+                else:
+                    raw_items, search_error = await self._discover_twitter_keyword(
+                        keyword, job, tw_client=tw_client, identity=identity)
             elif job.platform == "shipinhao":
-                raw_items, search_error = await self._discover_channels_account(
-                    identity, job)
+                if job.source_type == "creator":
+                    raw_items, search_error = await self._discover_channels_creator(
+                        job, proto_client=channels_client)
+                elif job.source_type == "keyword":
+                    raw_items, search_error = await self._discover_channels_keyword(
+                        keyword, job, proto_client=channels_client)
+                else:
+                    raw_items, search_error = await self._discover_channels_account(
+                        identity, job, account=account, proto_client=channels_client)
+            elif job.platform == "rednote":
+                raw_items, search_error = await self._discover_rednote_source(
+                    identity, account, keyword, job, rednote_client=rednote_client)
             elif browser_reads:
                 if job.source_type in {"favorite_all", "favorite_board"}:
                     raw_items, search_error = await self._discover_xhs_favorites_browser(
@@ -1147,7 +471,7 @@ class KeywordCollector:
                         xhs_client, keyword, job)
             if search_error:
                 self._record_error(job_id, f"{keyword}: {search_error}")
-                if "登录态已失效" in search_error:
+                if "登录态已失效" in search_error and account is not None:
                     self._mark_account_invalid(account.id)
                 category, _ = classify_platform_error(search_error)
                 if category in {
@@ -1179,7 +503,7 @@ class KeywordCollector:
                     current_item_index=index,
                     current_item_total=len(candidates),
                 )
-                if job.platform == "xhs" and index > 1:
+                if job.platform in {"xhs", "rednote"} and index > 1:
                     await self._xhs_gap(self.cfg.engine.xhs_item_gap_seconds)
                 detail_error = ""
                 detail_raw = raw
@@ -1202,11 +526,91 @@ class KeywordCollector:
                     token = ""
                 elif job.platform == "shipinhao":
                     aweme = parse_channels_feed(raw, job.video_quality or "highest")
-                    if aweme is not None and not aweme.author_name:
+                    if (aweme is not None and channels_client is not None
+                            and job.download_media and not aweme.medias
+                            and aweme.aweme_id):
+                        detail_obj, _ = await channels_client.fetch_feed_detail(
+                            object_id=aweme.aweme_id,
+                            object_nonce_id=aweme.object_nonce_id,
+                        )
+                        if detail_obj:
+                            detail_aweme = parse_channels_feed(
+                                detail_obj, job.video_quality or "highest")
+                            if detail_aweme is not None:
+                                detail_aweme.like_count = max(
+                                    detail_aweme.like_count, aweme.like_count)
+                                detail_aweme.comment_count = max(
+                                    detail_aweme.comment_count, aweme.comment_count)
+                                if not detail_aweme.author_name:
+                                    detail_aweme.author_name = aweme.author_name
+                                if not detail_aweme.desc:
+                                    detail_aweme.desc = aweme.desc
+                                aweme = detail_aweme
+                                detail_raw = detail_obj
+                    if (aweme is not None and not aweme.author_name
+                            and job.source_type == "account_works"):
                         aweme.author_name = str(getattr(account, "nickname", "") or "")
-                    token = ""
+                    token = (aweme.object_nonce_id if aweme is not None else "") or ""
                 elif job.platform == "tiktok":
                     aweme = parse_tiktok_aweme(raw, job.video_quality or "highest")
+                    token = ""
+                elif job.platform == "bilibili":
+                    aweme = parse_bili_aweme(raw, require_media=False)
+                    if (
+                        aweme is not None
+                        and job.download_media
+                        and not aweme.medias
+                        and bili_client is not None
+                    ):
+                        full_aw, play_err = await bili_client.fetch_aweme_by_work(
+                            aweme.aweme_id,
+                            with_play_url=True,
+                            quality=job.video_quality or "highest",
+                        )
+                        if full_aw is not None:
+                            aweme = full_aw
+                        if play_err and not aweme.medias:
+                            detail_error = play_err
+                    token = ""
+                elif job.platform == "rednote":
+                    aweme, parts, detail_error = await self._materialize_rednote(
+                        identity, raw, rednote_client=rednote_client)
+                    brief = parts.get("brief") or {}
+                    card = parts.get("card") or {}
+                    detail_raw = card or raw
+                    token = brief.get("xsec_token") or ""
+                    source = brief.get("xsec_source") or (
+                        "pc_feed" if job.source_type == "creator" else
+                        "pc_user" if job.source_type != "keyword" else "pc_search")
+                elif job.platform == "instagram":
+                    aweme = parse_ig_aweme(raw, require_media=False)
+                    if (
+                        aweme is not None
+                        and (not aweme.medias or (aweme.media_type == "video" and not any(m.kind == "video" for m in aweme.medias)))
+                        and ig_client is not None
+                    ):
+                        full_aw, full_raw, info_err = await ig_client.fetch_media_info(aweme.aweme_id)
+                        if full_aw is not None:
+                            aweme = full_aw
+                            detail_raw = full_raw
+                        elif info_err and job.download_media and not aweme.medias:
+                            detail_error = info_err
+                    token = ""
+                elif job.platform == "twitter":
+                    aweme = parse_twitter_aweme(raw)
+                    if (
+                        aweme is not None
+                        and job.download_media
+                        and not aweme.medias
+                        and tw_client is not None
+                        and not isinstance(raw.get("legacy"), dict)
+                    ):
+                        full_aw, full_raw, _info_err = await tw_client.fetch_tweet_syndication(
+                            aweme.source_url or aweme.aweme_id
+                        )
+                        if full_aw is not None and full_aw.medias:
+                            aweme = full_aw
+                            detail_raw = full_raw
                     token = ""
                 elif browser_reads:
                     aweme, parts, detail_error = \
@@ -1227,7 +631,7 @@ class KeywordCollector:
                     source = brief.get("xsec_source") or (
                         "pc_feed" if job.source_type == "creator" else
                         "pc_user" if job.source_type != "keyword" else "pc_search")
-                if job.platform == "xhs" and detail_error:
+                if job.platform in {"xhs", "rednote"} and detail_error:
                     category, _ = classify_platform_error(detail_error)
                     if category in {
                             RiskCategory.RISK, RiskCategory.AUTH,
@@ -1240,15 +644,16 @@ class KeywordCollector:
                 if aweme is None:
                     self._record_error(job_id, f"{keyword}: 无法解析一条搜索结果")
                     continue
-                if job.platform in {"xhs", "kuaishou", "shipinhao", "tiktok"} and not \
+                if job.platform in {"xhs", "rednote", "kuaishou", "shipinhao", "tiktok", "bilibili", "instagram", "twitter"} and not \
                         _collection_content_matches(aweme, job):
                     continue
 
                 current = self._job(job_id)
                 author_id = _author_id(detail_raw, job.platform)
-                if job.platform == "xhs" and not author_id:
+                if job.platform in {"xhs", "rednote"} and not author_id:
                     author_id = brief.get("author_id") or ""
-                if job.platform == "shipinhao" and not author_id:
+                if (job.platform == "shipinhao" and not author_id
+                        and job.source_type == "account_works"):
                     author_id = str(getattr(account, "sec_uid", "") or "")
                 content = self._upsert_content(
                     current, keyword, aweme, author_id,
@@ -1259,15 +664,23 @@ class KeywordCollector:
                         job_id, f"{keyword}/{aweme.aweme_id}: {detail_error}")
                 self._refresh_counts(job_id)
 
+                if self._cancel_requested(job_id):
+                    return {"canceled": True, "errors": self._job(job_id).error_count}
                 if job.download_media:
                     self._progress(job_id, keyword=keyword, step=f"下载作品 {index}")
                     await self._download(
                         current, content, aweme, proxy,
                         account=account, identity=identity)
 
+                if self._cancel_requested(job_id):
+                    return {"canceled": True, "errors": self._job(job_id).error_count}
                 should_collect_comments = (
                     job.max_comments_per_content > 0
-                    and (job.platform != "shipinhao" or aweme.comment_count > 0)
+                    and (
+                        job.platform != "shipinhao"
+                        or aweme.comment_count > 0
+                        or channels_client is not None
+                    )
                 )
                 if should_collect_comments:
                     self._progress(job_id, keyword=keyword, step=f"抓取评论 {index}")
@@ -1283,13 +696,55 @@ class KeywordCollector:
                     elif job.platform == "shipinhao":
                         comments, comment_error = await self._channels_comments(
                             identity, aweme.aweme_id,
-                            job.max_comments_per_content, job.include_replies)
+                            job.max_comments_per_content, job.include_replies,
+                            object_nonce_id=token,
+                            proto_client=channels_client,
+                            source_type=job.source_type)
+                        if (not comments and not comment_error
+                                and aweme.comment_count > 0
+                                and channels_client is not None):
+                            detail_obj, _ = await channels_client.fetch_feed_detail(
+                                object_id=aweme.aweme_id,
+                                object_nonce_id=token,
+                            )
+                            detail_nonce = str(
+                                (detail_obj or {}).get("objectNonceId")
+                                or (detail_obj or {}).get("object_nonce_id")
+                                or ""
+                            ).strip()
+                            if detail_nonce and detail_nonce != token:
+                                comments, comment_error = await self._channels_comments(
+                                    identity, aweme.aweme_id,
+                                    job.max_comments_per_content, job.include_replies,
+                                    object_nonce_id=detail_nonce,
+                                    proto_client=channels_client,
+                                    source_type=job.source_type)
                     elif job.platform == "tiktok":
                         comments, comment_error = await self._tiktok_comments(
                             identity, aweme.aweme_id,
                             job.max_comments_per_content, job.include_replies,
                             author_unique_id=aweme.author_unique_id,
                             target_url=aweme.source_url, account=account)
+                    elif job.platform == "bilibili":
+                        comments, comment_error = await self._bilibili_comments(
+                            identity, aweme.aweme_id,
+                            job.max_comments_per_content, job.include_replies,
+                            bili_client=bili_client)
+                    elif job.platform == "rednote":
+                        comments, comment_error = await self._rednote_comments(
+                            identity, aweme.aweme_id, token, source,
+                            job.max_comments_per_content, job.include_replies,
+                            rednote_client=rednote_client)
+                    elif job.platform == "instagram":
+                        comments, comment_error = await self._instagram_comments(
+                            identity, aweme.aweme_id,
+                            job.max_comments_per_content, job.include_replies,
+                            ig_client=ig_client)
+                    elif job.platform == "twitter":
+                        comments, comment_error = await self._twitter_comments(
+                            identity, aweme.aweme_id,
+                            job.max_comments_per_content, job.include_replies,
+                            tw_client=tw_client, target_url=aweme.source_url)
                     elif browser_reads:
                         comments, comment_error = await self._xhs_comments_browser(
                             identity, aweme.aweme_id, token, source,
@@ -1300,16 +755,27 @@ class KeywordCollector:
                             job.max_comments_per_content, job.include_replies)
                     self._persist_comments(
                         job_id, content.id, job.platform, aweme.aweme_id, comments)
+                    if job.platform == "shipinhao":
+                        audit_counts = self.__dict__.get("_last_channels_counts", {}).pop(
+                            aweme.aweme_id, {})
+                        self._backfill_channels_counts(
+                            content,
+                            like_count=_xhs_count(audit_counts.get("likeCount")),
+                            comment_count=max(
+                                _xhs_count(audit_counts.get("commentCount")),
+                                len(comments),
+                            ),
+                        )
                     if comment_error:
                         self._record_error(
                             job_id, f"{keyword}/{aweme.aweme_id}: {comment_error}")
-                        if job.platform in {"xhs", "kuaishou", "shipinhao", "tiktok"} and classify_platform_error(
+                        if job.platform in {"xhs", "rednote", "kuaishou", "shipinhao", "tiktok", "bilibili", "instagram", "twitter"} and classify_platform_error(
                                 comment_error)[0] in {
                                 RiskCategory.RISK, RiskCategory.AUTH,
                                 RiskCategory.NETWORK}:
                             return self._result(job_id, stopped=True)
                 self._refresh_counts(job_id)
-                if job.platform != "xhs":
+                if job.platform not in {"xhs", "rednote"}:
                     await asyncio.sleep(0.4)
                 if accepted >= job.max_contents_per_keyword:
                     break

@@ -3,11 +3,24 @@ import asyncio
 import pytest
 from app import licensing
 from app.agent import runtime
+from app.agent.config import SettingsUpdate, save_settings
 from app.agent.providers import Turn, ToolCall
 from app.agent.workflows import save_plan, validate_plan, apply_plan
-from test_agent import client, enabled, account, plan_args, store
-from test_project_optimizations import local_project
-from app.models import AgentRun
+from app.models import AgentRun, DouyinAccount
+from commercial_fixtures import client, local_project, store
+
+
+def enabled():
+    save_settings(SettingsUpdate(enabled=True, base_url="https://model.example/v1", model="fixture"))
+
+
+def account():
+    return store(DouyinAccount(platform="douyin", nickname="Fixture", status="active"))
+
+
+def plan_args(account_id):
+    return {"title": "本地采集计划", "steps": [{"kind": "create_collection", "platform": "douyin",
+            "account_id": account_id, "keywords": ["摄影"]}]}
 
 
 def test_denied_operations_preserve_history_and_stop(local_project, monkeypatch):
@@ -149,16 +162,17 @@ def test_direct_model_boundaries_never_reach_network(local_project, monkeypatch,
 
 @pytest.mark.parametrize('operation',['collection','monitor'])
 def test_direct_business_creation_requires_license(local_project, monkeypatch, operation):
-    from app import main, db
+    from app import db
+    from app.api import collections, monitors
     from app.models import KeywordCollectionJob, MonitorTarget, TaskSubmission
     from sqlmodel import select
     monkeypatch.setattr(licensing,'is_active',lambda:False)
     async def scenario():
         with pytest.raises(licensing.LicenseRequired):
             if operation=='collection':
-                await main.create_keyword_collection(main.KeywordCollectionIn.model_construct())
+                await collections.create_keyword_collection(collections.collections_service.KeywordCollectionIn.model_construct())
             else:
-                await main.add_monitor(main.TargetIn.model_construct())
+                await monitors.add_monitor(monitors.TargetIn.model_construct())
     asyncio.run(scenario())
     with db.get_session() as session:
         for model in (KeywordCollectionJob,MonitorTarget,TaskSubmission):

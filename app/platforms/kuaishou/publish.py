@@ -8,14 +8,22 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple
+from typing import Awaitable, Callable, List, Tuple
 from urllib.parse import urlparse
 
+from ...browser.human_interaction import (
+    DEFAULT_HUMAN_ENGINE,
+    human_click_first,
+    human_fill_first,
+    human_wait,
+)
 from ...browser.identity import Identity
 from ...browser.manager import BrowserManager
+from .._submit import notify_stage as _notify_stage, notify_submit as _notify_submit
 
 PUBLISH_URL = "https://cp.kuaishou.com/article/publish/video"
 MANAGE_URL = "https://cp.kuaishou.com/article/manage/video"
@@ -34,13 +42,44 @@ _DESC_SEL = (
     'textarea[placeholder*="描述"]',
     'textarea',
 )
+# 上传输入框兜底、引导跳过与进度/报错监测选择器
+_VIDEO_INPUTS = (
+    '#root-video-publish #rc-tabs-0-panel-1 input[type*="file"]',
+    'input[type="file"][accept*="video"]',
+    'input[type="file"]',
+)
+_IMAGE_INPUTS = (
+    '#root-video-publish #rc-tabs-0-panel-2 input[accept*="image"]',
+    'input[type="file"][accept*="image"]',
+    'input[type="file"]',
+)
+_JOYRIDE_SKIP = (
+    '#react-joyride-step-0 div[aria-label="Skip"]',
+    'button:has-text("跳过")',
+    'button:has-text("我知道了")',
+)
+_PROGRESS_SEL = (
+    '#root-video-publish main .ant-progress',
+    '#preview-tours .ant-progress',
+)
+_UPLOAD_ERR_SEL = (
+    '#main-container .error',
+    '#preview-tours div[class*="phone-item"]',
+)
+_UPLOAD_ERR_KW = ("上传失败", "转码失败", "超过限制", "格式不支持")
 _SUCCESS_KW = ("发布成功", "作品发布成功", "投稿成功", "提交成功", "审核中")
 _VERIFY_KW = ("安全验证", "扫码验证", "短信验证", "验证码", "拖动滑块", "身份验证")
 _DEBUG_DIR = Path("./data/debug")
 
 
+_pub_log = logging.getLogger("creatorhub.publish.kuaishou")
+
+
 def _log(message: str) -> None:
-    print(f"[ks-publish] {message}", flush=True)
+    if any(k in message for k in ("失败", "超时", "异常", "验证", "拦截")):
+        _pub_log.warning("%s", message)
+    else:
+        _pub_log.info("%s", message)
 
 
 def _published_work_url(payload) -> str:
@@ -88,35 +127,11 @@ async def _dump(page, tag: str) -> str:
 
 
 async def _click_first_visible(page, selectors, timeout=3000) -> bool:
-    for selector in selectors:
-        try:
-            loc = page.locator(selector)
-            for index in range(await loc.count()):
-                candidate = loc.nth(index)
-                if not await candidate.is_visible():
-                    continue
-                await candidate.click(timeout=timeout)
-                return True
-        except Exception:
-            continue
-    return False
+    return await human_click_first(page, selectors, timeout=timeout)
 
 
 async def _fill_first(page, selectors, text, timeout=4000) -> bool:
-    for selector in selectors:
-        try:
-            editor = page.locator(selector).first
-            await editor.wait_for(state="visible", timeout=timeout)
-            await editor.click(timeout=timeout)
-            try:
-                await editor.fill(text, timeout=timeout)
-            except Exception:
-                await page.keyboard.press("Control+A")
-                await page.keyboard.type(text, delay=15)
-            return True
-        except Exception:
-            continue
-    return False
+    return bool(await human_fill_first(page, selectors, text, clear=True, timeout=timeout))
 
 
 async def _visible_text(page, keywords) -> str:
@@ -142,7 +157,7 @@ async def _upload_files(page, media_type: str, files: List[str]) -> bool:
             for index in range(await button.count()):
                 candidate = button.nth(index)
                 if await candidate.is_visible():
-                    await candidate.click(timeout=4000)
+                    await DEFAULT_HUMAN_ENGINE.click_locator(candidate, page=page, timeout=4000)
                     clicked = True
                     break
             if not clicked:
@@ -153,15 +168,65 @@ async def _upload_files(page, media_type: str, files: List[str]) -> bool:
     except Exception as chooser_error:
         _log(f"file chooser 上传未命中，尝试 input 兜底: {chooser_error!r}")
 
-    selector = ('input[type="file"][accept*="image"]'
-                if media_type == "images"
-                else 'input[type="file"][accept*="video"]')
-    try:
-        target = page.locator(selector).first
-        await target.set_input_files(want, timeout=15000)
-        return True
-    except Exception:
-        return False
+    selectors = _IMAGE_INPUTS if media_type == "images" else _VIDEO_INPUTS
+    for selector in selectors:
+        try:
+            target = page.locator(selector).first
+            if hasattr(target, "count") and not await target.count():
+                continue
+            await target.set_input_files(want, timeout=15000)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+async def _dismiss_guides(page) -> None:
+    """跳过快手新手引导气泡，防止遮挡编辑区或发布按钮。"""
+    if await human_click_first(page, _JOYRIDE_SKIP, timeout=1500):
+        await human_wait(page, 250)
+
+
+async def _upload_error_message(page) -> str:
+    """读取页面或预览区上传失败提示文案。"""
+    for sel in _UPLOAD_ERR_SEL:
+        try:
+            loc = page.locator(sel).first
+            if await loc.count() and await loc.is_visible():
+                txt = (await loc.inner_text() or "").strip()
+                if txt and ("#main-container .error" in sel or "上传失败" in txt):
+                    return txt
+        except Exception:
+            continue
+    return await _visible_text(page, _UPLOAD_ERR_KW)
+
+
+async def _wait_upload_complete(page, timeout_ms: int, on_stage=None) -> str:
+    """轮询 .ant-progress 上传进度与失败文案，完成后再提交发布。"""
+    deadline = asyncio.get_running_loop().time() + max(5.0, timeout_ms / 1000)
+    last_prog = ""
+    while asyncio.get_running_loop().time() < deadline:
+        err = await _upload_error_message(page)
+        if err:
+            return f"快手媒体上传失败: {err}"
+        busy_prog = ""
+        for sel in _PROGRESS_SEL:
+            try:
+                loc = page.locator(sel).first
+                if await loc.count() and await loc.is_visible():
+                    txt = (await loc.inner_text() or "").strip()
+                    if txt and "100%" not in txt:
+                        busy_prog = txt
+                        break
+            except Exception:
+                continue
+        if not busy_prog:
+            return ""
+        if busy_prog != last_prog:
+            last_prog = busy_prog
+            await _notify_stage(on_stage, f"正在上传媒体（{busy_prog}）…")
+        await human_wait(page, 1200)
+    return "快手媒体上传超时，请检查视频格式/大小后重试"
 
 
 async def _wait_editor(page, timeout_ms: int) -> bool:
@@ -174,13 +239,15 @@ async def _wait_editor(page, timeout_ms: int) -> bool:
                     return True
             except Exception:
                 continue
-        await page.wait_for_timeout(500)
+        await human_wait(page, 500)
     return False
 
 
 async def _primary_publish_button(page):
-    """新版提交控件是 div.button-primary，不是 button。只取精确“发布”。"""
+    """优先查找表单底部提交容器中的可用「发布」控件。"""
     selectors = (
+        '#onvideo_creator_platform div[class*="section-btns"] div[class*="button-primary"]',
+        'div[class*="section-form-btns"] div[class*="button-primary"]',
         'div[class*="button-primary"]',
         '[role="button"]',
         'button',
@@ -210,23 +277,36 @@ async def _primary_publish_button(page):
     return None
 
 
-async def _choose_visibility(page, visibility: str) -> None:
+async def _choose_visibility(page, visibility: str) -> bool:
     label = {
         "public": "所有人可见",
         "friends": "好友可见",
         "private": "仅自己可见",
     }.get(visibility, "所有人可见")
     if visibility == "public":
-        return  # 当前默认即所有人可见，少一次点击更稳。
+        return True  # 当前默认即所有人可见，少一次点击更稳。
     try:
         choices = page.get_by_text(label, exact=True)
         for index in range(await choices.count() - 1, -1, -1):
             choice = choices.nth(index)
             if await choice.is_visible():
-                await choice.click(timeout=2500)
-                return
+                await choice.scroll_into_view_if_needed(timeout=2000)
+                await DEFAULT_HUMAN_ENGINE.click_locator(choice, page=page, timeout=2500)
+                return True
     except Exception:
-        _log(f"未能设置查看权限“{label}”，继续使用页面当前值")
+        pass
+    _log(f"未能设置查看权限“{label}”")
+    return False
+
+
+def _is_kuaishou_submit_path(path: str) -> bool:
+    """Match both Kuaishou atlas (``/publish/submit``) and video (``/v2/video/pc/submit``) POSTs."""
+    path_l = str(path or "").lower()
+    if not path_l.startswith("/rest/cp/works/"):
+        return False
+    if any(word in path_l for word in ("config", "snapshot", "tips", "/upload/", "/pre")):
+        return False
+    return "/publish" in path_l or "/submit" in path_l
 
 
 async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
@@ -234,6 +314,8 @@ async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
                            desc: str, media_paths: List[str], topics: str = "",
                            headed: bool = True, timeout_seconds: int = 180,
                            visibility: str = "public", allow_save: bool = True,
+                           on_submit: Callable[[], object | Awaitable[object]] | None = None,
+                           on_stage: Callable[[str], object | Awaitable[object]] | None = None,
                            ) -> Tuple[bool, str, str]:
     """发布一条快手作品，返回 ``(ok, result_url, error)``。"""
     files = [str(Path(path).resolve()) for path in media_paths
@@ -250,19 +332,28 @@ async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
     ctx = await mgr.open_headed(identity)
     page = await ctx.new_page()
     ok, result_url, error = False, "", ""
+    submitted = {"clicked": False}
     publish_response = {"seen": False, "ok": False, "message": "", "url": ""}
 
     async def on_response(response):
-        if publish_response["seen"] or response.request.method != "POST":
+        if publish_response["seen"] or not submitted["clicked"]:
             return
-        path = urlparse(response.url).path.lower()
-        if "/rest/cp/works/" not in path or "/publish" not in path:
+        if str(getattr(response.request, "method", "") or "").upper() != "POST":
             return
-        if any(word in path for word in ("config", "snapshot", "tips")):
+        path = urlparse(str(response.url or "")).path.lower()
+        if not _is_kuaishou_submit_path(path):
+            return
+        status = int(getattr(response, "status", 200) or 200)
+        if status >= 400:
+            publish_response["seen"] = True
+            publish_response["ok"] = False
+            publish_response["message"] = f"HTTP {status}"
             return
         try:
             payload = await response.json()
         except Exception:
+            return
+        if not isinstance(payload, dict):
             return
         publish_response["seen"] = True
         publish_response["ok"] = payload.get("result") in (1, "1")
@@ -275,8 +366,9 @@ async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
     page.on("response", on_response)
     try:
         _log(f"打开统一发布页 media_type={media_type}, files={len(files)}")
+        await _notify_stage(on_stage, "正在打开快手发布页并上传媒体…")
         await page.goto(PUBLISH_URL, wait_until="domcontentloaded", timeout=40000)
-        await page.wait_for_timeout(3500)
+        await human_wait(page, 3500)
         body_text = ""
         try:
             body_text = await page.locator("body").inner_text()
@@ -287,54 +379,70 @@ async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
             await _dump(page, "loggedout")
             return False, "", "logged_out:快手创作平台未登录"
 
+        await _dismiss_guides(page)
         if media_type == "images":
             if not await _click_first_visible(page, _IMAGE_TAB, timeout=3500):
                 await _dump(page, "no-image-tab")
                 return False, "", "未找到“上传图文”标签(发布页可能改版)"
-            await page.wait_for_timeout(700)
+            await human_wait(page, 700)
 
         if not await _upload_files(page, media_type, files):
             await _dump(page, "upload-failed")
             return False, "", "上传文件失败:未找到可用的快手上传入口"
 
         editor_timeout = 120000 if media_type == "video" else 45000
+        await _notify_stage(on_stage, "正在等待编辑页加载…")
         if not await _wait_editor(page, editor_timeout):
             await _dump(page, "no-editor")
             return False, "", ("文件已选择，但上传后未进入编辑页。请查看弹出的快手窗口，"
                                   "确认文件格式、尺寸或转码状态")
 
+        await _dismiss_guides(page)
+        await _notify_stage(on_stage, "正在填写快手描述与可见权限…")
         if body and not await _fill_first(page, _DESC_SEL, body):
             await _dump(page, "no-editor-fill")
             return False, "", "已上传媒体，但未找到作品描述输入框"
-        await _choose_visibility(page, visibility)
+        if not await _choose_visibility(page, visibility):
+            await _dump(page, "visibility-failed")
+            return False, "", f"未能设置快手查看权限({visibility})，已停止提交以保留你的权限设置"
         # 当前快手图文页未提供稳定的“允许下载”控件；保留参数兼容队列模型。
         _ = allow_save
-        await page.wait_for_timeout(700)
+        await human_wait(page, 700)
 
+        upload_err = await _wait_upload_complete(page, editor_timeout, on_stage=on_stage)
+        if upload_err:
+            await _dump(page, "upload-err")
+            return False, "", upload_err
+
+        await _dismiss_guides(page)
+        await _notify_stage(on_stage, "正在准备点击「发布」…")
         button = None
         for _index in range(90):
             button = await _primary_publish_button(page)
             if button is not None:
                 break
-            await page.wait_for_timeout(1000)
+            await human_wait(page, 1000)
         if button is None:
             await _dump(page, "no-publish-button")
             return False, "", "未找到可用的“发布”按钮(已保存 data/debug 诊断快照)"
         await button.scroll_into_view_if_needed(timeout=3000)
-        from app.licensing import require_active
-        require_active()
-        await button.click(timeout=5000)
+        await _notify_submit(on_submit)
+        submitted["clicked"] = True
+        await DEFAULT_HUMAN_ENGINE.click_locator(button, page=page, timeout=5000)
         _log("已点击发布，等待平台确认")
+        await _notify_stage(on_stage, "已点击「发布」，等待快手确认…")
 
-        waited = 0
-        while waited < max(int(timeout_seconds), 180):
-            url_lower = page.url.lower()
+        waited, verify_notified = 0.0, False
+        deadline = float(max(1, int(timeout_seconds)))
+        while waited < deadline:
+            url_lower = str(page.url or "").lower()
             if publish_response["seen"]:
                 if publish_response["ok"]:
                     ok = True
                     break
-                error = ("快手拒绝发布:"
-                         + (publish_response["message"] or "未知原因"))
+                error = ("write_uncertain:快手返回发布拒绝("
+                         + (publish_response["message"] or "未知原因")
+                         + ")，结果需到快手创作平台核对，系统不会自动重发")
                 break
             if any(part in url_lower for part in (
                     "/article/manage", "/content/manage", "/article/list")):
@@ -345,10 +453,14 @@ async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
                 ok = True
                 break
             verification = await _visible_text(page, _VERIFY_KW)
-            if verification:
+            if verification and not verify_notified:
+                verify_notified = True
+                await _notify_stage(
+                    on_stage,
+                    f"需要人工安全验证（页面提示「{verification}」），请在弹出的快手窗口里完成验证",
+                )
                 _log(f"等待用户在可见窗口完成“{verification}”")
-            await page.wait_for_timeout(1000)
-            waited += 1
+            waited += await human_wait(page, 1000)
 
         if ok:
             # 发布回包有 photoId 时直达作品；否则打开作品管理页。不能保存当前
@@ -362,15 +474,23 @@ async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
                 result_url = publish_response["url"] or MANAGE_URL
         if not ok and not error:
             png = await _dump(page, "unconfirmed")
-            error = ("已点击发布但未收到成功回包；请查看快手窗口是否要求验证码/声明/封面。"
+            error = ("write_uncertain:已点击发布但未收到成功回包；请先到快手创作平台核对是否已发出"
+                     "(系统不会自动重发)。"
                      f"诊断截图: {png or 'data/debug'}")
+    except asyncio.CancelledError:
+        raise
     except Exception as exc:
         try:
             await _dump(page, "exception")
         except Exception:
             pass
-        error = f"发布异常: {exc!r}"
+        prefix = "write_uncertain:" if submitted["clicked"] else ""
+        error = f"{prefix}发布异常: {exc!r}"
     finally:
+        try:
+            page.remove_listener("response", on_response)
+        except Exception:
+            pass
         try:
             await ctx.close()
         except Exception:

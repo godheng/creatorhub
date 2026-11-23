@@ -6,7 +6,7 @@
 - 单独构建 `macos-arm64` 与 `macos-x86_64`，避免让每位用户下载两套原生依赖。
 - 用户数据：`~/Library/Application Support/CreatorHub/user-data`；不写入 `.app`。
 - `.github/workflows/macos-installer.yml` 与 Windows 一起响应 `v*` 版本标签，从同一提交构建同版本 ARM/Intel 包；也支持手动构建。当前只上传 Actions artifacts，不自动发布 Mac Release 资产。
-- 2026-11-10 已在 GitHub macOS 15 ARM/Intel runner 完成两架构原生构建、WKWebView 页面导航、随包 Node/FFmpeg 与本地服务冒烟检查，见[云端验证构建](https://github.com/3441293738/creatorhub/actions/runs/42768658541)。实际安装、托盘、最低系统版本、Developer ID 签名与 Apple 公证仍需后续验收。
+- 2026-11-10 已在 GitHub macOS 15 ARM/Intel runner 完成两架构原生构建、WKWebView 页面导航、随包 Node/FFmpeg 与本地服务启动校验，见[云端验证构建](https://github.com/3441293738/creatorhub/actions/runs/42768658541)。实际安装、托盘、最低系统版本、Developer ID 签名与 Apple 公证仍需后续验收。
 - macOS 首版通过下载匹配架构的完整 DMG 更新，退出应用后拖入 Applications 替换。暂不运行 Windows 文件增量更新器，也不修改已签名 `.app` 内的单个文件。
 
 ## 未签名验证构建
@@ -26,6 +26,8 @@ python desktop/build_macos.py --version 0.2.7 --arch arm64
 
 输出到 `dist/macos-架构/`。未完成签名和公证的文件命名为 `aispace-UNTESTED-...dmg`，不作为正式下载资产，也不要求用户关闭 Gatekeeper。
 
+cryptography 从 49 起不再发布 macOS x86_64 wheel。若在 Intel 上从源码编译,它会动态链接 Homebrew OpenSSL,打包后与 Python 自带的旧版 `libssl.3.dylib` 同名冲突,启动时报 `Symbol not found: _SSL_get0_group_name`。因此 `desktop/requirements-macos.txt` 对 cryptography 只允许 wheel,并把 Intel 限制在 48.x;升级前先确认 PyPI 是否恢复了 x86_64/universal2 wheel。
+
 ## Developer ID 签名与公证
 
 本地先导入维护者自己的 Developer ID Application 证书，并使用 `notarytool store-credentials` 创建钥匙串 profile：
@@ -35,7 +37,7 @@ export MACOS_SIGNING_IDENTITY='Developer ID Application: YOUR NAME (TEAM_ID)'
 python desktop/build_macos.py --version 0.2.7 --arch arm64 --notary-profile creatorhub
 ```
 
-脚本按内到外签名 Mach-O 文件、嵌套 bundle 与应用，开启 Hardened Runtime，仅添加 Node/V8 所需 JIT entitlement。随后执行资源、Node/媒体处理、WKWebView、服务生命周期冒烟测试；对应用 ZIP 公证、给 `.app` 装订票据，通过 Gatekeeper 检查后创建 DMG，再签名、公证、装订并生成 SHA-256。公证返回状态必须为 `Accepted`。
+脚本按内到外签名 Mach-O 文件、嵌套 bundle 与应用，开启 Hardened Runtime，仅添加 Node/V8 所需 JIT entitlement。随后对应用 ZIP 公证、给 `.app` 装订票据，通过 Gatekeeper 检查后创建 DMG，再签名、公证、装订并生成 SHA-256。公证返回状态必须为 `Accepted`。
 
 在 Actions 启用 `sign` 前配置六个 repository secrets：
 

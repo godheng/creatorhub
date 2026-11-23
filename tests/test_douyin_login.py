@@ -95,7 +95,7 @@ class DouyinReloginTests(unittest.IsolatedAsyncioTestCase):
         async def scan(_seconds):
             self.assertFalse(context.closed)
             context.page.login_visible = False
-        with patch("app.browser.login.asyncio.sleep", new=scan):
+        with patch("app.browser.login_platforms.asyncio.sleep", new=scan):
             ok, state, _ = await interactive_login(
                 _Manager(context), self._identity(), timeout_seconds=2)
         self.assertTrue(ok)
@@ -107,7 +107,7 @@ class DouyinReloginTests(unittest.IsolatedAsyncioTestCase):
         context = _Context(login_visible=True)
         context.page.url = "https://www.douyin.com/"
         context.page.goto = AsyncMock(side_effect=BrowserTimeoutError("timeout"))
-        with patch("app.browser.login.asyncio.sleep", new=AsyncMock()):
+        with patch("app.browser.login_platforms.asyncio.sleep", new=AsyncMock()):
             ok, state, _ = await interactive_login(
                 _Manager(context), self._identity(), timeout_seconds=1)
         self.assertFalse(ok)
@@ -133,7 +133,7 @@ class DouyinReloginTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_force_reauth_clears_stale_cookies_before_polling(self):
         context = _Context()
-        with patch("app.browser.login.asyncio.sleep", new=AsyncMock()):
+        with patch("app.browser.login_platforms.asyncio.sleep", new=AsyncMock()):
             ok, state, nickname = await interactive_login(
                 _Manager(context), self._identity(),
                 timeout_seconds=1, force_reauth=True,
@@ -149,7 +149,7 @@ class DouyinReloginTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_visible_login_dialog_blocks_cookie_only_success(self):
         context = _Context(login_visible=True, rotate_after_clear=False)
-        with patch("app.browser.login.asyncio.sleep", new=AsyncMock()):
+        with patch("app.browser.login_platforms.asyncio.sleep", new=AsyncMock()):
             ok, state, _nickname = await interactive_login(
                 _Manager(context), self._identity(), timeout_seconds=0.1,
             )

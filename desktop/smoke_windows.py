@@ -24,7 +24,7 @@ def main():
         home = Path(temp)
         env = {**os.environ, "CREATORHUB_DESKTOP_HOME": temp, "PYTHONUTF8": "1"}
         try:
-            subprocess.run([str(executable), "--smoke-test"], env=env, check=True, timeout=120)
+            subprocess.run([str(executable), "--update-health-check"], env=env, check=True, timeout=120)
             subprocess.run([str(executable), "--shell-smoke-test"], env=env, check=True, timeout=120)
         except Exception:
             for log in (home / "logs").glob("*.log"):

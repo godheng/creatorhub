@@ -11,7 +11,7 @@
 - 最多保存 20 个模型渠道，各自拥有地址、协议、密钥、模型目录和高级设置。渠道列表支持新增、编辑、使用和确认删除；助手页可直接切换当前渠道。新增或编辑非当前渠道不会自动切换，未保存草稿会阻止切换，当前渠道须先切换后再删除。
 - 每个渠道的表单依次为显示名称、API 地址、API 协议、API 密钥、模型目录。「添加模型」支持 ID 与可选显示名称，保存后保留目录；「取消」恢复上次保存的表单。启用开关、工具调用、调用限制和 MCP 开关随渠道保存与切换。列表显示配置状态，不伪装成已通过连通测试。
 - 获取成功后先打开「选择模型」弹窗：搜索、勾选、全选搜索结果或取消全选，然后显式「更新目录」。首次默认勾选全部返回项；已有目录时保留原选择与别名，未出现在本次上游结果的手动条目也可继续勾选。取消或 Esc 不修改目录。模型行支持编辑显示名称、配置 ID、移除；当前使用的模型独立选择，移除快捷项不清空可直接使用的 ID。
-- 工作流：生成最多五步的关键词采集 / 作品监控草稿；查看参数后明确确认创建。视频号支持只读分析，暂不支持生成创建计划。
+- 工作流：为抖音、小红书、海外小红书、快手、TikTok、哔哩哔哩、Instagram、Twitter 生成最多五步的关键词采集 / 作品监控草稿，查看参数后明确确认创建；视频号支持只读分析，暂不支持生成创建计划。
 - MCP：可选的官方 Python SDK stdio 桥接，只开放五个本地查询工具，不调用付费模型、不加载数据库或启动浏览器。
 - 不包含定时 AI 巡检 / 日报发送、自动修复配置、发布 / 私信 / 删除、源码修改、多模态上传、外部 MCP Client。这些不是首版的隐式执行能力。
 
@@ -52,8 +52,6 @@ Windows 安装包的 AI 助手无新增 Python 依赖。MCP SDK 放在独立环�
 - 平台、账号、模式或诊断任务变化时，界面提示下一条新建对话。服务端进一步校验渠道、协议、目标地址、路径模式与密钥摘要，拒绝跨范围续接；同一渠道内显式换模型可以续接。
 - 旧版记录可查看；缺少范围指纹的旧记录会开启新对话，不隐式转发旧历史。启动时现有 SQLite 迁移补充会话列与索引，保留旧消息。
 - Markdown 仅支持标题、列表、粗体、行内代码和代码块；内容按 React 文本渲染，不解析 HTML、不加载外部图片、不执行代码。回复和代码复制只由用户点击触发。
-
-交互参考 [Hermes Desktop 的聊天 / 会话布局](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/desktop.md) 与 [会话恢复说明](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/sessions.md)。本项目独立实现这些交互，不引入 Hermes 后端或其终端执行能力。
 
 ## 仅流式请求
 
@@ -128,7 +126,7 @@ Windows 安装包的 AI 助手无新增 Python 依赖。MCP SDK 放在独立环�
 
 更新代码后若模型目录提示本地 `404 / Not Found`，先重启后端，再强制刷新网页：旧进程可能没有加载 `POST /api/agent/models`，仅刷新静态前端不会注册新路由。上游目录在路径兼容尝试后仍为 404，则由本地接口返回 502 并显示「上游返回 404」；这时检查自定义路径及上游是否开放目录，而非直接判断密钥无效。
 
-实现对照：[Sub2API 网关路由](https://github.com/Wei-Shaw/sub2api/blob/main/backend/internal/server/routes/gateway.go) 同时开放根路径与 `/v1` 模型目录；[鉴权中间件](https://github.com/Wei-Shaw/sub2api/blob/main/backend/internal/server/middleware/api_key_auth.go) 接受 Bearer 与 `x-api-key`。[Hermes 提供商基础类](https://github.com/NousResearch/hermes-agent/blob/main/providers/base.py) 按提供商获取目录，[Anthropic 实现](https://github.com/NousResearch/hermes-agent/blob/main/plugins/model-providers/anthropic/__init__.py) 使用原生鉴权与独立路径处理。本项目借鉴其协议分离思路，不按模型名称前缀擅自过滤目录，继续保留响应大小、限时和不跨域转发密钥的边界。
+网关路由兼容根路径与 `/v1` 模型目录，鉴权同时支持 Bearer 与 `x-api-key`；Anthropic 渠道使用原生鉴权头与独立路径处理，不按模型名称前缀擅自过滤目录，保留响应大小、限时和不跨域转发密钥的安全边界。
 
 协议参考：[OpenAI 模型列表](https://developers.openai.com/api/reference/python/resources/models/methods/list)、[OpenAI 鉴权](https://developers.openai.com/api/reference/overview)、[Anthropic 模型列表](https://platform.claude.com/docs/en/api/models/list)。
 
@@ -148,29 +146,14 @@ Windows 安装包的 AI 助手无新增 Python 依赖。MCP SDK 放在独立环�
 
 ## 扩展方式
 
-新业务查询首先加入 `tools.py`，写白名单字段 / 范围 / 分页测试，然后选择是否加入 MCP 的独立 allowlist。
+新业务查询首先加入 `tools.py`，配置白名单字段 / 范围 / 分页，然后选择是否加入 MCP 的独立 allowlist。
 新写操作先定义严格参数模型、确认文案、幂等事务和现有业务服务执行器，再加入工作流；不直接暴露路由全集。
-新模型协议实现 `ModelSession` 的 request / parse / add_results 与 `NativeStream` 的增量组装，测试完整终止事件、公开预览和工具往返；不要靠替换 URL 假定协议完全兼容。
+新模型协议实现 `ModelSession` 的 request / parse / add_results 与 `NativeStream` 的增量组装，确保完整终止事件、公开预览和工具往返一致；不要靠替换 URL 假定协议完全兼容。
 
 参考：[OpenAI 工具调用](https://developers.openai.com/api/docs/guides/function-calling)、[Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create)、[MCP 官方 SDK](https://github.com/modelcontextprotocol/python-sdk/tree/v1.30.0)。
 
-## 验证
+## 前端构建
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests/test_agent.py tests/test_agent_catalog.py tests/test_agent_provider_settings.py tests/test_agent_channels.py tests/test_agent_response_formats.py tests/test_agent_conversations.py tests/test_agent_telemetry.py tests/test_agent_streaming.py tests/test_access_and_submissions.py tests/test_monitor_strategy.py tests/test_task_queue.py -q
 npm run build:ui
-$env:CREATORHUB_RUN_LOCAL_CDP = '1'
-.venv\Scripts\python.exe -m pytest tests/test_agent_browser.py tests/test_agent_chat_browser.py tests/test_agent_telemetry_browser.py tests/test_agent_streaming_browser.py -q
 ```
-
-浏览器测试只启动隔离的本地演示站点和合成 API；不启动业务引擎、不访问真实账号、不调用模型。
-可选 `test_agent_mcp_sdk.py` 通过官方 SDK 客户端验证 stdio 发现 / 调用 / 写工具拒绝；只连接本地 HTTP fixture。
-
-
-## 商业版授权
-
-AI 与 MCP 默认关闭。打开工作台右下角的全局 AI 助手，在设置中配置用户自己的渠道、协议、基础地址、模型和密钥；模型服务费用由用户所选服务商收取。
-
-商业版复用现有设备授权缓存。新分析、连通测试、外部模型目录请求及工作流执行需要有效授权；排队分析启动、每轮模型调用和每个新业务任务创建前再次检查。授权失效会停止后续调用和创建，保留已接收输出、用量和已创建任务结果。历史、部分输出及停止分析仍可使用。恢复工作流需要重新明确确认，并复用原幂等键，不自动重发模型请求。
-
-MCP 仍作为独立环境中的可选只读服务，不增加业务写能力。模拟流式测试只能验证协议与控制流程，不代表真实模型效果验收。

@@ -16,7 +16,38 @@ from curl_cffi.curl import CURL_READFUNC_ABORT
 
 from app.platforms.xhs import creator_api, creator_sign, deadline, media, publish
 from app.platforms.xhs.responses import XhsApiError
-from test_xhs_creator_contract import creator, Response
+
+
+class Response:
+    def __init__(self, payload=None, status=200):
+        self.status_code = status
+        self.payload = payload
+
+    def json(self):
+        if isinstance(self.payload, Exception):
+            raise self.payload
+        return self.payload
+
+
+@pytest.fixture
+def creator(monkeypatch):
+    transport = Mock()
+    transport.get.return_value = Response({"success": True, "data": {}})
+    transport.post.return_value = Response({
+        "success": True, "data": {"id": "fixture-note"}})
+    factory = Mock(return_value=transport)
+    monkeypatch.setattr(creator_api, "Session", factory)
+    monkeypatch.setattr(creator_sign, "generate_xsc", lambda *_args, **_kwargs: {"x-t": "123"})
+    monkeypatch.setattr(creator_sign, "generate_xs_xs_common", lambda *_args, **_kwargs: ("xs", 123, "common"))
+    monkeypatch.setattr(creator_sign, "generate_x_rap_param", lambda *_args, **_kwargs: "rap")
+    monkeypatch.setattr(creator_sign, "available", lambda: True)
+    monkeypatch.setattr(creator_api, "_video_cover_and_meta", lambda *_args: (
+        b"cover", {"video": {}, "audio": {}}))
+    client = creator_api.XhsCreatorApi("a1=fixture")
+    client.upload_media = Mock(side_effect=lambda *_args: {
+        "fileIds": "fixture", "width": 10, "height": 20, "video_id": "fixture-video"})
+    client.session_factory = factory
+    return client
 
 
 STATE = '{"cookies":[{"name":"a1","value":"fixture"}]}'

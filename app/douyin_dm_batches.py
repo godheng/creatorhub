@@ -10,9 +10,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import update
 from sqlmodel import select
 
+from . import runtime
 from .db import get_session
 from .models import DouyinAccount, DmConversation, AccountActionTask, TaskSubmission
+from .platforms.douyin import DouyinClient, cookie_from_state as douyin_cookie_from_state
+from .risk import OperationKind
 from .submissions import submit_once
+from .transport_matrix import douyin_client_environment
 
 router = APIRouter(prefix="/api/douyin/dm")
 
@@ -103,22 +107,21 @@ async def resolve_profile(account, link):
             or parsed.hostname not in {"douyin.com", "www.douyin.com"}
             or not re.fullmatch(r"/user/[A-Za-z0-9_-]+/?", parsed.path)):
         raise ValueError("请输入完整抖音用户主页链接 https://www.douyin.com/user/…")
-    from . import main
-    cookie = main.douyin_cookie_from_state(
+    cookie = douyin_cookie_from_state(
         account.storage_state or account.creator_storage_state or "")
     if not cookie:
         raise ValueError("账号缺少可用登录态，请重新登录")
-    client = main.DouyinClient(cookie, account.ua or main.cfg.engine.user_agent,
-        timeout=main.cfg.engine.request_timeout_seconds, proxy=account.proxy or "",
-        **main.douyin_client_environment(account))
+    client = DouyinClient(cookie, account.ua or runtime.cfg.engine.user_agent,
+        timeout=runtime.cfg.engine.request_timeout_seconds, proxy=account.proxy or "",
+        **douyin_client_environment(account))
     async def read():
         async with client.session_scope():
             profile, error = await client.resolve_user_identifier(parsed.path.strip("/").split("/")[-1])
             return profile, error
-    if main.engine is None:
+    if runtime.engine is None:
         raise ValueError("引擎未就绪")
-    profile, error = await main.engine.guarded_read_pair(
-        account.id, main.OperationKind.READ_HEAVY, f"dm-preview:{account.id}", read, empty_result=None)
+    profile, error = await runtime.engine.guarded_read_pair(
+        account.id, OperationKind.READ_HEAVY, f"dm-preview:{account.id}", read, empty_result=None)
     if not profile:
         raise ValueError(error or "无法解析接收人")
     return Recipient(target_uid=str(profile.get("uid") or profile.get("user_id") or ""),
@@ -156,7 +159,7 @@ async def preview(body: PreviewIn):
 
 
 def batch_view(session, receipt):
-    from .main import _action_dict
+    from .api.account_actions import _action_dict
     payload = json.loads(receipt.response_json)
     tasks = [session.get(AccountActionTask, task_id) for task_id in payload["task_ids"]]
     counts = dict.fromkeys(["pending", "doing", "done", "failed", "uncertain", "canceled"], 0)

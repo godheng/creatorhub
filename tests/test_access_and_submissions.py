@@ -5,13 +5,13 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import AsyncMock, Mock
 
-import httpx
 import pytest
 from fastapi import HTTPException, Request
 from sqlmodel import select
 
 import app.db as db
-import app.main as main
+from app import licensing, runtime
+from app.api import account_actions, comment_rules, notifications
 from app.config import Config
 from app.engine.monitor import MonitorEngine
 from app.models import (AccountActionTask, CommentRule, ContentRecord,
@@ -19,18 +19,13 @@ from app.models import (AccountActionTask, CommentRule, ContentRecord,
                         NotificationChannel, PublishTask, TaskSubmission)
 from app.notification_config import MASK, redact_detail, redact_config
 from app.submissions import submit_once
-from test_project_optimizations import local_project, store
+from commercial_fixtures import client, local_project, store
 
 
 @pytest.fixture(autouse=True)
 def active_license_for_submission_contract(monkeypatch):
     # Scope to this API boundary suite; commercial license verification remains separate.
-    monkeypatch.setattr(main.licensing, "is_active", lambda: True)
-
-
-def client(*, peer="127.0.0.1", base="http://127.0.0.1"):
-    return httpx.AsyncClient(transport=httpx.ASGITransport(
-        app=main.app, client=(peer, 1234)), base_url=base)
+    monkeypatch.setattr(licensing, "is_active", lambda: True)
 
 
 def test_loopback_defaults_and_no_login_system(local_project, monkeypatch):
@@ -106,7 +101,7 @@ def test_local_origin_and_untrusted_forwarding(local_project):
 
 def test_notification_secrets_are_write_only_and_mask_preserves_latest(local_project, monkeypatch):
     sender = AsyncMock(return_value=(False, "request secret-new failed"))
-    monkeypatch.setattr(main, "send_one", sender)
+    monkeypatch.setattr(notifications, "send_one", sender)
     async def scenario():
         async with client() as http:
             response = await http.post("/api/notifications", json={"name": "fixture", "type": "telegram",
@@ -217,7 +212,7 @@ def test_callback_failure_rolls_back_receipt_and_task(local_project):
 def test_failed_run_now_keeps_task_and_never_dispatches_replay(local_project, monkeypatch):
     account = store(DouyinAccount(platform="douyin"))
     execute = AsyncMock(side_effect=HTTPException(503, "engine not ready"))
-    monkeypatch.setattr(main, "_exec_action", execute)
+    monkeypatch.setattr(account_actions, "_exec_action", execute)
     async def scenario():
         async with client() as http:
             body = {"account_id": account, "action": "send_dm", "target_uid": "peer", "content": "hello", "run_now": True}
@@ -249,7 +244,7 @@ def test_concurrent_run_now_reuses_task_while_execution_is_inflight(local_projec
                 task.status = "done"; session.add(task); session.commit()
             return True, ""
         mock = AsyncMock(side_effect=execute)
-        monkeypatch.setattr(main, "_exec_action", mock)
+        monkeypatch.setattr(account_actions, "_exec_action", mock)
         async with client() as http:
             body = {"account_id": account, "action": "follow", "target_uid": "peer", "run_now": True}
             headers = {"Idempotency-Key": "fixture-running-key"}
@@ -269,12 +264,12 @@ def test_repost_rule_and_collection_creation_use_durable_receipts(local_project,
     xhs = store(DouyinAccount(platform="xhs", storage_state="{}"))
     content = store(ContentRecord(target_id=0, aweme_id="fixture", download_status="done"))
     engine = MonitorEngine(local_project.cfg, local_project.browser)
-    monkeypatch.setattr(main, "engine", engine)
+    monkeypatch.setattr(runtime, "engine", engine)
     monkeypatch.setattr(engine, "_content_files", lambda _: [str(local_project.root / "fixture.jpg")])
     enqueue = Mock()
     monkeypatch.setattr(engine, "enqueue_collection_job", enqueue)
     resolve = AsyncMock(return_value=("self", "", "", "", ""))
-    monkeypatch.setattr(main, "_resolve_rule_target", resolve)
+    monkeypatch.setattr(comment_rules, "_resolve_rule_target", resolve)
     async def scenario():
         async with client() as http:
             for path, body, model in [

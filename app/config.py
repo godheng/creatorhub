@@ -1,4 +1,4 @@
-"""配置加载。对应逆向 internal/config。"""
+"""全局配置模型与 YAML 加载校验。"""
 from __future__ import annotations
 
 import os
@@ -60,9 +60,28 @@ class EngineConfig:
     xhs_cdp_idle_seconds: int | None = None
     # 小红书读取默认使用常驻签名客户端直连；browser 保留为页面兼容模式。
     xhs_read_mode: str = "api"               # api | browser
+    # 海外小红书(Rednote)读取通道: hybrid=XYS/XYW+b1 直连优先、普通兼容失败回退页面(默认推荐); api=仅直连; browser=仅页面
+    rednote_read_mode: str = "hybrid"        # hybrid | api | browser
     douyin_read_mode: str = "hybrid"         # 默认 API 优先/浏览器回退；api=仅 API；browser=仅浏览器
     # native=纯 Python 离线签名直连；browser=已授权页面；auto=直连优先/页面回退。
     tiktok_read_mode: str = "native"          # native | auto | browser
+    # B站读写通道: hybrid=WBI/Cookie直连优先、明确风控兼容失败时回退页面; api=仅直连; browser=仅页面
+    bilibili_read_mode: str = "hybrid"        # hybrid | api | browser
+    bilibili_write_mode: str = "hybrid"       # hybrid | api | browser
+    # Instagram 读写通道: hybrid=双栈协议直连优先、兼容失败回退页面; api=仅直连; browser=仅页面
+    instagram_read_mode: str = "hybrid"       # hybrid | api | browser
+    instagram_write_mode: str = "hybrid"      # hybrid | api | browser
+    # X (Twitter) 读取与写入通道: hybrid=Syndication/REST直连优先、GraphQL时间线回退隔离浏览器; browser=全程隔离浏览器
+    twitter_read_mode: str = "hybrid"         # hybrid | api | browser
+    twitter_write_mode: str = "browser"       # browser
+    # 视频号读取模式: auto=优先桌面微信原生 Finder CDP 协议、回退创作者助手页面;
+    # protocol=仅原生 Finder 协议; browser=仅创作者助手页面。
+    channels_read_mode: str = "auto"          # auto | protocol | browser
+    channels_cdp_endpoint: str = ""           # 本地回环 CDP 端点(如 http://127.0.0.1:9222 或 ws://127.0.0.1:9422/cdp/...)
+    channels_cdp_endpoint_file: str = ""      # wmpf_cdp 生成的本地控制口令端点描述文件
+    channels_proxy_enabled: bool = False      # 是否使用内置本机视频号选择性 HTTPS 代理桥接
+    channels_proxy_port: int = 2023           # 内置视频号本机代理监听端口(127.0.0.1)
+    channels_proxy_manage_sysproxy: bool = True  # 内置代理是否自动托管 Windows 系统代理
     # 本账号管理中的独立读取通道。资料与粉丝已支持直连；其余三项保留
     # 独立开关，待协议完整可验证后无需再迁移配置。
     douyin_profile_mode: str = "hybrid"      # hybrid | api | browser
@@ -70,13 +89,14 @@ class EngineConfig:
     douyin_dm_sync_mode: str = "hybrid"      # hybrid | api | browser
     douyin_creator_danmaku_mode: str = "hybrid"  # hybrid | api | browser
     douyin_publish_mode: str = "browser"     # browser (api reserved)
-    # browser=页面写入；api=仅网页 HTTP/imapi；hybrid=API 优先、明确拒绝时页面回退。
+    # browser=页面写入(默认推荐，真机拟人交互)；api=仅网页 HTTP/imapi；hybrid=API 优先、明确拒绝时页面回退。
     # 不确定的网络结果一律不回退，避免重复提交非幂等写请求。
-    douyin_write_mode: str = "hybrid"        # 默认 API 优先；明确失败后才回退浏览器
+    douyin_write_mode: str = "browser"       # 默认真机浏览器写入，避免无 DTrait 直连高频触发风控
     xhs_keyword_gap_seconds: float = 10.0    # 同一任务相邻关键词的最小停顿
     xhs_item_gap_seconds: float = 2.5         # 相邻详情/评论读取的最小停顿
     xhs_request_jitter: float = 0.35          # 上述停顿的正向随机抖动比例
     xhs_publish_mode: str = "browser"       # browser | api(API 仅为显式兼容模式)
+    rednote_publish_mode: str = "browser"   # browser | api(API 为实验性 XYS+b1 纯协议直发通道)
     # 小红书 Web 私信。监控只读；命中规则后仍进入统一 DM 限速队列。
     xhs_dm_monitor_enabled: bool = False
     xhs_dm_poll_interval_seconds: int = 120
@@ -108,13 +128,18 @@ class EngineConfig:
     action_daily_cap_per_account: int = 20   # 每账号每日写操作总上限(跨所有动作),0=不限
     action_hourly_cap_per_account: int = 6   # 每账号每小时写操作上限,0=不限
     action_min_gap_seconds: int = 90         # 同账号两次写操作全局最小间隔(与任务级 min_gap 取大)
-    # ── 活跃时段(夜间静默)──
-    #   仅约束「写操作」(评论/关注/取关/私信)自动排队执行;读取抓取不受影响。
-    #   按东八区(账号时区)小时判定,避免整个账号矩阵在深夜齐发的机器特征。
+    # ── 活跃时段(夜间静默与人类作息节律)──
+    #   默认同时约束自动写操作与后台自动抓爬/体检(手动即时查看不受影响)，
+    #   并按「账号 ID + 当地日期」叠加每日独立随机苏醒/入睡偏移，彻底消除矩阵整点齐发与凌晨 3 点机器爬虫特征。
     quiet_hours_enabled: bool = True         # 夜间静默总开关
+    quiet_hours_include_reads: bool = True   # 夜间静默期间同步休眠后台监控/评论采集/登录态体检
+    quiet_hours_wake_jitter_minutes: int = 35  # 每账号每日独立苏醒/入睡随机偏移上限(0-120 分钟)
     active_hours_start: int = 8              # 活跃起点小时(含),0-23
     active_hours_end: int = 24               # 活跃止点小时(不含);可 >24 表示跨零点(如 25=次日 1 点)
     verify_proxy_region: bool = True         # 体检时探测代理出口国家,与账号时区不一致则告警
+    # ── 代理防关联提醒策略（默认仅提醒不强拦，允许本机直连与多号共用代理）──
+    strict_proxy_required: bool = False      # 兼容保留字段；已改为非阻断式风险提醒，不再强制拦截本机直连
+    forbid_same_platform_shared_proxy: bool = False  # 兼容保留字段；已改为非阻断式风险提醒，不再强制拦截一号多绑
     # 新建 native 账号的写操作环境门禁。存量 legacy 账号不受这组开关影响。
     native_write_gate_enabled: bool = True
     native_write_require_system_chrome: bool = True
@@ -134,6 +159,18 @@ class EngineConfig:
 class ServerConfig:
     host: str = "127.0.0.1"
     port: int = 8000
+
+
+@dataclass
+class LoggingConfig:
+    level: str = "info"                     # info | debug | warning
+    dir: str = "./logs"                     # 日志目录(可用 CREATORHUB_LOG_DIR 覆盖)
+    max_bytes: int = 5 * 1024 * 1024        # app.log 单文件体积上限(默认 5 MB)
+    backup_count: int = 4                   # app.log 滚动备份数量
+    error_max_bytes: int = 2 * 1024 * 1024  # error.log 单文件体积上限(默认 2 MB)
+    error_backup_count: int = 3             # error.log 滚动备份数量
+    slow_request_ms: int = 3000             # 慢请求告警阈值(毫秒,0=关闭)
+    log_mutations: bool = True              # 记录写请求(POST/PUT/PATCH/DELETE)轨迹,高频轮询默认静默
 
 
 @dataclass
@@ -181,6 +218,7 @@ class RiskControlConfig:
 @dataclass
 class Config:
     server: ServerConfig = field(default_factory=ServerConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
     engine: EngineConfig = field(default_factory=EngineConfig)
     risk_control: RiskControlConfig = field(default_factory=RiskControlConfig)
     db_path: str = "./data/creatorhub.db"
@@ -206,20 +244,38 @@ def load_config(path: str | None = None) -> Config:
         cfg.engine.xhs_read_mode = (
             xhs_read_mode if xhs_read_mode in {"browser", "api"}
             else "api")
+        for pub_name in ("xhs_publish_mode", "rednote_publish_mode"):
+            pub_val = str(getattr(cfg.engine, pub_name, "browser") or "browser").strip().lower()
+            setattr(cfg.engine, pub_name, pub_val if pub_val in {"browser", "api"} else "browser")
         tiktok_read_mode = str(
             cfg.engine.tiktok_read_mode or "native").strip().lower()
         cfg.engine.tiktok_read_mode = (
             tiktok_read_mode
             if tiktok_read_mode in {"auto", "native", "browser"}
             else "native")
+        channels_read_mode = str(
+            cfg.engine.channels_read_mode or "auto").strip().lower()
+        cfg.engine.channels_read_mode = (
+            channels_read_mode
+            if channels_read_mode in {"auto", "protocol", "browser"}
+            else "auto")
+        proxy_port = int(cfg.engine.channels_proxy_port or 2023)
+        cfg.engine.channels_proxy_port = proxy_port if 1024 <= proxy_port <= 65535 else 2023
         for name, default in (
+                ("rednote_read_mode", "hybrid"),
+                ("bilibili_read_mode", "hybrid"),
+                ("bilibili_write_mode", "hybrid"),
                 ("douyin_read_mode", "hybrid"),
                 ("douyin_profile_mode", "hybrid"),
                 ("douyin_followers_mode", "hybrid"),
                 ("douyin_dm_sync_mode", "hybrid"),
                 ("douyin_creator_danmaku_mode", "hybrid"),
                 ("douyin_publish_mode", "browser"),
-                ("douyin_write_mode", "hybrid")):
+                ("douyin_write_mode", "browser"),
+                ("bilibili_read_mode", "hybrid"),
+                ("bilibili_write_mode", "hybrid"),
+                ("instagram_read_mode", "hybrid"),
+                ("instagram_write_mode", "hybrid")):
             mode = str(getattr(cfg.engine, name, default) or default).strip().lower()
             setattr(cfg.engine, name, mode if mode in {"hybrid", "api", "browser"}
                     else default)
@@ -244,6 +300,8 @@ def load_config(path: str | None = None) -> Config:
             setattr(cfg.engine, name, min(1.0, max(0.0, value)) if math.isfinite(value) else 0.0)
         cfg.engine.initial_scan_spread_seconds = max(
             0, min(600, int(cfg.engine.initial_scan_spread_seconds)))
+        cfg.engine.quiet_hours_wake_jitter_minutes = max(
+            0, min(120, int(cfg.engine.quiet_hours_wake_jitter_minutes)))
         cfg.engine.browser_session_idle_seconds = max(
             0, int(cfg.engine.browser_session_idle_seconds))
         if cfg.engine.xhs_cdp_idle_seconds is not None:
@@ -271,9 +329,36 @@ def load_config(path: str | None = None) -> Config:
         risk_values["mode"] = (
             mode if mode in {"conservative", "custom"} else "conservative")
         cfg.risk_control = RiskControlConfig(**risk_values)
+        log_raw = raw.get("logging", {}) or {}
+        if isinstance(log_raw, dict):
+            log_values = {
+                k: v for k, v in log_raw.items()
+                if k in LoggingConfig.__dataclass_fields__
+            }
+            cfg.logging = LoggingConfig(**log_values)
         cfg.db_path = (raw.get("storage", {}) or {}).get("db_path", cfg.db_path)
         px = raw.get("proxies") or []
         cfg.proxies = [str(p).strip() for p in px if str(p).strip()]
+    env_log_dir = os.environ.get("CREATORHUB_LOG_DIR", "").strip()
+    if env_log_dir:
+        cfg.logging.dir = env_log_dir
+    env_log_level = os.environ.get("CREATORHUB_LOG_LEVEL", "").strip().lower()
+    raw_level = env_log_level or str(cfg.logging.level or "info").strip().lower()
+    cfg.logging.level = raw_level if raw_level in {"debug", "info", "warning", "error"} else "info"
+    cfg.logging.max_bytes = max(512 * 1024, min(50 * 1024 * 1024, int(cfg.logging.max_bytes or 5 * 1024 * 1024)))
+    cfg.logging.backup_count = max(1, min(10, int(cfg.logging.backup_count or 4)))
+    cfg.logging.error_max_bytes = max(256 * 1024, min(20 * 1024 * 1024, int(cfg.logging.error_max_bytes or 2 * 1024 * 1024)))
+    cfg.logging.error_backup_count = max(1, min(10, int(cfg.logging.error_backup_count or 3)))
+    cfg.logging.slow_request_ms = max(0, min(60000, int(cfg.logging.slow_request_ms or 0)))
+    cfg.logging.log_mutations = bool(cfg.logging.log_mutations)
+    if not cfg.engine.channels_cdp_endpoint:
+        cfg.engine.channels_cdp_endpoint = os.environ.get(
+            "CREATORHUB_CHANNELS_CDP_ENDPOINT", ""
+        ).strip()
+    if not cfg.engine.channels_cdp_endpoint_file:
+        cfg.engine.channels_cdp_endpoint_file = os.environ.get(
+            "CREATORHUB_CHANNELS_CDP_ENDPOINT_FILE", ""
+        ).strip()
     Path(cfg.engine.media_dir).mkdir(parents=True, exist_ok=True)
     Path(cfg.engine.profiles_dir).mkdir(parents=True, exist_ok=True)
     Path(cfg.db_path).parent.mkdir(parents=True, exist_ok=True)

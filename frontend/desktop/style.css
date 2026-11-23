@@ -1,4 +1,4 @@
-/* CreatorHub desktop: Three-Tier iOS Liquid Glass material language. */
+/* CreatorHub desktop: Three-Tier Liquid Glass material system. */
 .update-status {
   min-height: 48px;
   padding: 6px 0 10px;
@@ -950,7 +950,7 @@ kbd, .key-button {
   border: 0;
   outline-offset: 4px;
   color: var(--fg);
-  width: 150px;
+  width: clamp(150px, 22vw, 220px);
   min-height: 36px;
   font-size: 12.5px;
 }
@@ -970,6 +970,13 @@ kbd, .key-button {
 .activity-row:hover {
   background: var(--surface-2);
   border-color: var(--line-soft);
+}
+.activity-row .object-copy > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .event-icon {
   height: 30px;
@@ -1061,8 +1068,15 @@ kbd, .key-button {
 }
 .pf-douyin { background: #26252b; color: #fff; }
 .pf-xhs { background: rgba(225, 29, 72, 0.12); color: #e11d48; }
+.pf-rednote { background: rgba(185, 16, 56, 0.13); color: #b91038; }
+:root[data-theme=dark] .pf-rednote { background: rgba(255, 122, 150, 0.16); color: #ff7a96; }
 .pf-kuaishou { background: rgba(234, 88, 12, 0.12); color: #ea580c; }
 .pf-shipinhao { background: var(--success-bg); color: var(--success); }
+.pf-tiktok { background: rgba(13, 148, 136, 0.14); color: #0f766e; }
+.pf-bilibili { background: rgba(0, 174, 236, 0.14); color: #0077a8; }
+.pf-instagram { background: rgba(225, 48, 108, 0.14); color: #b81d58; }
+.pf-twitter { background: rgba(29, 155, 240, 0.15); color: #0c7abf; }
+:root[data-theme=dark] .pf-twitter { background: rgba(56, 189, 248, 0.18); color: #38bdf8; }
 
 .guide-detail {
   min-width: 0;
@@ -1390,6 +1404,18 @@ kbd, .key-button {
 .path-block code {
   font: 11.5px/1.7 "SF Mono", Consolas, monospace;
   flex: 1;
+  word-break: break-all;
+}
+.directory-section {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.directory-note {
+  margin-top: 10px;
+}
+.update-target-dir code {
+  font: 11.5px/1.6 "SF Mono", Consolas, monospace;
   word-break: break-all;
 }
 .data-list { margin: 24px 0; }

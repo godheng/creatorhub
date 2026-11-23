@@ -18,8 +18,16 @@ class EngineSettingsPatch(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
 
     xhs_read_mode: Literal["browser", "api"] | None = None
+    rednote_read_mode: Literal["browser", "hybrid", "api"] | None = None
     douyin_read_mode: Literal["hybrid", "api", "browser"] | None = None
     tiktok_read_mode: Literal["auto", "native", "browser"] | None = None
+    channels_read_mode: Literal["auto", "protocol", "browser"] | None = None
+    bilibili_read_mode: Literal["hybrid", "api", "browser"] | None = None
+    bilibili_write_mode: Literal["hybrid", "api", "browser"] | None = None
+    instagram_read_mode: Literal["hybrid", "api", "browser"] | None = None
+    instagram_write_mode: Literal["hybrid", "api", "browser"] | None = None
+    twitter_read_mode: Literal["hybrid", "api", "browser"] | None = None
+    twitter_write_mode: Literal["browser"] | None = None
     douyin_profile_mode: Literal["hybrid", "api", "browser"] | None = None
     douyin_followers_mode: Literal["hybrid", "api", "browser"] | None = None
     douyin_dm_sync_mode: Literal["hybrid", "api", "browser"] | None = None
@@ -43,6 +51,7 @@ class EngineSettingsPatch(BaseModel):
     xhs_item_gap_seconds: float | None = Field(None, ge=0, le=120)
     xhs_request_jitter: float | None = Field(None, ge=0, le=1)
     xhs_publish_mode: Literal["browser", "api"] | None = None
+    rednote_publish_mode: Literal["browser", "api"] | None = None
     xhs_comment_write_mode: Literal["browser", "api", "manual"] | None = None
     xhs_comment_review_before_publish: bool | None = None
     work_health_enabled: bool | None = None
@@ -74,6 +83,11 @@ class EngineSettingsPatch(BaseModel):
     action_hourly_cap_per_account: int | None = Field(None, ge=0, le=10000)
     action_min_gap_seconds: int | None = Field(None, ge=0, le=86400)
     verify_proxy_region: bool | None = None
+    strict_proxy_required: bool | None = None
+    forbid_same_platform_shared_proxy: bool | None = None
+    quiet_hours_enabled: bool | None = None
+    quiet_hours_include_reads: bool | None = None
+    quiet_hours_wake_jitter_minutes: int | None = Field(None, ge=0, le=120)
     native_write_gate_enabled: bool | None = None
     native_write_require_system_chrome: bool | None = None
     native_write_require_verified_proxy: bool | None = None

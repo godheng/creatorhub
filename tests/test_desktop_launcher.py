@@ -10,7 +10,7 @@ import zipfile
 from contextlib import closing
 
 from desktop.launcher import (InstanceLock, bind_local_port, child_command,
-                              configure_process_streams, prepare_home, snapshot,
+                              configure_process_streams, main, prepare_home, snapshot,
                               user_directory, utf8_child_environment)
 
 
@@ -56,6 +56,29 @@ class DesktopTests(unittest.TestCase):
     def test_frozen_command_is_not_python_module_invocation(self):
         with patch("sys.frozen", True, create=True), patch("sys.executable", "aispace.exe"):
             self.assertEqual(child_command("--serve"), ["aispace.exe", "--serve"])
+
+    def test_smoke_commands_dispatch_without_preparing_user_home(self):
+        for argument, target in (
+            ("--smoke-test", "desktop.launcher.update_health_check"),
+            ("--update-health-check", "desktop.launcher.update_health_check"),
+            ("--shell-smoke-test", "desktop.webview_smoke.smoke"),
+        ):
+            with (self.subTest(argument=argument),
+                  patch("sys.argv", ["aispace.exe", argument]),
+                  patch("desktop.launcher.prepare_home") as prepare,
+                  patch(target, return_value=0) as smoke):
+                self.assertEqual(main(), 0)
+                smoke.assert_called_once_with()
+                prepare.assert_not_called()
+
+    def test_serve_command_passes_through_frozen_entry_point(self):
+        home = Path("temporary-home")
+        with (patch("sys.argv", ["aispace.exe", "--serve", "--session", "abc", "--skip-browser-install"]),
+              patch("desktop.launcher.user_directory", return_value=home),
+              patch("desktop.launcher.prepare_home"),
+              patch("desktop.launcher.serve", return_value=0) as serve):
+            self.assertEqual(main(), 0)
+        serve.assert_called_once_with(home, "abc", False, 0)
 
     def test_child_environment_overrides_legacy_windows_encoding(self):
         with patch.dict(os.environ, {"PYTHONUTF8": "0", "PYTHONIOENCODING": "cp1252"}):

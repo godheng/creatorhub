@@ -4,15 +4,14 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlmodel import select
 
-from app import db, main, douyin_dm_batches as dm
+from app import db, licensing, runtime, douyin_dm_batches as dm
 from app.models import AccountActionTask, DmConversation, DouyinAccount
-from test_project_optimizations import local_project, store
-from test_access_and_submissions import client
+from commercial_fixtures import BrowserStub, client, local_project, store
 
 
 @pytest.fixture
 def active(local_project, monkeypatch):
-    monkeypatch.setattr(main.licensing, "is_active", lambda: True)
+    monkeypatch.setattr(licensing, "is_active", lambda: True)
     return store(DouyinAccount(nickname="sender"))
 
 
@@ -74,7 +73,7 @@ def test_empty_missing_key_and_license_rejected(active, monkeypatch):
             assert (await http.post("/api/douyin/dm/batches", json=body, headers=headers)).status_code == 422
             body["content"] = "hello"
             assert (await http.post("/api/douyin/dm/batches", json=body)).status_code == 422
-            monkeypatch.setattr(main.licensing, "is_active", lambda: False)
+            monkeypatch.setattr(licensing, "is_active", lambda: False)
             response = await http.post("/api/douyin/dm/batches", json=body, headers=headers)
             assert response.status_code == 403 and response.json()["code"] == "license_required"
             with db.get_session() as session:
@@ -130,9 +129,9 @@ def test_profile_resolution_uses_selected_account_read_guard(active, monkeypatch
     async def guarded(account_id, kind, key, operation, **kwargs):
         seen["account_id"] = account_id
         return await operation()
-    monkeypatch.setattr(main, "DouyinClient", FakeClient)
-    monkeypatch.setattr(main, "douyin_cookie_from_state", lambda state: "isolated-cookie")
-    monkeypatch.setattr(main, "engine", SimpleNamespace(guarded_read_pair=guarded))
+    monkeypatch.setattr(dm, "DouyinClient", FakeClient)
+    monkeypatch.setattr(dm, "douyin_cookie_from_state", lambda state: "isolated-cookie")
+    monkeypatch.setattr(runtime, "engine", SimpleNamespace(guarded_read_pair=guarded))
     result = asyncio.run(dm.preview(dm.PreviewIn(account_id=active,
         links=["https://www.douyin.com/user/MS4wLjABabc"])))
     assert result["recipients"][0]["target_uid"] == "123"
@@ -141,7 +140,6 @@ def test_profile_resolution_uses_selected_account_read_guard(active, monkeypatch
 
 def test_restart_recovers_batch_doing_without_replaying_terminal_tasks(active, local_project):
     from app.engine.monitor import MonitorEngine
-    from test_write_gates import _BrowserStub
     async def scenario():
         async with client() as http:
             body = {"account_id": active, "content": "restart", "recipients": [
@@ -154,7 +152,7 @@ def test_restart_recovers_batch_doing_without_replaying_terminal_tasks(active, l
                 session.commit()
             db._engine.dispose()
             db.init_db(str(local_project.path))
-            engine=MonitorEngine(local_project.cfg,_BrowserStub())
+            engine=MonitorEngine(local_project.cfg,BrowserStub())
             assert engine.recover_interrupted_tasks()==1
             for ident in batch['task_ids'][:3]:
                 result=await engine.execute_action_task(ident)
@@ -169,7 +167,6 @@ def test_api_batch_executes_new_conversations_and_continues_after_recipient_reje
     import json
     from contextlib import asynccontextmanager
     from app.engine.monitor import MonitorEngine
-    from test_write_gates import _BrowserStub
     calls=[]
     class Platform:
         def __init__(self,*args,**kwargs): pass
@@ -181,15 +178,15 @@ def test_api_batch_executes_new_conversations_and_continues_after_recipient_reje
         async def send_dm(self,conv,short,ticket,content):
             calls.append(('send',conv))
             return (False,'recipient does not accept messages') if conv=='conv-101' else (True,'')
-    monkeypatch.setattr('app.engine.monitor.DouyinClient',Platform)
-    monkeypatch.setattr('app.engine.monitor.send_dm',AsyncMock(side_effect=AssertionError('no fallback')))
+    monkeypatch.setattr('app.engine.action_jobs.DouyinClient',Platform)
+    monkeypatch.setattr('app.engine.action_jobs.send_dm',AsyncMock(side_effect=AssertionError('no fallback')))
     with db.get_session() as session:
         account=session.get(DouyinAccount,active); account.uid='999'
         account.storage_state=json.dumps({'cookies':[{'domain':'.douyin.com','name':'sid_tt','value':'offline'}]})
         session.add(account); session.commit()
     local_project.cfg.engine.douyin_write_mode='api'
     local_project.cfg.engine.quiet_hours_enabled=False
-    engine=MonitorEngine(local_project.cfg,_BrowserStub())
+    engine=MonitorEngine(local_project.cfg,BrowserStub())
     async def scenario():
         async with client() as http:
             body=dict(account_id=active,content='offline',recipients=[dict(target_uid='101',target_sec_uid='sec-a'),dict(target_uid='102',target_sec_uid='sec-b')])

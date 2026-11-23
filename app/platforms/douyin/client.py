@@ -1,11 +1,14 @@
-"""抖音 Web 客户端。对应逆向 internal/douyin.NativeClient。
+"""抖音 Web API 异步直连客户端。
 负责:拼接公共参数 + a_bogus 签名 + 携带 Cookie 请求 douyin.com Web API。
 """
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
+import logging
+import random
 import time
 import urllib.parse
 import uuid
@@ -31,7 +34,8 @@ from .web_session import (
     DETAIL_ORIGINS, DETAIL_PATH, cookie_header, cookie_value,
     observed_detail_context, read_state,
 )
-from ...netfp import impersonate_for_ua
+from ...browser.manager import normalize_proxy
+from ...netfp import curl_proxy_url, impersonate_for_ua
 
 BASE = "https://www.douyin.com"
 WRITE_BASE = "https://www-hj.douyin.com"
@@ -49,6 +53,8 @@ SECURE_SDK_WRITE_PATHS = frozenset({
 SEARCH_STREAM_PATH = "/aweme/v1/web/general/search/stream/"
 SEARCH_SINGLE_PATH = "/aweme/v1/web/general/search/single/"
 SEARCH_PATHS = frozenset({SEARCH_SINGLE_PATH, SEARCH_STREAM_PATH})
+SEARCH_MAX_PAGE_SIZE = 20
+SEARCH_PAGE_DELAY_RANGE = (0.45, 0.85)
 
 
 def cookie_from_state(storage_state_json: str) -> str:
@@ -94,6 +100,59 @@ DEFAULT_PARAMS = {
 }
 
 
+def _ua_client_params(ua: str) -> Dict[str, str]:
+    """Derive coherent OS, browser, Client-Hints, and pc_libra_divert params from UA."""
+    s = str(ua or "")
+    is_mac = "Macintosh" in s or "Mac OS" in s
+    is_linux = not is_mac and ("Linux" in s and "Android" not in s)
+    if is_mac:
+        browser_platform = "MacIntel"
+        os_name = "Mac OS"
+        m_mac = re.search(r"Mac OS X (\d+[._]\d+(?:[._]\d+)?)", s)
+        os_version = m_mac.group(1).replace(".", "_") if m_mac else "10_15_7"
+        pc_libra_divert = "Mac"
+        ch_platform = '"macOS"'
+    elif is_linux:
+        browser_platform = "Linux x86_64"
+        os_name = "Linux"
+        os_version = ""
+        pc_libra_divert = "Windows"
+        ch_platform = '"Linux"'
+    else:
+        browser_platform = "Win32"
+        os_name = "Windows"
+        os_version = "10"
+        pc_libra_divert = "Windows"
+        ch_platform = '"Windows"'
+
+    is_edge = "Edg/" in s
+    browser_name = "Edge" if is_edge else "Chrome"
+    m_chr = re.search(r"Chrome/(\d+)", s)
+    m_edg = re.search(r"Edg/(\d+)", s)
+    browser_major = (
+        int(m_edg.group(1))
+        if (is_edge and m_edg)
+        else (int(m_chr.group(1)) if m_chr else 130)
+    )
+    engine_major = int(m_chr.group(1)) if m_chr else browser_major
+    brand = "Microsoft Edge" if is_edge else "Google Chrome"
+    return {
+        "browser_platform": browser_platform,
+        "browser_name": browser_name,
+        "browser_version": f"{browser_major}.0.0.0",
+        "engine_version": f"{engine_major}.0.0.0",
+        "os_name": os_name,
+        "os_version": os_version,
+        "pc_libra_divert": pc_libra_divert,
+        "sec-ch-ua": (
+            f'"Chromium";v="{engine_major}", "{brand}";v="{browser_major}", '
+            '"Not_A Brand";v="99"'
+        ),
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": ch_platform,
+    }
+
+
 class DouyinClient:
     def __init__(self, cookie: str, user_agent: str, timeout: float = 20.0,
                  proxy: str = "", *, locale: str = "zh-CN",
@@ -103,13 +162,14 @@ class DouyinClient:
         self.cookie = cookie or ""
         self.ua = user_agent
         self.timeout = timeout
-        self.proxy = (proxy or "").strip()
+        self.proxy = curl_proxy_url(proxy) if proxy else ""
         self.locale = str(locale or "zh-CN")
         self.accept_language = (str(accept_language or "").strip()
                                 or f"{self.locale},{self.locale.split('-', 1)[0]};q=0.9")
         self.screen_width = max(320, int(screen_width or 1536))
         self.screen_height = max(240, int(screen_height or 864))
-        self.impersonate = impersonate_for_ua(user_agent)  # TLS 指纹复刻,绕 JA3 风控
+        self.impersonate = impersonate_for_ua(user_agent)  # 对齐浏览器 TLS 握手指纹
+        self._ua_params = _ua_client_params(self.ua)
         self._session: AsyncSession | None = None
         self._ms_token: str | None = None
         self._token_source = ""
@@ -146,7 +206,7 @@ class DouyinClient:
         if self._session is not None:
             yield self
             return
-        self._session = AsyncSession(impersonate=self.impersonate)
+        self._session = AsyncSession(impersonate=self.impersonate, trust_env=False)
         try:
             yield self
         finally:
@@ -161,6 +221,9 @@ class DouyinClient:
             "Referer": referer,
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": self.accept_language,
+            "sec-ch-ua": self._ua_params["sec-ch-ua"],
+            "sec-ch-ua-mobile": self._ua_params["sec-ch-ua-mobile"],
+            "sec-ch-ua-platform": self._ua_params["sec-ch-ua-platform"],
             "Cookie": cookie_header(self._cookies, url),
         }
         parsed = urllib.parse.urlsplit(url)
@@ -241,6 +304,11 @@ class DouyinClient:
                 if webid.isdigit() and len(webid) <= 32:
                     result["webid"] = webid
             break
+        if "webid" not in result:
+            seed_cookie = self.cookie or cookie_header(self._cookies, BASE + "/")
+            digest = hashlib.sha256(f"{seed_cookie}|{self.ua}".encode("utf-8")).digest()
+            tail = int.from_bytes(digest[:16], "big") % (10 ** 17)
+            result["webid"] = f"73{tail:017d}"
         visitor = cookie_value(self._cookies, BASE + "/", "s_v_web_id")
         if visitor and len(visitor) <= 256 and not re.search(r"[\s;&]", visitor):
             result.update(verifyFp=visitor, fp=visitor)
@@ -373,22 +441,23 @@ class DouyinClient:
             q = dict(self.detail_context.get("params") or {})
         else:
             q = dict(DEFAULT_PARAMS)
+            ua_info = _ua_client_params(self.ua)
             # Cookie, UA, locale and viewport belong to the same account.
             q.update({
                 "screen_width": str(self.screen_width),
                 "screen_height": str(self.screen_height),
                 "browser_language": self.locale,
+                "browser_platform": ua_info["browser_platform"],
+                "browser_name": ua_info["browser_name"],
+                "browser_version": ua_info["browser_version"],
+                "engine_version": ua_info["engine_version"],
+                "os_name": ua_info["os_name"],
+                "os_version": ua_info["os_version"],
             })
-            # Keep query browser versions aligned with the account's UA.
-            m = re.search(r"Chrome/(\d+)", self.ua or "")
-            if m:
-                ver = f"{m.group(1)}.0.0.0"
-                q["browser_version"] = ver
-                q["engine_version"] = ver
             q.update(self._account_query)
             if self._normalized_path(path) in SECURE_SDK_WRITE_PATHS:
                 q.update({
-                    "pc_libra_divert": "Windows",
+                    "pc_libra_divert": ua_info["pc_libra_divert"],
                     "update_version_code": "170400",
                     "support_h265": "0",
                     "support_dash": "0",
@@ -425,7 +494,7 @@ class DouyinClient:
     def _abogus_fingerprint(self) -> str:
         """Build the signer fingerprint from the account's stable viewport."""
         width, height = self.screen_width, self.screen_height
-        platform = "MacIntel" if "Macintosh" in self.ua else "Win32"
+        platform = _ua_client_params(self.ua)["browser_platform"]
         return (
             f"{width}|{height}|{width + 24}|{height + 80}|0|0|0|0|"
             f"{width}|{height}|{width}|{height}|{width}|{height}|24|24|"
@@ -442,7 +511,7 @@ class DouyinClient:
                                   "rejection_reason": "missing_uifid", "request_sent": False}
             return []
         owned = self._session is None
-        cli = self._session or AsyncSession(impersonate=self.impersonate)
+        cli = self._session or AsyncSession(impersonate=self.impersonate, trust_env=False)
         try:
             await self._prepare_ms_token(self._api_origin(path) + path)
             url = self._build_url(path, params)
@@ -471,8 +540,13 @@ class DouyinClient:
                     self.last_error, reason = detail_http_error(r.status_code, r.content)
                     if reason:
                         self.last_response["rejection_reason"] = reason
-                print(f"[dy-client] {path} → HTTP {r.status_code} len={len(r.content)}"
-                      f"{' (空 body:多半被风控拒,非无数据)' if r.status_code == 200 else ''}")
+                logging.getLogger("creatorhub.douyin.client").warning(
+                    "%s -> HTTP %s len=%d%s",
+                    path,
+                    r.status_code,
+                    len(r.content),
+                    " (空 body:多半触发风控拦截)" if r.status_code == 200 else "",
+                )
                 return []
             try:
                 payload = r.json()
@@ -494,7 +568,12 @@ class DouyinClient:
                 self.last_error = ("risk:verification_required:html" if re.search(
                     r"<title[^>]*>[^<]*(?:验证码中间页|安全验证|人机验证)", body, re.I)
                     else "invalid_json")
-                print(f"[dy-client] {path} → 非 JSON len={len(r.content)}")
+                logging.getLogger("creatorhub.douyin.client").warning(
+                    "%s -> 非 JSON 响应 (%s, len=%d)",
+                    path,
+                    self.last_error,
+                    len(r.content),
+                )
                 return []
         except Exception as exc:
             self.last_error = f"network:{type(exc).__name__}"
@@ -522,7 +601,7 @@ class DouyinClient:
         self.last_response = {}
         self.last_write_uncertain = False
         owned = self._session is None
-        cli = self._session or AsyncSession(impersonate=self.impersonate)
+        cli = self._session or AsyncSession(impersonate=self.impersonate, trust_env=False)
         try:
             await self._prepare_ms_token(self._api_origin(path) + path)
             # a_bogus hashes the exact application/x-www-form-urlencoded body.
@@ -714,7 +793,7 @@ class DouyinClient:
         self.last_error = ""
         self.last_write_uncertain = False
         owned = self._session is None
-        cli = self._session or AsyncSession(impersonate=self.impersonate)
+        cli = self._session or AsyncSession(impersonate=self.impersonate, trust_env=False)
         referer = f"{BASE}/user/{target_sec_uid or target_uid}"
         try:
             body = build_create_conversation_request(
@@ -769,7 +848,7 @@ class DouyinClient:
         self.last_error = ""
         self.last_write_uncertain = False
         owned = self._session is None
-        cli = self._session or AsyncSession(impersonate=self.impersonate)
+        cli = self._session or AsyncSession(impersonate=self.impersonate, trust_env=False)
         try:
             body = build_send_request(
                 str(conv_id), int(conv_type or 1), int(conv_short_id), str(ticket),
@@ -864,7 +943,7 @@ class DouyinClient:
 
         self.last_error = ""
         owned = self._session is None
-        cli = self._session or AsyncSession(impersonate=self.impersonate)
+        cli = self._session or AsyncSession(impersonate=self.impersonate, trust_env=False)
         try:
             body = build_init_request(
                 int(time.time() * 1_000_000), **self._im_request_options())
@@ -940,7 +1019,7 @@ class DouyinClient:
             "query_correct_type": "1",
             "is_filter_search": "0",
             "offset": max(0, int(offset or 0)),
-            "count": max(1, min(50, int(count or 15))),
+            "count": max(1, min(SEARCH_MAX_PAGE_SIZE, int(count or 15))),
             "list_type": "multi",
             "search_id": self._search_id,
             "need_filter_settings": "1",
@@ -1019,21 +1098,35 @@ class DouyinClient:
     async def search_awemes(self, keyword: str, *, max_results: int = 20,
                             max_pages: int = 3, search_sort: str = "general",
                             publish_time: str = "all", content_type: str = "all",
-                            min_likes: int = 0, min_comments: int = 0) -> tuple[List[dict], str]:
+                            min_likes: int = 0, min_comments: int = 0,
+                            page_delay_seconds: float | None = None) -> tuple[List[dict], str]:
         """分页搜索并做本地筛选；返回 (作品列表, 可回退原因)。"""
-        import time
         # search_id belongs to one keyword pagination chain, not the account.
         self._search_id = ""
         found: Dict[str, dict] = {}
         offset = 0
-        for _ in range(max(1, min(10, int(max_pages or 1)))):
+        raw_candidates_seen = 0
+        # 抖音网页端搜索单页 count 超过 20 会触发网关参数异常/验证码风控；
+        # 大上限（如 50/100）必须按网页端正常每页 <=20 条配合分页间隔逐步拉取。
+        page_size = min(SEARCH_MAX_PAGE_SIZE, max(1, int(max_results or SEARCH_MAX_PAGE_SIZE)))
+        for page_index in range(max(1, min(40, int(max_pages or 1)))):
+            if page_index > 0:
+                delay = (random.uniform(*SEARCH_PAGE_DELAY_RANGE)
+                         if page_delay_seconds is None
+                         else max(0.0, float(page_delay_seconds)))
+                if delay > 0:
+                    await asyncio.sleep(delay)
             page = await self.search_awemes_page(
-                keyword, offset=offset, count=min(50, max_results),
+                keyword, offset=offset, count=page_size,
                 search_sort=search_sort, publish_time=publish_time,
                 content_type=content_type)
             if page.get("error"):
-                return list(found.values())[:max_results], str(page["error"])
+                page_error = str(page["error"])
+                if found and page_error in {"empty_body", "empty_response"}:
+                    break
+                return list(found.values())[:max_results], page_error
             for item in page.get("items") or []:
+                raw_candidates_seen += 1
                 stats = item.get("statistics") or {}
                 if content_type == "video" and not item.get("video"):
                     continue
@@ -1062,7 +1155,7 @@ class DouyinClient:
             items.sort(key=lambda x: int(x.get("create_time") or 0), reverse=True)
         elif search_sort == "most_liked":
             items.sort(key=lambda x: int((x.get("statistics") or {}).get("digg_count") or 0), reverse=True)
-        return items, ("empty_response" if not items else "")
+        return items, ("" if (items or raw_candidates_seen > 0) else "empty_response")
 
     async def fetch_all_video_list(self, sec_uid: str, max_pages: int = 10,
                                    count: int = 20) -> List[dict]:
@@ -1088,7 +1181,7 @@ class DouyinClient:
             cursor = nxt
         return out
 
-    # ── 用户资料(对应 NativeClient.FetchProfile)──
+    # ── 用户资料 ──
     async def fetch_self_profile(self) -> Optional[dict]:
         """读取当前 Cookie 对应账号，不依赖已知 sec_uid。"""
         data = await self._get_json(
@@ -1197,7 +1290,7 @@ class DouyinClient:
             "nickname": str(user.get("nickname") or ""),
         }
 
-    # ── 作品列表(对应 NativeClient.FetchVideoList)──
+    # ── 作品列表 ──
     async def fetch_video_list(self, sec_uid: str, max_cursor: int = 0,
                                count: int = 20) -> Dict[str, Any]:
         data = await self._get_json(
@@ -1220,7 +1313,7 @@ class DouyinClient:
 
     async def fetch_all_new_videos(self, sec_uid: str, known_ids: set,
                                    max_pages: int = 5) -> List[dict]:
-        """对应 NativeClient.FetchAllNewVideos:翻页直到遇到已知作品。"""
+        """按游标翻页抓取新增作品，遇到已知作品即停止。"""
         new_items: List[dict] = []
         cursor = 0
         for _ in range(max_pages):
@@ -1239,7 +1332,7 @@ class DouyinClient:
             cursor = page["max_cursor"]
         return new_items
 
-    # ── 作品详情(对应 NativeClient.FetchVideoDetail)──
+    # ── 作品详情 ──
     async def fetch_video_detail(self, aweme_id: str) -> Optional[dict]:
         data = await self._get_json(
             "/aweme/v1/web/aweme/detail/",
@@ -1252,7 +1345,7 @@ class DouyinClient:
         item, self.last_error = parse_detail_response(data, aweme_id)
         return item
 
-    # ── 评论(直连 comment/list + reply,分页拉全量;参考 CommentAll)──
+    # ── 评论(直连 comment/list + reply 分页拉取)──
     async def fetch_comments_page(self, aweme_id: str, cursor: int = 0,
                                   count: int = 20) -> dict:
         data = await self._get_json(
