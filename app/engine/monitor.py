@@ -3067,7 +3067,7 @@ class MonitorEngine:
                     "", sec_uid, direction, on_page=receive_page,
                     collect=False)
         except Exception as e:
-            return [], repr(e)
+            return out, repr(e)
         meta = getattr(client, "last_follow_meta", {})
         print(f"[follow-direct] dir={direction} sec_uid={sec_uid} "
               f"pages={meta.get('pages', 0)} norm={len(out)} "
