@@ -6,7 +6,7 @@ User=aispace-license
 Group=aispace-license
 WorkingDirectory=/opt/aispace-license
 Environment=LICENSE_DATA=/var/lib/aispace-license
-ExecStart=/opt/aispace-license/venv/bin/uvicorn license_service.server:app --host 0.0.0.0 --port 8088 --no-access-log
+ExecStart=/opt/aispace-license/venv/bin/uvicorn license_service.server:app --host 127.0.0.1 --port 8088 --no-access-log
 Restart=on-failure
 UMask=0077
 NoNewPrivileges=true
