@@ -446,7 +446,7 @@ class WorkSyncMixin:
                     "", sec_uid, direction, on_page=receive_page,
                     collect=False)
         except Exception as e:
-            return out, repr(e)
+            return [], repr(e)
         meta = getattr(client, "last_follow_meta", {})
         log.debug(
             "抖音关系直连同步 dir=%s pages=%s norm=%d complete=%s",

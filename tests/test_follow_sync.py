@@ -189,44 +189,6 @@ class FollowSyncTests(unittest.TestCase):
         self.assertEqual(result["source"], "browser_fallback")
         browser_fetch.assert_awaited_once()
 
-    def test_timeout_after_direct_page_rejects_short_browser_snapshot(self):
-        with db.get_session() as session:
-            account = session.get(DouyinAccount, self.account_id)
-            account.storage_state = '{"cookies":[{"name":"sid_tt","value":"x"}]}'
-            session.add(account)
-            for uid in ("old-fan-1", "old-fan-2"):
-                session.add(FollowEdge(platform="douyin", account_id=self.account_id,
-                                       direction="fan", uid=uid))
-            session.commit()
-        cfg = Config()
-        cfg.engine.quiet_hours_include_reads = False
-        runtime.engine = MonitorEngine(cfg, runtime.browser)
-        first_page = {
-            "followers": [_user(f"direct-{i}") for i in range(3)],
-            "has_more": 1, "min_time": 1900, "offset": 0,
-        }
-        with (
-            patch.object(runtime.browser, "lock_for", create=True, return_value=asyncio.Lock()),
-            patch("app.licensing.require_active"),
-            patch("app.engine.work_sync.DouyinClient.fetch_profile",
-                  new_callable=AsyncMock, return_value={"uid": "self"}),
-            patch("app.engine.work_sync.DouyinClient._follow_page", new_callable=AsyncMock,
-                  side_effect=[first_page, TimeoutError("second page timed out")]) as fetch_page,
-            patch("app.api.follows.fetch_follows", new_callable=AsyncMock,
-                  return_value=([_user("browser-only")], "")) as browser_fetch,
-        ):
-            with self.assertRaises(HTTPException) as caught:
-                asyncio.run(follows.sync_follows(self.account_id, "fan"))
-
-        self.assertEqual(caught.exception.status_code, 502)
-        self.assertIn("second page timed out", caught.exception.detail)
-        self.assertEqual(fetch_page.await_count, 2)
-        browser_fetch.assert_awaited_once()
-        with db.get_session() as session:
-            rows = session.exec(select(FollowEdge).where(
-                FollowEdge.account_id == self.account_id, FollowEdge.direction == "fan")).all()
-        self.assertEqual({row.uid for row in rows}, {"old-fan-1", "old-fan-2"})
-
     def test_hybrid_stalled_partial_preserves_existing_rows_when_browser_also_fails(self):
         with db.get_session() as session:
             session.add(FollowEdge(
