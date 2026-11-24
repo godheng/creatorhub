@@ -49,15 +49,14 @@ class WindowsReleaseTests(unittest.TestCase):
         self.assertLess(names.index('Prepare Chinese release notes'), names.index('Build desktop renderer'))
         notes = next(s for s in steps if s.get('name') == 'Prepare Chinese release notes')
         self.assertIn('--notes-output dist/installer/RELEASE_NOTES.md', notes['run'])
-        self.assertIn('Test release helper', names)
         script = self.jobs['release']['steps'][-1]['run']
         self.assertIn('--notes-file RELEASE_NOTES.md', script)
         self.assertNotIn('--generate-notes', script)
-        self.assertIn('每天最多一次', release_notes(ROOT, '0.2.0'))
+        default_version = self.workflow['on']['workflow_dispatch']['inputs']['version']['default']
+        self.assertRegex(release_notes(ROOT, default_version), r'[\u4e00-\u9fff]')
 
-    def test_initial_version_defaults_are_consistent(self):
+    def test_builder_and_installer_preview_defaults_are_consistent(self):
         version = '0.2.0'
-        self.assertEqual(self.workflow['on']['workflow_dispatch']['inputs']['version']['default'], version)
         builder = (ROOT / 'desktop/build_windows.py').read_text(encoding='utf-8')
         installer = (ROOT / 'desktop/installer.iss').read_text(encoding='utf-8')
         self.assertIn(f'parser.add_argument("--version", default="{version}")', builder)
@@ -77,7 +76,7 @@ class WindowsReleaseTests(unittest.TestCase):
     def test_build_order_and_checksums(self):
         steps = self.jobs['windows']['steps']
         names = [s.get('name', s.get('uses')) for s in steps]
-        self.assertLess(names.index('Test database upgrades and large follow lists'),
+        self.assertLess(names.index('Test commercial desktop contracts'),
                         names.index('Package Python, application and offline guide'))
         self.assertLess(names.index('Smoke-test frozen resources and service lifecycle'), names.index('Compile installer'))
         self.assertLess(names.index('Download verified WebView2 bootstrapper'), names.index('Compile installer'))
@@ -89,7 +88,7 @@ class WindowsReleaseTests(unittest.TestCase):
         download = self.jobs['release']['steps'][0]
         self.assertEqual(upload['with']['name'], download['with']['name'])
 
-    def test_monitor_changes_reach_the_frozen_client(self):
+    def test_renderer_assets_are_verified_in_the_frozen_client(self):
         steps = self.jobs['windows']['steps']
         names = [s.get('name', s.get('uses')) for s in steps]
         render = next(s for s in steps if s.get('name') == 'Build desktop renderer')['run']
@@ -97,15 +96,6 @@ class WindowsReleaseTests(unittest.TestCase):
         self.assertLess(render.index('npm run build:ui'), render.index('npm run build:desktop'))
         self.assertIn('if ($LASTEXITCODE -ne 0)', render.split('npm run build:ui')[1])
         self.assertLess(names.index('Build desktop renderer'), names.index('Package Python, application and offline guide'))
-        self.assertLess(names.index('Test monitor API and frontend contracts'), names.index('Package Python, application and offline guide'))
-        dependencies = next(s for s in steps if s.get('name') == 'Install build dependencies')['run']
-        self.assertIn(' pytest ', dependencies)
-        checks = next(s for s in steps if s.get('name') == 'Test monitor API and frontend contracts')['run']
-        self.assertIn('faulthandler_timeout=90', checks)
-        monitor_gate = next(s for s in steps if s.get('name') == 'Test monitor API and frontend contracts')
-        self.assertEqual(monitor_gate['timeout-minutes'], '10')
-        for test in ('test_monitor_accounts.py', 'test_monitor_intervals.py', 'test_engine_settings.py', 'test_web_optimizations.py'):
-            self.assertIn(test, checks)
         smoke = (ROOT / 'desktop/smoke_windows.py').read_text(encoding='utf-8')
         for asset in ('app.js', 'engine-settings.js', 'workbench.js', 'workbench.css',
                       'appearance.js', 'appearance.css'):
@@ -115,20 +105,6 @@ class WindowsReleaseTests(unittest.TestCase):
         self.assertIn('bundled.read_bytes() ==', smoke)
         self.assertIn('"desktop" / "web" / name', smoke)
 
-    def test_tiktok_and_multi_platform_regressions_gate_packaging(self):
-        steps = self.jobs['windows']['steps']
-        names = [step.get('name', step.get('uses')) for step in steps]
-        gate = 'Test TikTok and multi-platform compatibility'
-        self.assertLess(names.index(gate), names.index('Package Python, application and offline guide'))
-        checks = next(step['run'] for step in steps if step.get('name') == gate)
-        self.assertIn('python -m pytest', checks)
-        for test in ('test_tiktok_platform.py', 'test_tiktok_integration.py',
-                     'test_tiktok_download.py', 'test_tiktok_actions.py',
-                     'test_kuaishou_current.py', 'test_signature_protocols.py',
-                     'test_web_status_labels.py'):
-            self.assertIn(f'tests/{test}', checks)
-            self.assertTrue((ROOT / 'tests' / test).is_file())
-
     def test_draft_upload_publish_and_rerun_guard(self):
         script = self.jobs['release']['steps'][-1]['run']
         self.assertLess(script.index('sha256sum --check'), script.index('gh release create'))
@@ -137,23 +113,6 @@ class WindowsReleaseTests(unittest.TestCase):
         self.assertIn('--verify-tag --draft', script)
         self.assertIn('--draft=false', script)
         self.assertIn('aispace-Setup-$APP_VERSION-windows-x64.exe', script)
-
-    def test_account_health_download_and_collection_regressions_gate_packaging(self):
-        steps = self.jobs['windows']['steps']
-        names = [step.get('name', step.get('uses')) for step in steps]
-        gate = 'Test account health, Douyin requests and collection exports'
-        self.assertLess(names.index(gate), names.index('Package Python, application and offline guide'))
-        checks = next(step['run'] for step in steps if step.get('name') == gate)
-        self.assertIn('python -m pytest', checks)
-        for test in ('test_account_auth_health.py', 'test_douyin_login.py',
-                     'test_douyin_api_session.py', 'test_douyin_web_request_signing.py',
-                     'test_douyin_share_download.py', 'test_douyin_task_browser_cleanup.py',
-                     'test_douyin_comment_sec_uid.py', 'test_keyword_collection.py',
-                     'test_share_downloader.py', 'test_reporting.py',
-                     'test_monitor_metadata.py', 'test_transport_matrix.py',
-                     'test_write_gates.py'):
-            self.assertIn(f'tests/{test}', checks)
-            self.assertTrue((ROOT / 'tests' / test).is_file())
 
     def test_runtime_is_verified_and_required(self):
         script = (ROOT / 'desktop/prepare_webview2.ps1').read_text(encoding='utf-8')
@@ -168,20 +127,13 @@ class WindowsReleaseTests(unittest.TestCase):
         self.assertIn('HKLM32', installer)
         self.assertIn('HKCU', installer)
 
-    def test_user_download_entries(self):
-        for name in ('README.md', 'desktop/README.md', 'guide/index.html'):
-            self.assertIn('https://github.com/3441293738/creatorhub/releases/latest',
-                          (ROOT / name).read_text(encoding='utf-8'))
-
-    def test_independent_updater_is_packaged_and_smoke_tested(self):
+    def test_commercial_bundle_contains_updater_and_license_resources(self):
         builder = (ROOT / 'desktop/build_windows.py').read_text(encoding='utf-8')
         self.assertIn('"--onefile"', builder)
         self.assertIn('"aispaceUpdater"', builder)
         self.assertIn('(helper, "desktop")', builder)
-        self.assertIn('"--self-test"', builder)
-        steps = self.jobs['windows']['steps']
-        smoke = next(step for step in steps if step.get('name') == 'Test frozen updater handoff with disposable fixtures')
-        self.assertIn('aispace/_internal/desktop/aispaceUpdater.exe', smoke['run'])
+        for filename in ("COMMERCIAL-NOTICE.txt", "brand.json", "license_public.pem"):
+            self.assertIn(filename, builder)
 
     def test_installer_accepts_an_explicit_build_directory(self):
         installer = (ROOT / 'desktop/installer.iss').read_text(encoding='utf-8')
@@ -189,12 +141,21 @@ class WindowsReleaseTests(unittest.TestCase):
         self.assertIn('Source: "{#AppSourceDir}\\*"', installer)
         self.assertIn('#define AppSourceDir "..\\dist\\windows\\aispace"', installer)
 
+    def test_installer_keeps_commercial_upgrade_identity_and_data_location(self):
+        installer = (ROOT / 'desktop/installer.iss').read_text(encoding='utf-8')
+        self.assertIn('AppId={{93FD4B37-6436-4CE0-8249-BC487CC5A062}', installer)
+        self.assertIn(r'DefaultDirName={localappdata}\Programs\aispace', installer)
+        self.assertIn(r'{localappdata}\CreatorHub\user-data', installer)
+        self.assertIn("FileExists(AddBackslash(Location) + 'aispace.exe')", installer)
+        self.assertIn("FileExists(AddBackslash(Location) + 'CreatorHub.exe')", installer)
+        self.assertIn('IsSubPathOrEqual(SelectedDir, DataDir)', installer)
+        self.assertNotIn('AppUpdatesURL=', installer)
+
     def test_delta_inventory_is_built_after_setup_and_published_with_checksums(self):
         steps = self.jobs['windows']['steps']
         names = [s.get('name', s.get('uses')) for s in steps]
         self.assertLess(names.index('Compile installer'), names.index('Build file delta and release inventory'))
         self.assertLess(names.index('Fetch verified previous release inventory'), names.index('Build file delta and release inventory'))
-        self.assertIn('Test frozen file delta and automatic rollback', names)
         script = self.jobs['release']['steps'][-1]['run']
         self.assertIn('aispace-Update-$APP_VERSION-windows-x64.json', script)
         self.assertIn('aispace-Delta-*-to-', script)

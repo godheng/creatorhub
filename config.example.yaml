@@ -13,18 +13,26 @@ engine:
   resident_browser_sessions: true # reuse one account browser process/Profile/task page
   browser_session_idle_seconds: 1800 # idle recycle; 0=LRU/explicit close/shutdown only
   xhs_read_mode: api              # api=常驻Node签名直连（默认）;browser=复用账号浏览器
+  rednote_read_mode: hybrid       # 海外小红书:hybrid=XYS/XYW+b1直连优先失败回退页面(默认推荐);api=仅直连;browser=仅页面
   douyin_read_mode: hybrid         # hybrid=API优先，普通兼容失败才回退浏览器；验证/风控直接冷却
   tiktok_read_mode: native         # native=全程离线直连、不打开浏览器;auto=失败页面回退;browser=仅页面
+  bilibili_read_mode: hybrid       # hybrid=WBI直连优先、兼容失败回退浏览器;api=仅直连;browser=仅页面
+  bilibili_write_mode: hybrid      # hybrid=CSRF/WBI直连优先(评论/私信/关注);api=仅直连;browser=仅页面
+  instagram_read_mode: hybrid      # hybrid=Instagram双栈直连优先、兼容失败回退浏览器;api=仅直连;browser=仅页面
+  instagram_write_mode: hybrid     # hybrid=SIGNATURE./Direct直连优先(评论/私信/关注/发布);api=仅直连;browser=仅页面
+  twitter_read_mode: hybrid        # hybrid=GraphQL/Syndication/REST直连优先、兼容失败回退隔离浏览器;api=仅直连;browser=全程浏览器
+  twitter_write_mode: browser      # X (Twitter) 写操作与发布统一走隔离浏览器原生签名通道
   douyin_profile_mode: hybrid      # 手动刷新资料:hybrid/API/browser
   douyin_followers_mode: hybrid    # 粉丝同步:hybrid/API/browser
   douyin_dm_sync_mode: hybrid      # 私信会话同步:hybrid/API/browser
   douyin_creator_danmaku_mode: hybrid # 本账号作品弹幕:hybrid/API/browser
   douyin_publish_mode: browser     # 发布当前仅 browser
-  douyin_write_mode: hybrid        # hybrid=API优先、明确拒绝时回退页面;api=仅API;browser=仅页面
+  douyin_write_mode: browser       # browser=仅真机浏览器拟人操作(默认推荐,防风控);hybrid=API优先失败回退页面;api=仅API
   xhs_keyword_gap_seconds: 10     # 同一任务相邻关键词的最小停顿
   xhs_item_gap_seconds: 2.5       # 相邻详情/评论读取的最小停顿
   xhs_request_jitter: 0.35        # 小红书读取停顿的正向随机抖动比例
   xhs_publish_mode: browser       # browser=页面发布;api=显式 API 兼容模式
+  rednote_publish_mode: browser   # browser=创作者中心页面发布(默认);api=实验性 XYS+b1 纯协议直发通道
   xhs_dm_monitor_enabled: false   # 低频检查 Web 私信；首次只建立基线
   xhs_dm_poll_interval_seconds: 120
   xhs_dm_realtime_enabled: true   # 监听页面原生 WebSocket；推送只用于唤醒
@@ -69,6 +77,8 @@ engine:
   scan_jitter: 0.15              # 扫描周期额外增加 0–15%；按任务和上次执行时间稳定错峰
   initial_scan_spread_seconds: 60 # 新监控/评论规则首次自动执行额外等待 0–60 秒；0 关闭
   route_download_via_proxy: true  # 媒体下载是否走账号代理(避免 CDN 拉流暴露真实 IP)
+  strict_proxy_required: false    # 兼容保留字段:默认仅提醒不强拦,允许本机直连
+  forbid_same_platform_shared_proxy: false # 兼容保留字段:默认仅提醒不强拦,允许同平台复用代理
   verify_proxy_region: true       # 体检时探测代理出口国家,与账号时区(默认东八区)不一致则告警
   native_write_gate_enabled: true # 仅新建 native 账号:写操作执行前检查浏览器/代理基线
   native_write_require_system_chrome: true # 写操作必须使用系统稳定版 Chrome
@@ -82,12 +92,19 @@ engine:
   comment_risk_cooldown_seconds: 21600 # 平台拒绝/验证后暂停该账号写操作(默认6小时)
   xhs_comment_write_mode: browser      # browser=页面发布;api=显式兼容;manual=只保存草稿
   xhs_comment_review_before_publish: true # true=人工审核后自动发布;false=生成后直接发布
+  channels_read_mode: auto             # auto=优先桌面微信 Finder 原生协议,回退创作者助手;protocol=仅原生协议;browser=仅助手页面
+  channels_cdp_endpoint: ""            # 可选:本机回环微信 Finder CDP 端点(如 http://127.0.0.1:9222)
+  channels_cdp_endpoint_file: ""       # 可选:wmpf_cdp 生成的单会话本地回环端点描述文件路径
+  channels_proxy_enabled: false        # 可选:启用内置本机视频号 HTTPS 代理桥接(配合普通版已登录桌面微信)
+  channels_proxy_port: 2023            # 可选:内置视频号本机代理监听端口(127.0.0.1)
   action_daily_cap_per_account: 20     # 每账号每日写操作(关注/取关/私信)总上限(0=不限)
   action_hourly_cap_per_account: 6     # 每账号每小时写操作上限(0=不限)
   action_min_gap_seconds: 90           # 同账号两次写操作全局最小间隔(与任务级 min_gap 取大)
 
-  # ── 活跃时段(夜间静默)—— 仅约束写操作自动排队执行,按东八区小时判定 ──
+  # ── 活跃时段(夜间静默与人类作息节律)—— 按账号所在时区判定 ──
   quiet_hours_enabled: true       # 夜间静默总开关，手动「立即执行」也遵守写操作风控
+  quiet_hours_include_reads: true # 活跃时段外同步休眠后台定时监控、评论采集与登录态体检(手动即时查看不受影响)
+  quiet_hours_wake_jitter_minutes: 35 # 每账号每日独立随机苏醒/入睡偏移上限(0–120 分钟),消除整点齐发特征
   active_hours_start: 8           # 活跃起点小时(含)
   active_hours_end: 24            # 活跃止点小时(不含);可 >24 跨零点(如 25=次日 1 点)
 
@@ -141,9 +158,18 @@ risk_control:
 storage:
   db_path: ./data/creatorhub.db
 
-# 代理池:建号时一号一代理 sticky 分配(占用最少优先)。务必用住宅/4G 长效代理,
-# 一号一长效固定 IP,IP 地区与账号时区/locale 一致;切勿机房 IP、切勿多号共享一个 IP。
-# 支持 http / https / socks5,可带账号密码。留空则不分配(走宿主真实 IP,多账号有关联风险)。
+# 日志与问题排查：默认精简记录关键状态、写操作与异常，不刷屏高频轮询请求，自动滚动限容与脱敏。
+# 也可直接在「设置 → 日志与诊断」查看日志、临时切换调试级别或一键导出脱敏诊断包。
+logging:
+  level: info                 # info=精简排障(推荐) | debug=详细协议/页面诊断 | warning=仅告警与错误
+  dir: ./logs                 # 日志目录(app.log 常规运行日志 + error.log 告警与异常日志)
+  max_bytes: 5242880          # app.log 单文件上限(5 MB)，自动滚动保留最近 4 份
+  backup_count: 4
+  slow_request_ms: 3000       # 接口耗时超过该毫秒数时自动记录慢请求告警(0=关闭)
+
+# 代理池:建号或批量配代理时优先分配同地区空闲节点,同区余量不足时按最少占用均衡复用(自动跳过反方向地区节点防错配),并高亮提醒共用风险。
+# 推荐尽量使用住宅/4G 长效独立代理(一号一固定 IP,国内平台配大陆节点、海外平台配境外节点),降低同 IP 矩阵关联限流概率。
+# 支持 http / https / socks5(自动升级 socks5h 远程 DNS 解析),可带账号密码;也可留空使用本机直连。
 proxies: []
   # - http://user:pass@gateway.example.com:8000
   # - socks5://user:pass@1.2.3.4:1080

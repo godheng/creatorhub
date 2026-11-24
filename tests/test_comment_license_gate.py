@@ -16,6 +16,8 @@ async def test_comment_submission_gate(monkeypatch,module,fn,url,payload,case):
     monkeypatch.setattr(licensing,'is_active',lambda:active[0])
     monkeypatch.setattr(module,'_COMMENT_INPUT',['editor'])
     monkeypatch.setattr(module,'_COMMENT_SUBMIT',['button'])
+    monkeypatch.setattr(module, 'human_wait', AsyncMock())
+    monkeypatch.setattr(module, 'human_scroll', AsyncMock())
     if module is fetcher: url='https://fixture'+module._PUBLISH_API
     calls=[]
     async def submit(**kwargs):
@@ -28,11 +30,15 @@ async def test_comment_submission_gate(monkeypatch,module,fn,url,payload,case):
     async def press(key):
         calls.append(key)
         await page.response(SimpleNamespace(url=url,json=AsyncMock(return_value=payload)))
+    async def click_locator(locator, **_kwargs):
+        await locator.click()
+    monkeypatch.setattr(module, 'DEFAULT_HUMAN_ENGINE',
+                        SimpleNamespace(type_text=AsyncMock(), click_locator=click_locator))
     editor=SimpleNamespace(click=AsyncMock(),inner_text=AsyncMock(return_value=''))
     editor.first=editor;editor.count=AsyncMock(return_value=1)
     button=SimpleNamespace(count=AsyncMock(return_value=0 if case.startswith('fallback') else 1),is_enabled=AsyncMock(return_value=True),click=submit)
     button.first=button
-    page=SimpleNamespace(url='https://fixture/video',goto=AsyncMock(),wait_for_timeout=AsyncMock(),evaluate=AsyncMock(),wait_for_selector=AsyncMock(),close=AsyncMock(),keyboard=SimpleNamespace(type=AsyncMock(),press=press),locator=lambda selector:editor if selector=='editor' else button)
+    page=SimpleNamespace(url='https://fixture/video',goto=AsyncMock(),wait_for_timeout=AsyncMock(),evaluate=AsyncMock(),wait_for_selector=AsyncMock(),close=AsyncMock(),is_closed=lambda:False,keyboard=SimpleNamespace(type=AsyncMock(),press=press),locator=lambda selector:editor if selector=='editor' else button)
     page.on=lambda event,handler:setattr(page,'response',handler)
     mgr=SimpleNamespace(new_page=AsyncMock(return_value=page))
     if case in ('button_denied','fallback_denied','expires_after_failure'):

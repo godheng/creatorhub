@@ -1,6 +1,6 @@
 """Windows desktop entry point. Source mode uses the same isolated user data.
 
-The frozen executable also hosts --serve and --smoke-test child modes; it never
+The frozen executable also hosts --serve child mode; it never
 attempts to run `sys.executable -m ...` as if a frozen bootloader were Python.
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-from app.brand import PRODUCT_NAME, BRAND
+from app.brand import PRODUCT_NAME
 
 def resources() -> Path:
     return Path(getattr(sys, "_MEIPASS", ROOT))
@@ -128,6 +128,20 @@ def utf8_child_environment(**overrides: str) -> dict[str, str]:
     return env
 
 
+def open_service_stdio_log(home: Path):
+    """Rotate at most one previous child stdio log so logs/ never grows unbounded."""
+    logs_dir = home / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    current = logs_dir / "service-stdio.log"
+    previous = logs_dir / "service-stdio.prev.log"
+    if current.is_file():
+        try:
+            current.replace(previous)
+        except OSError:
+            pass
+    return current.open("w", encoding="utf-8", errors="backslashreplace")
+
+
 def configure_process_streams(home: Path) -> None:
     """Make frozen and redirected output independent of the Windows code page."""
     if sys.stdout is None or sys.stderr is None:
@@ -186,6 +200,7 @@ def ensure_browser():
 def _serve(home: Path, session: str, install_browser: bool) -> int:
     os.chdir(home)
     os.environ["CREATORHUB_CONFIG_PATH"] = str(home / "config.yaml")
+    os.environ.setdefault("CREATORHUB_LOG_DIR", str(home / "logs"))
     os.environ.pop("DY_CONFIG_PATH", None)
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(home / "browsers")
     docs = resources() / "desktop-guide"
@@ -214,7 +229,7 @@ def _serve(home: Path, session: str, install_browser: bool) -> int:
     temp = state.with_suffix(".tmp")
     temp.write_text(json.dumps({"port": port}), encoding="utf-8")
     temp.replace(state)
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, workers=1, log_config=None))
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, workers=1, access_log=False, log_config=None))
     stop = home / "runtime" / f"{session}.stop"
     def watch_stop():
         while not server.should_exit:
@@ -233,69 +248,57 @@ def _serve(home: Path, session: str, install_browser: bool) -> int:
     return 0
 
 
-def smoke_test() -> int:
-    # Import all application dependencies and resolve bundled assets in an
-    # isolated directory, without starting jobs, signing in or making requests.
-    import tempfile
-    previous = Path.cwd()
-    with tempfile.TemporaryDirectory() as temp:
-        try:
-            os.chdir(temp)
-            os.environ["CREATORHUB_CONFIG_PATH"] = str(Path(temp) / "absent.yaml")
-            from app.main import app, WEB_DIR
-            from patchright._impl._driver import compute_driver_executable
-            from imageio_ffmpeg import get_ffmpeg_exe
-            from patchright.sync_api import sync_playwright
-            import tkinter as tk
-            import pystray
-            assert app and (WEB_DIR / "workbench.js").is_file()
-            assert (resources() / "config.example.yaml").is_file()
-            assert (resources() / "desktop-guide" / "xhs" / "index.html").is_file()
-            if os.name == "nt" and getattr(sys, "frozen", False):
-                updater = resources() / "desktop" / "aispaceUpdater.exe"
-                assert updater.is_file()
-                from desktop.update_helper import clean_environment
-                subprocess.run([str(updater), "--self-test"], env=clean_environment(),
-                               check=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
-            assert all(Path(path).is_file() for path in compute_driver_executable())
-            assert Path(get_ffmpeg_exe()).is_file()
-            verify_shared_runtimes()
-            with sync_playwright() as playwright:
-                assert playwright.chromium.executable_path
-            ui = tk.Tk()
-            ui.withdraw()
-            from types import SimpleNamespace
-            from desktop.ui import LauncherView
-            owner = SimpleNamespace(root=ui, **{name: lambda: None for name in (
-                "start", "open_panel", "open_guide", "open_data", "diagnostics", "hide", "close")})
-            view = LauncherView(owner, version())
-            view.phase("ready", "http://127.0.0.1:8000")
-            ui.update_idletasks()
-            ui.destroy()
-            assert pystray.Icon
-        finally:
-            os.chdir(previous)
-    return 0
-
-
 def update_health_check() -> int:
     """Import/resource readiness only; never start services or migrate user data."""
     import tempfile
     previous = Path.cwd()
+    if sys.argv and sys.argv[0]:
+        sys.argv[0] = str(Path(sys.argv[0]).resolve())
     with tempfile.TemporaryDirectory(prefix="creatorhub-health-") as temp:
         try:
             os.chdir(temp)
             os.environ["CREATORHUB_CONFIG_PATH"] = str(Path(temp) / "absent.yaml")
+            import app as app_pkg
             from app.main import app, WEB_DIR
+            from app.platforms.bilibili import BilibiliClient, publish_bilibili, receive_bili_broadcast
+            from app.platforms.rednote import RednoteApiClient, publish_rednote_browser
+            from app.platforms.instagram import InstagramClient, publish_instagram
+            from app.platforms.twitter import TwitterClient, publish_twitter
+            from app.platforms.channels import open_or_focus_wechat
+            from app.platforms.channels.local_ca import LocalCaManager
+            from app.browser.human_interaction import HumanInteractionEngine
+            from app.services import thumb_cache
+            from app.logging_setup import configure_logging, read_log_tail
+            from app.diagnostics import build_diagnostic_summary, build_diagnostic_zip
+            from app.api import diagnostics as api_diagnostics, matrix as api_matrix
             from desktop.controller import Controller
+            from desktop.ui import brand_image
             from desktop.web_shell import ShellServer
+            import websockets.asyncio.client
             from patchright._impl._driver import compute_driver_executable
             from imageio_ffmpeg import get_ffmpeg_exe
             import webview
-            assert app and Controller and ShellServer and webview
-            assert (WEB_DIR / "workbench.js").is_file()
+            channels_js = Path(app_pkg.__file__).parent / "platforms" / "channels" / "js"
+            assert app and LocalCaManager and open_or_focus_wechat and BilibiliClient and receive_bili_broadcast and publish_bilibili and RednoteApiClient and publish_rednote_browser
+            assert InstagramClient and publish_instagram
+            assert TwitterClient and publish_twitter
+            assert HumanInteractionEngine and thumb_cache
+            assert configure_logging and read_log_tail and build_diagnostic_summary and build_diagnostic_zip and api_diagnostics and api_matrix
+            assert websockets.asyncio.client and Controller and ShellServer and webview
+            assert brand_image(32).size == (32, 32)
+            for web_asset in ("index.html", "app.js", "workbench.js", "workbench.css", "agent.css"):
+                assert (WEB_DIR / web_asset).is_file(), web_asset
+            assert (channels_js / "finder_proxy_bridge.js").is_file()
+            assert (channels_js / "finder_native_protocol.js").is_file()
+            assert (channels_js / "finder_protocol_browser_bootstrap.js").is_file()
             for name in ("desktop/web/app.js", "desktop/web/index.html", "config.example.yaml"):
                 assert (resources() / name).is_file(), name
+            if getattr(sys, "frozen", False):
+                for name in ("COMMERCIAL-NOTICE.txt", "app/brand.json", "app/license_public.pem"):
+                    assert (resources() / name).is_file(), name
+                assert (resources() / "desktop-guide" / "xhs" / "index.html").is_file()
+                if os.name == "nt":
+                    assert (resources() / "desktop" / "aispaceUpdater.exe").is_file()
             assert all(Path(path).is_file() for path in compute_driver_executable())
             assert Path(get_ffmpeg_exe()).is_file()
             verify_shared_runtimes()
@@ -320,12 +323,12 @@ def verify_shared_runtimes():
                    check=True, timeout=15, **child_options())
     from app.platforms.xhs import creator_sign
     try:
-        assert creator_sign.available(), "Bundled Node signing runtime failed its offline self-test"
+        assert creator_sign.available(), "Bundled Node signing runtime check failed"
         assert creator_sign._ctx("xhs_rap.js").eval("1 + 1") == 2
         assert creator_sign._ctx("xhs_rap.js").eval("'中文运行环境'") == "中文运行环境"
     finally:
         creator_sign.close_signers()
-    with tempfile.TemporaryDirectory(prefix="creatorhub-media-smoke-") as directory:
+    with tempfile.TemporaryDirectory(prefix="creatorhub-media-check-") as directory:
         path = Path(directory) / "sample.mp4"
         subprocess.run([find_ffmpeg(), "-nostdin", "-y", "-f", "lavfi", "-i",
                         "color=c=blue:s=160x90:r=25:d=1", "-c:v", "libx264", str(path)],
@@ -402,10 +405,12 @@ class Launcher:
             self.session = uuid.uuid4().hex
             if self.closing:
                 return
-            log = self.home / "logs" / f"desktop-{time.strftime('%Y%m%d-%H%M%S')}.log"
             self.events.put(("status", "正在启动；如缺少浏览器组件，将自动下载…"))
-            with log.open("w", encoding="utf-8") as output:
-                env = utf8_child_environment(CREATORHUB_DESKTOP_HOME=str(self.home))
+            with open_service_stdio_log(self.home) as output:
+                env = utf8_child_environment(
+                    CREATORHUB_DESKTOP_HOME=str(self.home),
+                    CREATORHUB_LOG_DIR=str(self.home / "logs"),
+                )
                 self.process = subprocess.Popen(child_command("--serve", "--session", self.session, "--parent-pid", str(os.getpid())),
                     cwd=self.home, env=env, stdout=output, stderr=subprocess.STDOUT,
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
@@ -518,14 +523,23 @@ class Launcher:
         import platform
         path = filedialog.asksaveasfilename(title="导出不含账号数据的诊断摘要", defaultextension=".json", initialfile="aispace-diagnostics.json")
         if path:
-            # Allowlist only: no raw logs, paths, config, tokens, accounts or DB.
-            data = {"app_version": version(), "os": platform.system(), "os_release": platform.release(),
-                    "python": platform.python_version(), "frozen": bool(getattr(sys, "frozen", False)),
-                    "service_running": bool(self.process and self.process.poll() is None),
-                    "exit_code": self.process.poll() if self.process else None}
+            logs_dir = self.home / "logs"
+            data = {
+                "app_version": version(),
+                "os": platform.system(),
+                "os_release": platform.release(),
+                "arch": platform.machine(),
+                "python": platform.python_version(),
+                "frozen": bool(getattr(sys, "frozen", False)),
+                "service_running": bool(self.process and self.process.poll() is None),
+                "exit_code": self.process.poll() if self.process else None,
+                "error_log_tail": read_log_tail(logs_dir / "error.log", max_lines=80, max_bytes=32768, for_export=True),
+                "app_log_tail": read_log_tail(logs_dir / "app.log", max_lines=80, max_bytes=32768, for_export=True),
+                "stdio_log_tail": read_log_tail(logs_dir / "service-stdio.log", max_lines=60, max_bytes=24576, for_export=True),
+            }
             try:
                 Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-                messagebox.showinfo("已导出", "摘要不包含配置、账号、日志或本机目录。")
+                messagebox.showinfo("已导出", "脱敏诊断摘要已保存（已自动剔除账号凭据、密钥与本机路径）。")
             except OSError as exc:
                 messagebox.showerror("保存失败", str(exc))
 
@@ -564,8 +578,7 @@ def main() -> int:
     parser.add_argument("--serve", action="store_true")
     parser.add_argument("--session", default="")
     parser.add_argument("--parent-pid", type=int, default=0)
-    parser.add_argument("--smoke-test", action="store_true")
-    parser.add_argument("--update-health-check", action="store_true")
+    parser.add_argument("--update-health-check", "--smoke-test", action="store_true")
     parser.add_argument("--shell-smoke-test", action="store_true")
     parser.add_argument("--skip-browser-install", action="store_true")
     parser.add_argument("--legacy-ui", action="store_true", help="Use the legacy emergency window")
@@ -576,8 +589,6 @@ def main() -> int:
     if args.shell_smoke_test:
         from desktop.webview_smoke import smoke
         return smoke()
-    if args.smoke_test:
-        return smoke_test()
     home = user_directory()
     prepare_home(home)
     if os.name == "nt" and getattr(sys, "frozen", False) and recover_interrupted_update(home):

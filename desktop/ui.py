@@ -2,9 +2,12 @@
 
 No server, file access or task execution here; lifecycle remains in launcher.py.
 """
+import os
 import tkinter as tk
 from tkinter import ttk
 from app.brand import PRODUCT_NAME, BRAND
+
+from desktop.installer_assets import render_brand_icon
 
 COLORS = {
     "bg": "#f4f5f8", "surface": "#ffffff", "fg": "#2c313c",
@@ -15,16 +18,19 @@ COLORS = {
 }
 
 
-def brand_image(size=64):
-    """Rasterize the existing magnifier mark for native titlebar/tray/EXE icons."""
-    from PIL import Image, ImageDraw
+def brand_image(size=64, *, dark=False):
+    """Render the commercial mark for the launcher and installer."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    font_path = os.path.join(os.environ.get("WINDIR", "C:/Windows"), "Fonts", "msyh.ttc")
+    try:
+        font = ImageFont.truetype(font_path, 170)
+    except OSError:
+        return render_brand_icon(size, dark=dark)
+
     image = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     draw.rounded_rectangle((2, 2, 254, 254), radius=54, fill="#ffffff")
-    from PIL import ImageFont
-    import os
-    font_path = os.path.join(os.environ.get("WINDIR", "C:/Windows"), "Fonts", "msyh.ttc")
-    font = ImageFont.truetype(font_path, 170)
     draw.text((128, 118), BRAND["mark"], font=font, anchor="mm", fill=BRAND["accent"])
     return image.resize((size, size), Image.Resampling.LANCZOS)
 

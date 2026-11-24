@@ -14,8 +14,8 @@ import urllib.request
 import uuid
 import webbrowser
 
-from desktop.launcher import (InstanceLock, child_command, resources, snapshot,
-                              utf8_child_environment, version)
+from desktop.launcher import (InstanceLock, child_command, open_service_stdio_log,
+                              resources, snapshot, utf8_child_environment, version)
 from desktop.updates import UpdateChecker, RELEASES_URL
 from desktop.update_helper import atomic_json, clean_environment, read_request, verify_installer
 from desktop.platform_support import open_folder
@@ -51,8 +51,8 @@ class Controller:
         self.exit_window = None
         self.export_file = None
         self.exiting = False
-        install_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else None
-        self.updates = UpdateChecker(version(), home / "runtime" / "updates", install_dir)
+        self.install_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else None
+        self.updates = UpdateChecker(version(), home / "runtime" / "updates", self.install_dir)
         self.installing_update = False
         self.install_worker = None
         self._consume_update_result()
@@ -104,7 +104,9 @@ class Controller:
     def state(self):
         with self.lock:
             return {"phase": self.phase, "detail": self.detail, "url": self.url,
-                    "version": version(), "home": str(self.home), "events": list(self.events),
+                    "version": version(), "home": str(self.home),
+                    "install_dir": str(self.install_dir) if self.install_dir else None,
+                    "events": list(self.events),
                     "updates": self.updates.state(),
                     "update_install_supported": self.update_install_supported(),
                     "installing_update": self.installing_update,
@@ -148,9 +150,12 @@ class Controller:
             args = ["--serve", "--session", session, "--parent-pid", str(os.getpid())]
             if not self.install_browser:
                 args.append("--skip-browser-install")
-            with (self.home / "logs" / f"desktop-{session[:8]}.log").open("w", encoding="utf-8") as log:
+            with open_service_stdio_log(self.home) as log:
                 process = subprocess.Popen(child_command(*args), cwd=self.home,
-                    env=utf8_child_environment(CREATORHUB_DESKTOP_HOME=str(self.home)),
+                    env=utf8_child_environment(
+                        CREATORHUB_DESKTOP_HOME=str(self.home),
+                        CREATORHUB_LOG_DIR=str(self.home / "logs"),
+                    ),
                     stdout=log, stderr=subprocess.STDOUT, **child_options())
             with self.lock:
                 self.process = process
@@ -261,10 +266,34 @@ class Controller:
             self.change("error", "服务尚未完全退出，请再次尝试停止或查看本地日志。")
 
     def diagnostic(self):
+        from app.logging_setup import read_log_tail, sanitize_for_export
+        logs_dir = self.home / "logs"
         with self.lock:
-            return {"app_version": version(), "os": platform.system(), "os_release": platform.release(),
-                    "python": platform.python_version(), "service_state": self.phase,
-                    "exit_code": self.process.poll() if self.process else None}
+            recent_events = [
+                {
+                    "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(e["time"])),
+                    "level": e.get("level", "info"),
+                    "title": sanitize_for_export(e.get("title", "")),
+                    "detail": sanitize_for_export(e.get("detail", "")),
+                }
+                for e in list(self.events)[:30]
+            ]
+            summary = {
+                "app_version": version(),
+                "os": platform.system(),
+                "os_release": platform.release(),
+                "arch": platform.machine(),
+                "python": platform.python_version(),
+                "frozen": bool(getattr(sys, "frozen", False)),
+                "service_state": self.phase,
+                "uptime_seconds": int(time.monotonic() - self.started_at) if self.started_at else 0,
+                "exit_code": self.process.poll() if self.process else None,
+                "recent_events": recent_events,
+            }
+        summary["error_log_tail"] = read_log_tail(logs_dir / "error.log", max_lines=80, max_bytes=32768, for_export=True)
+        summary["app_log_tail"] = read_log_tail(logs_dir / "app.log", max_lines=80, max_bytes=32768, for_export=True)
+        summary["stdio_log_tail"] = read_log_tail(logs_dir / "service-stdio.log", max_lines=60, max_bytes=24576, for_export=True)
+        return summary
 
     def install_update(self, tag):
         with self.lock:
@@ -413,11 +442,15 @@ class Controller:
             webbrowser.open(url)
         elif name in {"open_data", "open_logs"}:
             open_folder(self.home if name == "open_data" else self.home / "logs")
+        elif name == "open_install":
+            if not self.install_dir or not self.install_dir.is_dir():
+                raise ValueError("当前为源码运行模式，请在打包安装版中打开程序安装目录。")
+            open_folder(self.install_dir)
         elif name == "cancel_browser_download":
             (self.home / "runtime" / "browser-component.cancel").touch()
         elif name == "open_guide":
             slug = data.get("platform", "")
-            if slug not in {"", "douyin", "xhs", "kuaishou", "shipinhao", "tiktok"}:
+            if slug not in {"", "douyin", "xhs", "rednote", "kuaishou", "shipinhao", "tiktok", "bilibili", "instagram", "twitter"}:
                 raise ValueError("请选择有效的平台。")
             root = self.url + "/guide/" if self.url and (resources() / "desktop-guide").exists() else "https://3441293738.github.io/creatorhub/guide/"
             webbrowser.open(root + (slug + "/" if slug else ""))

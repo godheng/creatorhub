@@ -5,7 +5,6 @@
   - 独立代理 / UA / 视口 / 时区 / 指纹
 常驻这些 context 并按 LRU 控制同时存活数量(省内存)。
 登录/发布用同一 profile 的**有头** context(headless=False)。
-对应原项目用 chromedp 的角色。
 """
 from __future__ import annotations
 
@@ -37,13 +36,62 @@ from .identity import Identity, fingerprint_script
 from .cdp import (CdpLaunchError, CdpProfileConflictError, CdpProxyError,
                   CdpProxyAuthController, XhsCdpBackend, profile_is_locked)
 from .proxy import (HttpProxyAuthRelay, ProxyConfigError, ProxyPlan,
-                    try_proxy_plan)
+                    Socks5AuthRelay, try_proxy_plan)
 from .xhs_interaction import XhsInteractionPolicy, XhsVisibleActionGate
 
 _PROXY_WEBRTC_ARGS = [
     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
     "--webrtc-ip-handling-policy=disable_non_proxied_udp",
 ]
+
+# Unprefixed www.rednote.com/explore & /login 302-redirect via EdgeOne to
+# domestic www.xiaohongshu.com. Intercept both domestic xiaohongshu.com hosts
+# and those unprefixed 302 entrypoints before Chromium follows the redirect.
+_REDNOTE_DOMESTIC_GUARD_RE = re.compile(
+    r"^https?://(?:"
+    r"(?:[a-z0-9-]+\.)*xiaohongshu\.com(?::\d+)?(?:/|$)"
+    r"|(?:www\.)?rednote\.com/(?:explore|login)(?:[/?#]|$)"
+    r")",
+    re.IGNORECASE,
+)
+
+
+async def install_rednote_domain_guard(ctx: Any) -> None:
+    """Block domestic ``xiaohongshu.com`` leakage inside a Rednote BrowserContext."""
+    if ctx is None or getattr(ctx, "_rednote_domain_guard_installed", False):
+        return
+    route_fn = getattr(ctx, "route", None)
+    if not callable(route_fn):
+        return
+    from ..platforms.rednote.domains import FRONT_HOME_PAGE_URL
+
+    async def _guard(route):
+        req = route.request
+        is_main_nav = False
+        try:
+            is_main_nav = (
+                bool(req.is_navigation_request())
+                and req.frame == req.frame.page.main_frame
+            )
+        except Exception:
+            is_main_nav = getattr(req, "resource_type", "") == "document"
+        if is_main_nav:
+            body = (
+                '<!doctype html><meta charset="utf-8">'
+                f'<meta http-equiv="refresh" content="0;url={FRONT_HOME_PAGE_URL}">'
+                f"<script>location.replace({json.dumps(FRONT_HOME_PAGE_URL)});</script>"
+            )
+            await route.fulfill(
+                status=200,
+                content_type="text/html; charset=utf-8",
+                body=body,
+            )
+            return
+        await route.abort()
+
+    with suppress(Exception):
+        await route_fn(_REDNOTE_DOMESTIC_GUARD_RE, _guard)
+        setattr(ctx, "_rednote_domain_guard_installed", True)
 
 # 存量 legacy 账号必须保持原来的启动参数，避免已建立的浏览器画像突然漂移。
 _LEGACY_ARGS = [
@@ -291,7 +339,7 @@ class BrowserManager:
         self._runtime_by_key: Dict[Any, str] = {}
         self._fallback_reason_by_key: Dict[Any, str] = {}
         self._proxy_signature_by_key: Dict[Any, str] = {}
-        self._proxy_relays: Dict[Any, HttpProxyAuthRelay] = {}
+        self._proxy_relays: Dict[Any, HttpProxyAuthRelay | Socks5AuthRelay] = {}
         self._profile_process_locks: Dict[Any, _ProfileProcessLock] = {}
         self._cdp_backend = None
         self.xhs_interaction = XhsInteractionPolicy()
@@ -412,7 +460,7 @@ class BrowserManager:
         )
 
     def environment_check_status(self, identity: Identity) -> Dict[str, Any]:
-        """Return the BrowserScan prompt state without launching a browser.
+        """Return the environment-check prompt state without launching a browser.
 
         A marker is valid only for the complete environment signature. Changing
         runtime, proxy, viewport or fingerprint settings therefore makes the
@@ -422,7 +470,7 @@ class BrowserManager:
         enabled = effective == FINGERPRINT_CHROMIUM_BACKEND
         base: Dict[str, Any] = {
             "enabled": enabled,
-            "provider": "BrowserScan",
+            "provider": "environment-check",
             "url": ENVIRONMENT_CHECK_URL,
             "required": False,
             "last_opened_at": None,
@@ -461,7 +509,7 @@ class BrowserManager:
             "version": _ENVIRONMENT_CHECK_MARKER_VERSION,
             "signature": self._environment_check_signature(identity),
             "opened_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "provider": "BrowserScan",
+            "provider": "environment-check",
             "url": ENVIRONMENT_CHECK_URL,
         }
         temporary = marker_path.with_suffix(".tmp")
@@ -474,7 +522,7 @@ class BrowserManager:
     async def open_environment_check(
             self, identity: Identity, *, context: BrowserContext | None = None,
             force: bool = False, bring_to_front: bool = False):
-        """Open BrowserScan in a separate tab for a fingerprint environment.
+        """Open the environment diagnostic page in a separate tab.
 
         The native startup ``about:blank`` tab is intentionally preserved. XHS
         login relies on that tab for its first platform navigation; consuming it
@@ -487,8 +535,8 @@ class BrowserManager:
         ctx = context or await self.context_for(identity)
         page = await ctx.new_page()
         try:
-            # ``commit`` keeps the login path responsive while BrowserScan
-            # continues rendering its detailed checks in the visible tab.
+            # ``commit`` keeps the login path responsive while the diagnostic
+            # page continues rendering its detailed checks in the visible tab.
             await page.goto(
                 ENVIRONMENT_CHECK_URL, wait_until="commit", timeout=12_000)
             self._mark_environment_check_opened(identity)
@@ -723,23 +771,25 @@ class BrowserManager:
                     await probe_page.close()
 
     def effective_browser_backend(self, identity: Identity) -> str:
-        """Resolve an account override without silently accepting bad values.
+        """Resolve an account browser backend.
 
-        Xiaohongshu is intentionally pinned to the local/system-Chrome path.
-        Mixing a third-party fingerprint runtime with its own identity surface
-        into an existing account profile creates cross-layer inconsistencies
-        (runtime, UA/client hints, GPU and persisted site state).  Treat that
-        combination as unsupported instead of trying to patch around a device
-        verification page.
+        Xiaohongshu defaults to the local/system-Chrome CDP path when set to
+        ``default``, while still allowing explicit ``fingerprint_chromium``
+        selection so multi-account XHS matrices on one host can isolate
+        engine-level Canvas/WebGL/Audio/Font hardware fingerprints.
         """
-        if str(getattr(identity, "platform", "") or "").lower() == "xhs":
-            return LOCAL_BACKEND
         requested = str(
             getattr(identity, "browser_backend", DEFAULT_BACKEND)
             or DEFAULT_BACKEND
         ).strip().lower()
         if requested not in ACCOUNT_BROWSER_BACKENDS:
             requested = DEFAULT_BACKEND
+        if str(getattr(identity, "platform", "") or "").lower() == "xhs":
+            return (
+                FINGERPRINT_CHROMIUM_BACKEND
+                if requested == FINGERPRINT_CHROMIUM_BACKEND
+                else LOCAL_BACKEND
+            )
         return (
             self.default_browser_backend
             if requested == DEFAULT_BACKEND else requested
@@ -816,28 +866,54 @@ class BrowserManager:
             "runtimes": self.fingerprint_runtime_catalog(),
         }
 
-    def anon_identity(self) -> Identity:
-        return Identity(account_id=None,
-                        profile_dir=str(Path(self.profiles_root) / "_anon"),
-                        ua=self.default_ua)
+    def anon_identity(self, *, proxy: str = "", platform: str = "") -> Identity:
+        from .identity import default_locale_for_platform, default_tz_for_platform
+        isolated_dir = Path(self.profiles_root) / "_anon" / f"session_{uuid.uuid4().hex}"
+        return Identity(
+            account_id=None,
+            profile_dir=str(isolated_dir),
+            identity_mode="native",
+            proxy=str(proxy or "").strip(),
+            ua=self.default_ua,
+            platform=str(platform or ""),
+            timezone_id=default_tz_for_platform(platform),
+            locale=default_locale_for_platform(platform),
+            fp_seed=uuid.uuid4().hex,
+        )
 
     def _uses_xhs_cdp(self, identity: Identity) -> bool:
         return (
-            identity.platform == "xhs"
+            identity.platform in {"xhs", "rednote"}
             and self.xhs_browser_mode in {"auto", "cdp"}
             and self.effective_browser_backend(identity) == LOCAL_BACKEND
         )
 
     @staticmethod
-    def _xhs_proxy_plan(identity: Identity) -> ProxyPlan | None:
+    def _strict_proxy_plan(identity: Identity) -> ProxyPlan | None:
+        raw = str(getattr(identity, "proxy", "") or "").strip()
+        if not raw:
+            return None
         try:
-            return ProxyPlan.parse(identity.proxy)
+            return ProxyPlan.parse(raw)
         except ProxyConfigError as exc:
-            raise CdpProxyError(str(exc)) from None
+            if identity.platform in {"xhs", "rednote"}:
+                raise CdpProxyError(str(exc)) from None
+            raise
+
+    @classmethod
+    def _xhs_proxy_plan(cls, identity: Identity) -> ProxyPlan | None:
+        return cls._strict_proxy_plan(identity)
+
+    @staticmethod
+    def _normalize_lock_key(key: Any) -> Any:
+        if isinstance(key, str) and key.startswith("acc:") and key[4:].isdigit():
+            return int(key[4:])
+        return key
 
     def lock_for(self, key) -> asyncio.Lock:
-        """每账号串行锁:同一账号同一时刻只允许一个浏览器动作。"""
-        return self._locks.setdefault(key, asyncio.Lock())
+        """每账号串行锁:统一归一化 acc:<id> 与 <id>，保证引擎与浏览器层互斥同一把锁。"""
+        norm_key = self._normalize_lock_key(key)
+        return self._locks.setdefault(norm_key, asyncio.Lock())
 
     @staticmethod
     def proxy_signature(proxy: str) -> str:
@@ -1042,15 +1118,16 @@ class BrowserManager:
         # 使用沙箱，新旧账号都显式开启，避免安全警告和不必要的启动差异。
         if os.name == "nt":
             kwargs["chromium_sandbox"] = True
+        ignore_default_args: List[str] = []
         if fingerprint_plan is not None:
             kwargs["executable_path"] = fingerprint_plan.executable_path
             # Fingerprint Chromium provides its own native automation surface.
             # Patchright's Chromium default would otherwise add this switch,
             # expose an unsupported-command-line warning, and make the first
             # site navigation differ from a normal user-opened window.
-            kwargs["ignore_default_args"] = [
-                "--disable-blink-features=AutomationControlled",
-            ]
+            ignore_default_args.append(
+                "--disable-blink-features=AutomationControlled"
+            )
         elif self._browser_executable:
             kwargs["executable_path"] = self._browser_executable
         elif self._browser_channel:
@@ -1062,29 +1139,37 @@ class BrowserManager:
             and fingerprint_plan is None
         )
         if legacy:
+            legacy_args = list(_LEGACY_ARGS)
+            if not str(identity.proxy or "").strip():
+                legacy_args.append("--proxy-bypass-list=channels.weixin.qq.com")
             kwargs.update(
-                args=list(_LEGACY_ARGS),
+                args=legacy_args,
                 viewport={"width": identity.viewport_w, "height": identity.viewport_h},
                 locale=identity.locale or "zh-CN",
                 timezone_id=identity.timezone_id or "Asia/Shanghai",
                 user_agent=ua,
-                # 存量账号保持既有画像，避免已建立的 profile 突然漂移。
                 geolocation=identity.geolocation,
                 permissions=["geolocation"],
             )
-        proxy_plan = try_proxy_plan(identity.proxy)
+        proxy_plan = self._strict_proxy_plan(identity)
         proxy = proxy_plan.playwright() if proxy_plan else None
         relay = None
-        if (proxy_plan is not None and proxy_plan.scheme in {"http", "https"}
-                and proxy_plan.authenticated):
-            relay = HttpProxyAuthRelay(proxy_plan)
-            await relay.start()
-            proxy = {"server": relay.chrome_server}
+        if proxy_plan is not None and proxy_plan.authenticated:
+            if proxy_plan.scheme in {"http", "https"}:
+                relay = HttpProxyAuthRelay(proxy_plan)
+                await relay.start()
+                proxy = {"server": relay.chrome_server}
+            elif proxy_plan.scheme == "socks5":
+                relay = Socks5AuthRelay(proxy_plan)
+                await relay.start()
+                proxy = {"server": relay.chrome_server}
         if fingerprint_plan is not None:
             args = list(fingerprint_plan.args)
             args.append(
                 f"--window-size={int(identity.viewport_w)},{int(identity.viewport_h)}")
-            if proxy and str(identity.fp_webrtc_mode or "conceal") != "allow":
+            if not proxy:
+                args.append("--proxy-bypass-list=channels.weixin.qq.com")
+            if str(identity.fp_webrtc_mode or "conceal") != "allow":
                 for item in _PROXY_WEBRTC_ARGS:
                     if item not in args:
                         args.append(item)
@@ -1099,13 +1184,38 @@ class BrowserManager:
             if geo_permission == "allow":
                 kwargs["permissions"] = ["geolocation"]
         elif not legacy:
-            # native 账号使用 Chrome/操作系统自己的视口、语言、时区与硬件画像。
-            # 仅在显式配置代理时约束 WebRTC，避免 UDP 绕过代理出口。
+            # native + local 账号保留 Chrome 原生硬件栈，同时严格对齐代理出口对应的时区、语言与 WebRTC 隔离。
             kwargs["no_viewport"] = True
-            if proxy:
-                kwargs["args"] = list(_PROXY_WEBRTC_ARGS)
+            native_args = list(_PROXY_WEBRTC_ARGS)
+            if not proxy:
+                native_args.append("--proxy-bypass-list=channels.weixin.qq.com")
+            loc = str(identity.locale or "").strip()
+            if loc:
+                native_args.append(f"--lang={loc}")
+                kwargs["locale"] = loc
+            tz = str(identity.timezone_id or "").strip()
+            if tz:
+                kwargs["timezone_id"] = tz
+            if identity.geo_lat or identity.geo_lon:
+                kwargs["geolocation"] = identity.geolocation
+                if str(identity.fp_geolocation_permission or "allow").lower() == "allow":
+                    kwargs["permissions"] = ["geolocation"]
+            kwargs["args"] = native_args
         if proxy:
             kwargs["proxy"] = proxy
+            if proxy_plan is not None and proxy_plan.scheme == "socks5":
+                # Patchright 遇到 socks5:// 会默认追加 --host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE <host>"，
+                # 触发 Chromium 顶部「不受支持的命令行标记」警告横幅。Chromium 的 --proxy-server=socks5://
+                # 本身已由远端代理解析域名(ATYP=0x03)，配合默认 --disable-background-networking 即可避免本地预解析。
+                from urllib.parse import urlsplit
+                parsed_host = (urlsplit(proxy["server"]).hostname or "").lower()
+                socks_host = f"[{parsed_host}]" if ":" in parsed_host else parsed_host
+                if socks_host:
+                    ignore_default_args.append(
+                        f'--host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE {socks_host}"'
+                    )
+        if ignore_default_args:
+            kwargs["ignore_default_args"] = ignore_default_args
         try:
             ctx = await self._pw.chromium.launch_persistent_context(**kwargs)
         except Exception as exc:
@@ -1144,7 +1254,8 @@ class BrowserManager:
                 pass
         if legacy and identity.fp_seed:
             try:
-                await ctx.add_init_script(fingerprint_script(identity.fp_seed, ua))
+                await ctx.add_init_script(
+                    fingerprint_script(identity.fp_seed, ua, identity.locale))
             except Exception:
                 pass
         # 登录态桥接:
@@ -1154,6 +1265,8 @@ class BrowserManager:
         #    正好会经过这条路径。只补缺失项，不覆盖 profile 中更新过的 Cookie。
         await self._bridge_identity_cookies(
             ctx, identity, assume_empty=was_empty)
+        if identity.platform == "rednote":
+            await install_rednote_domain_guard(ctx)
         if (identity.platform == "douyin" and identity.account_id is not None
                 and self._douyin_read_session_callback is not None):
             from .douyin_api_session import observe_douyin_api_session
@@ -1245,6 +1358,59 @@ class BrowserManager:
                 with suppress(Exception):
                     await relay.close()
             self._release_profile_lock(key)
+            if isinstance(key, str) and key.startswith("_anon:"):
+                self._cleanup_anon_dir_by_key(key)
+
+    def _cleanup_anon_dir_by_key(self, key: str) -> None:
+        anon_root = (Path(self.profiles_root) / "_anon").resolve()
+        if not anon_root.is_dir():
+            return
+        for child in anon_root.iterdir():
+            try:
+                norm = os.path.normcase(str(child.resolve()))
+                digest = hashlib.sha256(norm.encode("utf-8")).hexdigest()[:16]
+                if f"_anon:{digest}" == key:
+                    shutil.rmtree(child, ignore_errors=True)
+                    break
+            except Exception:
+                continue
+
+    @staticmethod
+    async def _apply_cdp_locality_alignment(page: Any, identity: Identity) -> None:
+        """通过引擎级 CDP Emulation 将系统 Chrome 页面时区/语言/经纬度对齐至账号代理出口地。
+        不注入任何 JS 原型补丁，也不启用 Runtime.enable。"""
+        ctx = getattr(page, "context", None)
+        new_cdp = getattr(ctx, "new_cdp_session", None) if ctx is not None else None
+        if not callable(new_cdp):
+            return
+        tz = str(getattr(identity, "timezone_id", "") or "").strip()
+        loc = str(getattr(identity, "locale", "") or "").strip()
+        has_geo = bool(getattr(identity, "geo_lat", 0.0) or getattr(identity, "geo_lon", 0.0))
+        if not (tz or loc or has_geo):
+            return
+        cdp = None
+        try:
+            cdp = await new_cdp(page)
+            if tz:
+                with suppress(Exception):
+                    await cdp.send("Emulation.setTimezoneOverride", {"timezoneId": tz})
+            if loc:
+                with suppress(Exception):
+                    await cdp.send("Emulation.setLocaleOverride", {"locale": loc.replace("-", "_")})
+            if has_geo and str(getattr(identity, "fp_geolocation_permission", "allow")).lower() != "deny":
+                geo = identity.geolocation
+                with suppress(Exception):
+                    await cdp.send("Emulation.setGeolocationOverride", {
+                        "latitude": float(geo["latitude"]),
+                        "longitude": float(geo["longitude"]),
+                        "accuracy": float(geo.get("accuracy", 60)),
+                    })
+        except Exception:
+            pass
+        finally:
+            if cdp is not None:
+                with suppress(Exception):
+                    await cdp.detach()
 
     def _forget_closed_context(self, ctx: BrowserContext) -> None:
         """Drop cache entries when callers close a managed context directly."""
@@ -1314,9 +1480,7 @@ class BrowserManager:
             runtime_id = (
                 self.effective_fingerprint_runtime_id(identity)
                 if effective_backend == FINGERPRINT_CHROMIUM_BACKEND else "")
-            plan = (self._xhs_proxy_plan(identity)
-                    if identity.platform == "xhs"
-                    else try_proxy_plan(identity.proxy))
+            plan = self._strict_proxy_plan(identity)
             proxy_signature = plan.signature if plan else "direct"
             signature = self._context_signature(
                 identity, effective_backend, runtime_id, proxy_signature)
@@ -1353,16 +1517,16 @@ class BrowserManager:
                     else:
                         ctx = session.context
                         await self._capture_context_ua(ctx, identity)
-                        if plan is not None and plan.scheme in {"http", "https"} \
-                                and plan.authenticated:
-                            session.auth_controller = CdpProxyAuthController(
-                                ctx, plan)
+                        for init_pg in list(getattr(ctx, "pages", ()) or ()):
+                            await self._apply_cdp_locality_alignment(init_pg, identity)
                         await self._bridge_identity_cookies(ctx, identity)
+                        if identity.platform == "rednote":
+                            await install_rednote_domain_guard(ctx)
                         self._cdp_sessions[key] = session
                         self._backend_by_key[key] = "cdp"
                 else:
                     ctx = await self._launch_persistent(
-                        identity, headless=(identity.platform != "xhs"))
+                        identity, headless=(identity.platform not in {"xhs", "rednote"}))
                     self._backend_by_key[key] = (
                         FINGERPRINT_CHROMIUM_BACKEND
                         if effective_backend == FINGERPRINT_CHROMIUM_BACKEND
@@ -1391,8 +1555,7 @@ class BrowserManager:
         """用账号真实 BrowserContext 探测出口，不经独立 HTTP 客户端。"""
         if not self.browser_exit_probe_url:
             raise RuntimeError("未配置 browser_exit_probe_url")
-        ctx = await self.context_for(identity)
-        page = await ctx.new_page()
+        page = await self.new_page(identity, block_media=True)
         try:
             response = await page.goto(
                 self.browser_exit_probe_url, wait_until="domcontentloaded",
@@ -1482,11 +1645,12 @@ class BrowserManager:
             await self.close_context(identity.key)
             ctx = await self.context_for(identity)
             page = await ctx.new_page()
-        session = self._cdp_sessions.get(identity.key)
-        controller = getattr(session, "auth_controller", None)
-        if controller is not None:
-            await controller.install(page)
-        if block_media and identity.platform != "xhs":
+        if (
+            self.effective_browser_backend(identity) == LOCAL_BACKEND
+            and identity.identity_mode == "native"
+        ):
+            await self._apply_cdp_locality_alignment(page, identity)
+        if block_media and identity.platform not in {"xhs", "rednote"}:
             async def _route(route):
                 if route.request.resource_type in ("image", "media", "font"):
                     await route.abort()
@@ -1536,12 +1700,9 @@ class BrowserManager:
     async def _visible_task_page(self, identity: Identity):
         """Reuse the account's owned task tab before creating a CDP page.
 
-        Fingerprint Chromium treats the first navigation of its native startup
-        tab differently from a tab created immediately through ``new_page``.
-        Xiaohongshu can redirect that newly-created automation tab to device
-        verification while the startup tab reaches the homepage normally.
-        Reusing only an untouched ``about:blank`` tab also avoids taking over a
-        page that the user already opened manually.
+        Tracks task-tab ownership strictly in Python memory (never writing any
+        marker string to ``window.name`` in the page's JavaScript realm, which
+        would otherwise be readable by first-party anti-bot scripts).
         """
         ctx = await self.context_for(identity)
         owned = self._task_pages.get(identity.key)
@@ -1552,29 +1713,12 @@ class BrowserManager:
             except Exception:
                 pass
             self._task_pages.pop(identity.key, None)
-        marker = f"creatorhub-task:{identity.key}"
         pages = list(getattr(ctx, "pages", ()) or ())
+        needs_cdp_align = (
+            self.effective_browser_backend(identity) == LOCAL_BACKEND
+            and identity.identity_mode == "native"
+        )
 
-        # CDP disconnect/reconnect creates fresh Python Page objects while the
-        # native profile can remain alive.  Recover the task tab by its durable
-        # window.name marker instead of opening another /chat tab on every
-        # application restart.
-        for candidate in pages:
-            try:
-                if candidate.is_closed():
-                    continue
-                candidate_marker = await candidate.evaluate("window.name")
-                if candidate_marker != marker:
-                    continue
-            except Exception:
-                continue
-            self._task_pages[identity.key] = candidate
-            return candidate
-
-        # Compatibility cleanup for tabs created before the marker existed.
-        # The background DM observer owns the exact /chat landing page; adopt
-        # one restored copy and close only identical duplicates.  User-opened
-        # conversations (/chat/<id>) and unrelated XHS pages are untouched.
         restored_chat_pages = []
         for candidate in pages:
             try:
@@ -1589,27 +1733,31 @@ class BrowserManager:
             for duplicate in restored_chat_pages[:-1]:
                 with suppress(Exception):
                     await duplicate.close()
-            with suppress(Exception):
-                await candidate.evaluate("(name) => { window.name = name; }", marker)
+            if needs_cdp_align:
+                await self._apply_cdp_locality_alignment(candidate, identity)
             self._task_pages[identity.key] = candidate
             return candidate
-        for candidate in pages:
-            try:
-                if candidate.url != "about:blank" or candidate.is_closed():
+
+        is_patchright = self._backend_by_key.get(identity.key) == "patchright"
+        if not is_patchright:
+            for candidate in pages:
+                try:
+                    if candidate.url != "about:blank" or candidate.is_closed():
+                        continue
+                except Exception:
                     continue
-            except Exception:
-                continue
-            session = self._cdp_sessions.get(identity.key)
-            controller = getattr(session, "auth_controller", None)
-            if controller is not None:
-                await controller.install(candidate)
-            with suppress(Exception):
-                await candidate.evaluate("(name) => { window.name = name; }", marker)
-            self._task_pages[identity.key] = candidate
-            return candidate
+                if needs_cdp_align:
+                    await self._apply_cdp_locality_alignment(candidate, identity)
+                self._task_pages[identity.key] = candidate
+                return candidate
+
         page = await self.new_page(identity, block_media=False)
-        with suppress(Exception):
-            await page.evaluate("(name) => { window.name = name; }", marker)
+        if is_patchright:
+            # Patchright 本地 Chrome 启动时的第 1 个 about:blank 会挂载命令行提示横幅，新建干净标签后收起空白页
+            for candidate in pages:
+                with suppress(Exception):
+                    if candidate is not page and candidate.url == "about:blank" and not candidate.is_closed():
+                        await candidate.close()
         self._task_pages[identity.key] = page
         return page
 
@@ -1649,7 +1797,7 @@ class BrowserManager:
         one-shot escape hatch for probes and cleanup-sensitive callers.
         """
         retain = (
-            self.resident_sessions and identity.platform == "xhs"
+            self.resident_sessions and identity.platform in {"xhs", "rednote"}
             if keep_context is None else bool(keep_context)
         )
         nested = self._xhs_visible_gate.owned_by_current_task
@@ -1680,7 +1828,7 @@ class BrowserManager:
         retain the foreground default.
         """
         retain = (
-            self.resident_sessions and identity.platform == "xhs"
+            self.resident_sessions and identity.platform in {"xhs", "rednote"}
             if keep_context is None else bool(keep_context)
         )
         async with self.visible_action(
@@ -1734,14 +1882,20 @@ class BrowserManager:
                     await self._set_chromium_window_state(
                         context, page, "minimized")
                 if foreground:
+                    if context is not None and (
+                        await self._chromium_window_state(context, page) == "minimized"
+                    ):
+                        await self._set_chromium_window_state(
+                            context, page, "normal")
                     with suppress(Exception):
                         await page.bring_to_front()
                     title = ""
                     with suppress(Exception):
                         title = await page.title()
+                    default_title = "Rednote" if identity.platform == "rednote" else "小红书"
                     await asyncio.to_thread(
                         bring_window_to_front, snapshot,
-                        CHROMIUM_WINDOW_CLASSES, title or "小红书", 1.5)
+                        CHROMIUM_WINDOW_CLASSES, title or default_title, 1.5)
                 yield page
             finally:
                 if minimize_task is not None:
@@ -1852,7 +2006,7 @@ class BrowserManager:
         context makes reads, account management and manual windows share the
         already-authenticated session instead of failing with a Profile conflict.
         """
-        if identity.platform == "xhs":
+        if identity.platform in {"xhs", "rednote"}:
             snapshot = capture_window_snapshot(CHROMIUM_WINDOW_CLASSES)
             ctx = await self.context_for(identity)
             await asyncio.to_thread(bring_window_to_front, snapshot,
@@ -1932,14 +2086,31 @@ class BrowserManager:
 _COOKIE_DOMAIN = {
     "douyin": ".douyin.com",
     "xhs": ".xiaohongshu.com",
+    "rednote": ".rednote.com",
     "kuaishou": ".kuaishou.com",
     "shipinhao": ".weixin.qq.com",   # 视频号:finder 登录态(_finder_auth/sessionid)挂在 .weixin.qq.com
+    "tiktok": ".tiktok.com",
+    "bilibili": ".bilibili.com",
+    "instagram": ".instagram.com",
+    "twitter": ".x.com",
 }
 
 
 def cookie_string_to_state(cookie_str: str, platform: str = "douyin") -> str:
-    """把粘贴的 Cookie 串转成 Patchright storage_state JSON(兜底登录用)。"""
-    domain = _COOKIE_DOMAIN.get(platform, ".douyin.com")
+    """把粘贴的 Cookie 或会话 Token 串转成 Patchright storage_state JSON(兜底登录用)。"""
+    if platform == "twitter":
+        from ..platforms.twitter.protocol import (
+            build_twitter_storage_state,
+            parse_twitter_credential_input,
+        )
+        tw_cookies, _ = parse_twitter_credential_input(cookie_str)
+        if tw_cookies:
+            return build_twitter_storage_state(tw_cookies)
+    domains = (
+        [".x.com", ".twitter.com"]
+        if platform == "twitter"
+        else [_COOKIE_DOMAIN.get(platform, ".douyin.com")]
+    )
     cookies: List[Dict[str, Any]] = []
     for part in cookie_str.strip().split(";"):
         if "=" not in part:
@@ -1947,8 +2118,9 @@ def cookie_string_to_state(cookie_str: str, platform: str = "douyin") -> str:
         k, v = part.strip().split("=", 1)
         if not k:
             continue
-        cookies.append({
-            "name": k.strip(), "value": v.strip(),
-            "domain": domain, "path": "/",
-        })
+        for dom in domains:
+            cookies.append({
+                "name": k.strip(), "value": v.strip(),
+                "domain": dom, "path": "/",
+            })
     return json.dumps({"cookies": cookies, "origins": []})

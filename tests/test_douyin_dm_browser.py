@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import pytest
 from patchright.sync_api import expect
-from test_web_appearance_browser import ui, navigate, capture
+from test_agent_commercial_browser import ui
 
 pytestmark = [pytest.mark.local_cdp, pytest.mark.skipif(os.environ.get('CREATORHUB_RUN_LOCAL_CDP') != '1', reason='opt-in isolated browser')]
 
@@ -11,7 +11,6 @@ def test_workbench_douyin_dm_single_and_batch(ui):
     page, errors = ui
     web = Path(__file__).resolve().parents[1] / "app/web"
     page.add_script_tag(path=str(web / "submissions.js"))
-    page.add_script_tag(path=str(web / "douyin-dm.js"))
     page.add_script_tag(content="""(() => {
       window.dmFixture = {posts:[], cancel:0};
       const original = window.fetch;
@@ -36,7 +35,8 @@ def test_workbench_douyin_dm_single_and_batch(ui):
         return original(url, options);
       };
     })();""")
-    navigate(page, 'hub')
+    page.locator('.navitem[data-tab="hub"]').click()
+    expect(page.locator('.navitem.active')).to_have_attribute("data-tab", "hub")
     page.locator('[data-hubtab=dm]').click()
     page.get_by_role('button', name='新建私信', exact=True).click()
     dialog=page.locator('#douyin-dm-dialog')
@@ -55,12 +55,10 @@ def test_workbench_douyin_dm_single_and_batch(ui):
     page.locator('#dy-dm-content').fill('模拟批量')
     page.get_by_role('button',name='解析并预览',exact=True).click()
     expect(page.locator('#dy-dm-preview')).to_contain_text('有效 2 人 · 重复 1 项 · 无效 1 项')
-    capture(page,'douyin-dm-batch-preview')
     page.get_by_role('button',name='确认创建发送任务',exact=True).dblclick()
     expect(dialog).to_contain_text('成功 1')
     page.get_by_role('button',name='取消尚未执行',exact=True).click()
     expect(dialog).to_contain_text('已取消 1')
-    capture(page,'douyin-dm-batch-results')
     posted=page.locator('html').get_attribute('data-dm-posts')
     import json
     posted=json.loads(posted)

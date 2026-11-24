@@ -16,7 +16,38 @@ from curl_cffi.curl import CURL_READFUNC_ABORT
 
 from app.platforms.xhs import creator_api, creator_sign, deadline, media, publish
 from app.platforms.xhs.responses import XhsApiError
-from test_xhs_creator_contract import creator, Response
+
+
+class Response:
+    def __init__(self, payload=None, status=200):
+        self.status_code = status
+        self.payload = payload
+
+    def json(self):
+        if isinstance(self.payload, Exception):
+            raise self.payload
+        return self.payload
+
+
+@pytest.fixture
+def creator(monkeypatch):
+    transport = Mock()
+    transport.get.return_value = Response({"success": True, "data": {}})
+    transport.post.return_value = Response({
+        "success": True, "data": {"id": "fixture-note"}})
+    factory = Mock(return_value=transport)
+    monkeypatch.setattr(creator_api, "Session", factory)
+    monkeypatch.setattr(creator_sign, "generate_xsc", lambda *_args, **_kwargs: {"x-t": "123"})
+    monkeypatch.setattr(creator_sign, "generate_xs_xs_common", lambda *_args, **_kwargs: ("xs", 123, "common"))
+    monkeypatch.setattr(creator_sign, "generate_x_rap_param", lambda *_args, **_kwargs: "rap")
+    monkeypatch.setattr(creator_sign, "available", lambda: True)
+    monkeypatch.setattr(creator_api, "_video_cover_and_meta", lambda *_args: (
+        b"cover", {"video": {}, "audio": {}}))
+    client = creator_api.XhsCreatorApi("a1=fixture")
+    client.upload_media = Mock(side_effect=lambda *_args: {
+        "fileIds": "fixture", "width": 10, "height": 20, "video_id": "fixture-video"})
+    client.session_factory = factory
+    return client
 
 
 STATE = '{"cookies":[{"name":"a1","value":"fixture"}]}'
@@ -301,6 +332,29 @@ def test_timeout_cancels_stalled_submit_callback(creator, media_path, monkeypatc
     asyncio.run(scenario())
     creator.cli.post.assert_not_called()
     creator.cli.close.assert_called_once()
+
+
+def test_budget_timer_firing_early_still_reports_timeout(creator, media_path, monkeypatch):
+    """asyncio runs timers up to one clock tick early (15.6 ms with Windows GetTickCount64).
+
+    The worker then sees the cancel signal while the deadline is still ahead; that must
+    stay a budget timeout, not a caller cancellation. Exaggerate the early firing so the
+    race is deterministic instead of depending on runner load.
+    """
+    monkeypatch.setattr(creator_api, "XhsCreatorApi", lambda *_args, **_kwargs: creator)
+    async def scenario():
+        loop = asyncio.get_running_loop()
+        call_later = loop.call_later
+        monkeypatch.setattr(loop, "call_later",
+                            lambda delay, *args: call_later(max(delay - .15, 0), *args))
+        async def stall():
+            await asyncio.Event().wait()
+        return await asyncio.wait_for(publish.publish_xhs(None, None, STATE,
+            "images", "", "", [str(media_path)], mode="api", timeout_seconds=.4,
+            on_submit=stall, preserve_error=True), 2)
+    result = asyncio.run(scenario())
+    assert result[0] is False and result[2].signal == "publish_timeout"
+    creator.cli.post.assert_not_called()
 
 
 def test_callback_own_timeout_is_not_misreported_as_budget_expiration(creator, media_path, monkeypatch):

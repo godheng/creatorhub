@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- AUTO-GENERATED FROM frontend/html/*.html & frontend/styles/base.css BY npm run build:ui — DO NOT EDIT DIRECTLY -->
 <html lang="zh-CN" data-theme="light" data-guide-base="https://3441293738.github.io/creatorhub/guide/">
 <head>
 <meta charset="utf-8">
@@ -86,9 +87,13 @@
   .pswitch button:hover { color:var(--fg); background:var(--surface-2); }
   .pswitch button.active[data-pf="douyin"] { background:var(--acc-soft); color:var(--acc); border-color:var(--acc-ring); }
   .pswitch button.active[data-pf="xhs"] { background:var(--xhs-soft); color:var(--xhs); border-color:var(--xhs-ring); }
+  .pswitch button.active[data-pf="rednote"] { background:rgba(225,29,72,.14); color:#e11d48; border-color:rgba(225,29,72,.42); }
   .pswitch button.active[data-pf="kuaishou"] { background:rgba(255,121,2,.16); color:#ff7902; border-color:rgba(255,121,2,.4); }
   .pswitch button.active[data-pf="shipinhao"] { background:rgba(7,193,96,.16); color:#07c160; border-color:rgba(7,193,96,.4); }
   .pswitch button.active[data-pf="tiktok"] { background:rgba(37,244,238,.12); color:#00b8b2; border-color:rgba(254,44,85,.38); }
+  .pswitch button.active[data-pf="bilibili"] { background:rgba(0,174,236,.14); color:#00aeec; border-color:rgba(0,174,236,.42); }
+  .pswitch button.active[data-pf="instagram"] { background:rgba(225,48,108,.14); color:#e1306c; border-color:rgba(225,48,108,.42); }
+  .pswitch button.active[data-pf="twitter"] { background:rgba(29,155,240,.15); color:#1d9bf0; border-color:rgba(29,155,240,.42); }
   .hidden { display:none !important; }
 
   /* Platform accents and light/dark themes are independent: appearance.css. */
@@ -610,6 +615,101 @@
   .proxy-format-examples li::before { counter-increment:proxy-format; content:counter(proxy-format,decimal-leading-zero); color:var(--mut); font-family:var(--mono); }
   .proxy-format-examples code { color:var(--fg); font-size:12px; white-space:normal; overflow-wrap:anywhere; }
   .card[data-section="proxies"] > .form-actions { margin-top:16px; }
+  /* ── 代理池管理面板重构样式 ── */
+  .px-card-head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .px-head-main { display:flex; align-items:flex-start; gap:12px; min-width:0; }
+  .px-head-main .proxy-pool-intro { margin:3px 0 0; font-size:12px; line-height:1.5; }
+  .px-head-actions { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+  .px-kpi-bar {
+    display:flex; flex-wrap:wrap; gap:7px; margin:0 0 14px;
+  }
+  .px-kpi-chip {
+    display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 12px;
+    border:1px solid var(--line); border-radius:999px; background:var(--surface);
+    box-shadow:none; color:var(--mut); font-size:12px; font-weight:550; cursor:pointer;
+    transition:border-color .15s var(--ease),background .15s var(--ease),color .15s var(--ease);
+  }
+  .px-kpi-chip:hover { color:var(--fg); background:var(--surface-2); filter:none; }
+  .px-kpi-chip.active {
+    color:var(--acc); border-color:var(--acc-ring); background:var(--acc-soft); font-weight:650;
+  }
+  .px-kpi-chip b { font-family:var(--mono); font-size:12px; }
+  .px-quick-add {
+    padding:14px 16px; margin:0 0 14px; border:1px solid var(--line-soft); border-radius:var(--r);
+    background:color-mix(in srgb,var(--surface) 88%,var(--bg)); display:grid; gap:10px;
+  }
+  .px-quick-grid {
+    display:grid; grid-template-columns:minmax(260px,2.1fr) minmax(170px,1fr) auto; gap:10px; align-items:end;
+  }
+  .px-quick-grid #px-url { font-family:var(--mono); font-size:13px; }
+  .px-quick-btns { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+  .px-detect-banner {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:8px 12px; border-radius:var(--r-sm); border:1px solid var(--line-soft);
+    background:var(--surface); font-size:12px; line-height:1.45;
+  }
+  .px-detect-banner[data-tone="ok"] {
+    border-color:color-mix(in srgb,var(--success) 32%,transparent);
+    background:var(--success-soft); color:var(--success);
+  }
+  .px-detect-banner[data-tone="err"] {
+    border-color:color-mix(in srgb,var(--danger) 32%,transparent);
+    background:var(--danger-soft); color:var(--danger);
+  }
+  .px-adv-details { border-top:1px dashed var(--line-soft); padding-top:8px; }
+  .px-adv-details > summary {
+    display:inline-flex; align-items:center; gap:6px; color:var(--mut); font-size:12px;
+    cursor:pointer; list-style:none; user-select:none;
+  }
+  .px-adv-details > summary::-webkit-details-marker { display:none; }
+  .px-adv-details > summary::after {
+    content:""; width:5px; height:5px; margin-top:-2px;
+    border:solid currentColor; border-width:0 1.4px 1.4px 0; transform:rotate(45deg);
+    transition:transform .15s var(--ease);
+  }
+  .px-adv-details[open] > summary::after { margin-top:2px; transform:rotate(225deg); }
+  .px-adv-details > summary:hover { color:var(--acc); }
+  .px-adv-body { margin-top:10px; display:grid; gap:10px; }
+  .px-adv-grid { grid-template-columns:minmax(130px,.7fr) minmax(200px,1.1fr) minmax(200px,1.4fr); }
+  .px-fmt-hint {
+    display:flex; flex-wrap:wrap; align-items:center; gap:6px; color:var(--mut-2); font-size:11.5px;
+  }
+  .px-fmt-hint code {
+    padding:2px 6px; border-radius:5px; border:1px solid var(--line-soft);
+    background:var(--surface); color:var(--fg); font:400 11px/1.3 var(--mono);
+  }
+  .px-batch-bar {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
+    padding:8px 12px; margin:0 0 10px; border:1px solid var(--acc-ring); border-radius:var(--r-sm);
+    background:var(--acc-soft);
+  }
+  .px-batch-count { font-size:12.5px; color:var(--fg-strong); }
+  .px-batch-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  #proxy-table input[type="checkbox"] { width:15px; height:15px; margin:0; accent-color:var(--acc); cursor:pointer; }
+  .px-node-head { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .px-node-sub {
+    display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px;
+    color:var(--mut-2); font-size:11.5px;
+  }
+  .px-node-sub code { font-family:var(--mono); font-size:11.5px; color:var(--mut); }
+  .px-user-hint {
+    padding:1px 6px; border-radius:4px; border:1px solid var(--line-soft);
+    background:var(--bg); color:var(--mut); font:500 10.5px/1.35 var(--mono);
+  }
+  .px-mini-copy { min-height:21px; padding:1px 6px; font-size:10.5px; border-radius:5px; }
+  .px-acc-list { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
+  .px-acc-chip {
+    display:inline-flex; align-items:center; gap:4px; padding:2px 8px;
+    border-radius:6px; border:1px solid var(--line-soft); background:var(--bg);
+    color:var(--fg); font-size:11.5px; line-height:1.4; max-width:190px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .px-acc-chip small { color:var(--mut); font-weight:600; font-size:10.5px; }
+  @media(max-width:980px) {
+    .px-quick-grid { grid-template-columns:1fr; }
+    .px-quick-btns { justify-content:flex-end; }
+    .px-adv-grid { grid-template-columns:1fr; }
+  }
   @media(max-width:1100px) {
     .form-grid.proxy-input-grid { grid-template-columns:minmax(140px,1fr) minmax(108px,.6fr) minmax(190px,1fr); }
     .proxy-address-field { grid-column:1 / -1; }
@@ -617,7 +717,8 @@
   @media(max-width:700px) { .form-grid.proxy-input-grid { grid-template-columns:minmax(0,1fr); } }
   @media(pointer:coarse) { .proxy-input-grid .form-field > label, .proxy-address-label, .proxy-format-disclosure > summary { min-height:44px; } }
   .form-field > label, .form-label { display:flex; align-items:center; gap:6px; margin:0 0 6px; color:var(--mut); font-size:12px; font-weight:550; }
-  .form-field > input, .form-field > textarea, .form-field > select, .form-field > .cs, .form-field > .input-affix { width:100%; }
+  .form-field > input, .form-field > textarea, .form-field > select, .form-field > .cs, .form-field > .input-affix, .form-field > .smart-target-input { width:100%; }
+  #col-source-ref-wrap { grid-column:2 / -1; }
   .field-help { margin-top:5px; color:var(--mut-2); font-size:11.5px; line-height:1.45; }
   .field-error { margin:5px 0 0; color:var(--danger); font-size:11.5px; line-height:1.4; }
   .input-affix { position:relative; }
@@ -628,8 +729,8 @@
   }
   button.input-action:hover { color:var(--fg); background:var(--surface-2); filter:none; }
   button.input-action:active { transform:translateY(-50%); }
-  .smart-target-input { position:relative; }
-  .smart-target-input > input { padding-right:98px; }
+  .smart-target-input { position:relative; width:100%; }
+  .smart-target-input > input { width:100%; padding-right:98px; }
   .smart-target-action {
     position:absolute; top:50%; right:5px; transform:translateY(-50%);
     min-height:30px; padding:5px 9px; gap:5px; border:0; border-radius:7px;
@@ -838,64 +939,87 @@
   td.num { font-family:var(--mono); font-size:12.5px; }
   .acttd { text-align:right; white-space:nowrap; }
   .acttd button { margin-left:4px; }
-  .local-path-cell { width:220px; min-width:200px; max-width:240px; }
-  .local-path { display:grid; grid-template-columns:minmax(0,1fr) 28px; align-items:center; gap:8px; min-width:0; }
-  .local-path-info { min-width:0; }
-  .local-path-file { display:flex; align-items:baseline; gap:6px; min-width:0; }
+  .local-path-cell { width:220px; min-width:180px; max-width:240px; }
+  .local-path { display:flex; align-items:center; gap:8px; min-width:0; }
+  .local-path-info { min-width:0; flex:1; }
+  .local-path-file { display:flex; align-items:center; gap:6px; min-width:0; }
   .local-path-name { color:var(--fg); font:500 11.5px/1.35 var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .local-path-ext { flex:0 0 auto; color:var(--info); font:650 9.5px/1 var(--mono); }
-  .local-path-dir { margin-top:4px; color:var(--mut-2); font:400 10.5px/1.25 var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  button.local-path-action { width:28px; height:28px; padding:0; border-radius:6px; color:var(--mut); }
+  .local-path-ext { flex:0 0 auto; color:var(--info); background:var(--info-soft); padding:1px 5px; border-radius:4px; font:650 10px/1.2 var(--mono); }
+  .local-path-dir { margin-top:2px; color:var(--mut-2); font:400 10.5px/1.25 var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  button.local-path-action { width:30px; min-width:30px; height:30px; min-height:30px; padding:0; border-radius:7px; color:var(--mut); }
   button.local-path-action:hover { color:var(--fg-strong); }
   button.local-path-action.reveal { color:var(--info); }
-  .local-path-empty { color:var(--mut-2); }
+  .local-path-empty { color:var(--mut-2); font-size:12px; }
 
-  /* 作品列表：描述优先，状态与操作分层，避免多个发布按钮挤在一行 */
+  /* 作品列表：主信息左对齐紧凑排布，只读状态与右侧操作列彻底解耦 */
   .content-record-table { table-layout:fixed; min-width:920px; }
-  .content-record-table .content-col-check { width:44px; }
-  .content-record-table .content-col-cover { width:72px; }
-  .content-record-table .content-col-type { width:72px; }
-  .content-record-table .content-col-time { width:108px; }
-  .content-record-table .content-col-data { width:84px; }
-  .content-record-table .content-col-actions { width:126px; }
-  .content-record-table .content-col-local { width:172px; }
-  .content-record-table th, .content-record-table td { padding:12px 10px; }
-  .content-record-table tbody tr { height:96px; }
-  .content-check-cell { text-align:center; }
+  .content-record-table .content-col-check { width:42px; }
+  .content-record-table .content-col-cover { width:68px; }
+  .content-record-table .content-col-type { width:100px; }
+  .content-record-table .content-col-time { width:176px; }
+  .content-record-table .content-col-data { width:96px; }
+  .content-record-table .content-col-local { width:196px; }
+  .content-record-table .content-col-actions { width:196px; }
+  .content-record-table th, .content-record-table td { padding:10px; vertical-align:top; }
+  .content-check-cell { text-align:center; padding-top:14px !important; }
   .content-cover-cell { text-align:center; }
+  .content-cover-box { position:relative; display:inline-block; width:46px; height:62px; }
   .content-cover-cell .thumb { width:46px; height:62px; }
+  .thumb-dur {
+    position:absolute; right:3px; bottom:3px; padding:1px 4px; border-radius:4px;
+    background:rgba(0,0,0,.74); color:#fff; font:600 9.5px/1.2 var(--mono);
+    pointer-events:none; letter-spacing:-.2px;
+  }
   .content-cover-empty {
-    display:inline-grid; place-items:center; width:46px; height:62px;
+    display:inline-grid; place-items:center; width:46px; height:62px; cursor:pointer;
     color:var(--mut-2); background:var(--surface-2); border:1px solid var(--line-soft); border-radius:7px;
   }
+  .content-cover-empty:hover { border-color:var(--acc); color:var(--acc); }
   .content-cover-empty svg { width:18px; height:18px; }
   .content-desc-cell { white-space:normal; min-width:0; }
   .content-desc-text {
-    display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:3;
-    color:var(--fg-strong); font-size:13px; font-weight:550; line-height:1.5;
+    display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    color:var(--fg-strong); font-size:13px; font-weight:560; line-height:1.48;
     word-break:break-word;
   }
+  .content-desc-text.clickable { cursor:pointer; transition:color .14s var(--ease); }
+  .content-desc-text.clickable:hover { color:var(--acc); }
   .content-desc-meta { margin-top:6px; }
   .content-desc-meta > div { margin-top:3px !important; }
   .content-desc-meta .meta-stack { max-width:100%; }
   .content-kind {
-    display:block; color:var(--fg); font-size:12px; font-weight:600;
+    display:block; color:var(--fg); font-size:12px; font-weight:600; line-height:1.35;
   }
   .content-quality {
-    display:block; margin-top:4px; color:var(--mut-2); font:400 10.5px/1.2 var(--mono);
+    display:block; margin-top:3px; color:var(--mut-2); font:400 11px/1.35 var(--mono); white-space:normal; overflow-wrap:anywhere;
   }
-  .content-time { display:grid; gap:4px; color:var(--mut); line-height:1.2; }
-  .content-time span:last-child { color:var(--mut-2); }
+  .content-time { display:grid; gap:3px; color:var(--mut); line-height:1.3; font-size:12px; }
+  .content-time span:last-child { color:var(--mut-2); font-size:11.5px; }
   .content-metrics { white-space:normal; }
-  .content-metrics .metric { display:flex; width:max-content; margin:0 0 6px; }
-  .content-metrics .metric:last-child { margin-bottom:0; }
-  .content-action-cell { white-space:normal; }
-  .content-status-row { display:flex; align-items:center; gap:5px; min-height:24px; }
+  .content-metrics .metric {
+    display:grid; grid-template-columns:14px minmax(0,1fr); align-items:center;
+    gap:5px; width:max-content; margin:0; font-size:12.5px; line-height:1.35;
+  }
+  .content-metrics .metric + .metric { margin:5px 0 0 0; }
+  .content-error-preview {
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    font-size:11.5px; line-height:1.45; margin-top:4px; color:var(--danger); white-space:normal; word-break:break-word;
+  }
+  .content-status-cell { white-space:normal; min-width:0; }
+  .content-status-cell .local-path { margin-top:5px; }
+  .content-action-cell { white-space:nowrap; text-align:right; }
+  .content-status-row { display:flex; align-items:center; flex-wrap:wrap; gap:5px; min-height:22px; }
   .content-status-row .warn-ic { display:inline-flex; }
-  .content-action-buttons { display:flex; align-items:center; gap:6px; margin-top:8px; }
+  .content-action-buttons { display:inline-flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:5px; margin-top:0; }
   .content-action-buttons button { margin:0; }
   .content-action-buttons .content-action-primary { color:var(--fg-strong); }
-  button.content-action-delete { width:30px; padding:5px; color:var(--mut-2); }
+  button.content-icon-btn,
+  button.content-action-delete {
+    width:30px; min-width:30px; height:30px; min-height:30px; padding:0 !important;
+    border-radius:7px; color:var(--mut); display:inline-grid; place-items:center;
+  }
+  button.content-icon-btn:hover { color:var(--acc); border-color:var(--acc-ring); }
+  button.content-action-delete { color:var(--mut-2); }
   button.content-action-delete:hover { color:var(--danger); border-color:color-mix(in srgb,var(--danger) 45%,var(--line)); }
   button.content-action-delete.danger:hover { color:#fff; border-color:var(--danger); }
   .content-record-table .local-path-cell { width:auto; min-width:0; max-width:none; }
@@ -909,10 +1033,10 @@
   .share-history-meta .share-history-download-time { color:var(--mut-2); }
   .share-history-file-count { display:block; margin-top:5px; color:var(--mut-2); font-size:10.5px; line-height:1.25; }
   /* 分享历史与作品表共用固定列宽；长格式名/指标必须在列内收口，不能挤到相邻列。 */
-  .share-history-table .content-kind,
-  .share-history-table .content-quality { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .share-history-table .content-kind { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .share-history-table .content-quality { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
   .share-history-table .content-metrics { min-width:0; overflow:hidden; }
-  .share-history-table .content-metrics .metric { width:100%; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .share-history-table .content-metrics .metric, .share-history-table .content-metrics .metric + .metric { max-width:100%; margin-left:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .share-history-table .content-time { min-width:0; overflow:hidden; }
 
   /* ── 监控分组 / 标签 / 别名 ── */
@@ -1133,6 +1257,160 @@
     background:var(--bg); color:var(--mut); font-family:var(--mono); font-size:10.5px;
   }
   #uimodal #ui-extra-action { margin-right:auto; }
+  /* ── 结构化代理选择器 & 扫码登录一体化向导 ── */
+  #uimodal .prelogin-section {
+    border:1px solid var(--line-soft); border-radius:var(--r);
+    background:color-mix(in srgb,var(--surface) 88%,var(--bg));
+    padding:12px 14px; margin:0 0 12px;
+  }
+  #uimodal .prelogin-sec-head {
+    display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;
+  }
+  #uimodal .prelogin-sec-title {
+    display:inline-flex; align-items:center; gap:6px; color:var(--fg-strong); font-size:13px; font-weight:650;
+  }
+  #uimodal .prelogin-sec-title svg { width:14px; height:14px; color:var(--acc); flex:0 0 auto; }
+  #uimodal .prelogin-env-hint { margin:7px 0 0; color:var(--mut-2); font-size:11.5px; line-height:1.5; }
+  #uimodal .prelogin-fp-row {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin-top:10px; padding-top:10px; border-top:1px solid var(--line-soft);
+  }
+  #uimodal .prelogin-fp-row > div:first-child { min-width:0; }
+  #uimodal .prelogin-fp-row b { display:block; color:var(--fg-strong); font-size:12px; }
+  #uimodal .prelogin-fp-row span { display:block; margin-top:2px; color:var(--mut-2); font-size:11px; }
+  #uimodal .pxp-wrap { display:grid; gap:10px; }
+  #uimodal .pxp-cur-bar {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;
+    padding:8px 11px; border:1px solid var(--line-soft); border-radius:var(--r-sm);
+    background:var(--bg); font-size:12px; color:var(--mut);
+  }
+  #uimodal .pxp-cur-bar code { font-family:var(--mono); font-size:11.5px; color:var(--fg); }
+  #uimodal .pxp-modes {
+    display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px;
+    padding:3px; border:1px solid var(--line); border-radius:10px; background:var(--bg);
+  }
+  #uimodal .pxp-mode-btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:5px;
+    min-height:32px; padding:5px 8px; border:1px solid transparent; border-radius:7px;
+    background:transparent; box-shadow:none; color:var(--mut); font-size:12px; font-weight:550;
+    white-space:nowrap; transition:background .15s var(--ease),color .15s var(--ease),border-color .15s var(--ease);
+  }
+  #uimodal .pxp-mode-btn:hover { color:var(--fg); background:var(--surface-2); filter:none; }
+  #uimodal .pxp-mode-btn.active {
+    color:var(--acc); background:var(--surface); border-color:var(--acc-ring);
+    font-weight:650; box-shadow:var(--sh-sm);
+  }
+  #uimodal .pxp-mode-dot { width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
+  #uimodal .pxp-mode-dot.ok { background:var(--success); }
+  #uimodal .pxp-mode-dot.warn { background:var(--warn); }
+  #uimodal .pxp-toolbar {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;
+  }
+  #uimodal .pxp-filters { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
+  #uimodal .pxp-flt-btn {
+    min-height:28px; padding:3px 10px; border:1px solid var(--line); border-radius:999px;
+    background:var(--surface); box-shadow:none; color:var(--mut); font-size:11.5px; font-weight:550;
+  }
+  #uimodal .pxp-flt-btn:hover { color:var(--fg); background:var(--surface-2); filter:none; }
+  #uimodal .pxp-flt-btn.active {
+    color:var(--acc); border-color:var(--acc-ring); background:var(--acc-soft); font-weight:650;
+  }
+  #uimodal .pxp-search {
+    flex:1 1 170px; max-width:230px; min-height:30px; padding:4px 10px; font-size:12px;
+  }
+  #uimodal .pxp-list {
+    display:grid; gap:7px; max-height:244px; overflow-y:auto; overscroll-behavior:contain;
+    padding:1px 3px 2px 1px;
+  }
+  #uimodal .pxp-item {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:9px 11px; border:1px solid var(--line-soft); border-radius:var(--r-sm);
+    background:var(--surface); cursor:pointer;
+    transition:border-color .14s var(--ease),background .14s var(--ease),box-shadow .14s var(--ease);
+  }
+  #uimodal .pxp-item:hover { border-color:var(--line); background:var(--control-bg-hover,var(--surface-2)); }
+  #uimodal .pxp-item:focus-visible { outline:none; border-color:var(--acc); box-shadow:0 0 0 2px var(--acc-ring); }
+  #uimodal .pxp-item.selected {
+    border-color:var(--acc); background:var(--acc-soft); box-shadow:inset 0 0 0 1px var(--acc-ring);
+  }
+  #uimodal .pxp-item.preview { cursor:default; background:var(--surface); }
+  #uimodal .pxp-item.disabled-node { opacity:.68; }
+  #uimodal .pxp-main { display:flex; align-items:flex-start; gap:9px; min-width:0; flex:1 1 auto; }
+  #uimodal .pxp-radio {
+    width:15px; height:15px; margin-top:2px; border:1.5px solid var(--control-line,var(--line));
+    border-radius:50%; flex:0 0 auto; display:grid; place-items:center; background:var(--surface);
+  }
+  #uimodal .pxp-item.selected .pxp-radio { border-color:var(--acc); background:var(--acc); }
+  #uimodal .pxp-item.selected .pxp-radio::after {
+    content:""; width:5px; height:5px; border-radius:50%; background:var(--on-accent,#fff);
+  }
+  #uimodal .pxp-copy { min-width:0; flex:1 1 auto; }
+  #uimodal .pxp-title-line {
+    display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; line-height:1.35;
+  }
+  #uimodal .pxp-name {
+    color:var(--fg-strong); font-size:13px; font-weight:650;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px;
+  }
+  #uimodal .pxp-proto {
+    padding:1px 5px; border-radius:4px; border:1px solid var(--line-soft);
+    background:var(--bg); color:var(--mut); font:600 10px/1.3 var(--mono);
+  }
+  #uimodal .pxp-geo { color:var(--mut); font-size:12px; }
+  #uimodal .pxp-sub-line {
+    margin-top:3px; color:var(--mut-2); font:400 11px/1.4 var(--mono);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  #uimodal .pxp-badges {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:5px; flex:0 0 auto;
+  }
+  #uimodal .pxp-test-btn {
+    min-height:24px; padding:2px 8px; font-size:11px; border-radius:6px;
+  }
+  #uimodal .pxp-card {
+    display:grid; gap:9px; padding:12px 14px; border:1px solid var(--line-soft);
+    border-radius:var(--r-sm); background:var(--surface);
+  }
+  #uimodal .pxp-card-head {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;
+  }
+  #uimodal .pxp-card-head b { color:var(--fg-strong); font-size:13px; }
+  #uimodal .pxp-card p { margin:0; color:var(--mut); font-size:12px; line-height:1.55; }
+  #uimodal .pxp-inline-warn {
+    display:flex; align-items:flex-start; gap:7px; padding:8px 11px;
+    border:1px solid color-mix(in srgb,var(--warn) 32%,transparent);
+    border-radius:var(--r-sm); background:var(--warn-soft); color:var(--warn);
+    font-size:11.5px; line-height:1.5;
+  }
+  #uimodal .pxp-inline-warn svg { width:14px; height:14px; margin-top:2px; flex:0 0 auto; }
+  #uimodal .pxp-custom-row { display:flex; gap:8px; align-items:stretch; }
+  #uimodal .pxp-custom-row input { flex:1 1 auto; min-width:0; font-family:var(--mono); font-size:12.5px; }
+  #uimodal .pxp-custom-row button { flex:0 0 auto; white-space:nowrap; }
+  #uimodal .pxp-detect-msg {
+    padding:7px 10px; border-radius:7px; border:1px solid var(--line-soft);
+    background:var(--bg); color:var(--mut); font-size:11.5px; line-height:1.45;
+  }
+  #uimodal .pxp-detect-msg[data-tone="ok"] {
+    border-color:color-mix(in srgb,var(--success) 30%,transparent);
+    background:var(--success-soft); color:var(--success);
+  }
+  #uimodal .pxp-detect-msg[data-tone="err"] {
+    border-color:color-mix(in srgb,var(--danger) 30%,transparent);
+    background:var(--danger-soft); color:var(--danger);
+  }
+  #uimodal .pxp-save-row {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
+    padding-top:4px;
+  }
+  #uimodal .pxp-save-chk {
+    display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--fg); cursor:pointer;
+  }
+  #uimodal .pxp-save-chk input { width:auto; margin:0; accent-color:var(--acc); }
+  #uimodal .pxp-label-inp { flex:1 1 180px; max-width:240px; min-height:32px; padding:4px 9px; font-size:12px; }
+  #uimodal .pxp-empty {
+    padding:22px 14px; border:1px dashed var(--line); border-radius:var(--r-sm);
+    text-align:center; color:var(--mut); font-size:12px; display:grid; gap:8px; justify-items:center;
+  }
   @media(max-width:600px) {
     .manage-toolbar input, .manage-toolbar select, .manage-toolbar .cs { flex:1 1 calc(50% - 8px); max-width:none; }
     .manage-toolbar input[type="search"] { min-width:0; }
@@ -1150,6 +1428,12 @@
     #uimodal .fp-readonly { grid-template-columns:1fr; gap:5px; }
     #uimodal #ui-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
     #uimodal #ui-extra-action { margin-right:0; }
+    #uimodal .prelogin-fp-row { align-items:flex-start; flex-direction:column; gap:8px; }
+    #uimodal .pxp-modes { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    #uimodal .pxp-search, #uimodal .pxp-label-inp { max-width:none; width:100%; }
+    #uimodal .pxp-item { flex-direction:column; align-items:stretch; }
+    #uimodal .pxp-badges { justify-content:flex-start; padding-left:24px; }
+    #uimodal .pxp-custom-row { flex-direction:column; }
   }
 
   /* table inside a card without extra border for the small acc/notif tables */
@@ -1411,6 +1695,15 @@
     min-width:0; max-width:128px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     color:var(--mut-2); font-family:var(--mono);
   }
+  .collection-author-row { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  button.collection-author-chip {
+    display:inline-flex; align-items:center; gap:5px; max-width:100%; min-height:24px; padding:3px 8px;
+    border:1px solid var(--line-soft); border-radius:var(--r-xs); background:var(--surface-2);
+    color:var(--mut); font:500 11px/1.25 var(--mono); cursor:pointer; box-shadow:none;
+  }
+  button.collection-author-chip span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  button.collection-author-chip svg { width:12px; height:12px; flex:0 0 auto; opacity:.78; }
+  button.collection-author-chip:hover { color:var(--fg-strong); border-color:color-mix(in srgb,var(--acc) 45%,var(--line)); background:var(--surface-3); filter:none; }
   .collection-result-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:11px; }
   .collection-result-metric { padding:7px 8px; border-radius:var(--r-xs); background:var(--surface-2); }
   .collection-result-metric b { display:flex; align-items:center; gap:4px; color:var(--fg); font:600 12px/1.2 var(--mono); }
@@ -1551,14 +1844,14 @@
   }
   .queue-toolbar .form-field { min-width:0; }
   .queue-toolbar button { min-height:40px; }
-  .queue-table { min-width:1084px; table-layout:fixed; }
-  .queue-table .queue-col-type { width:122px; }
-  .queue-table .queue-col-content { width:310px; }
-  .queue-table .queue-col-account { width:150px; }
-  .queue-table .queue-col-time { width:160px; }
-  .queue-table .queue-col-status { width:118px; }
-  .queue-table .queue-col-reason { width:230px; }
-  .queue-table .queue-col-action { width:92px; }
+  .queue-table { min-width:1020px; table-layout:fixed; }
+  .queue-table .queue-col-type { width:112px; }
+  .queue-table .queue-col-content { width:auto; }
+  .queue-table .queue-col-account { width:138px; }
+  .queue-table .queue-col-time { width:148px; }
+  .queue-table .queue-col-status { width:112px; }
+  .queue-table .queue-col-reason { width:206px; }
+  .queue-table .queue-col-action { width:164px; }
   .queue-copy, .queue-reason { white-space:normal; min-width:0; line-height:1.45; overflow-wrap:anywhere; }
   .queue-copy b { display:block; color:var(--fg-strong); font-weight:620; }
   .queue-copy small, .queue-reason small, .queue-account small, .queue-time small {
@@ -1615,6 +1908,7 @@
     .option-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
   @media(max-width:860px) {
+    #col-source-ref-wrap { grid-column:auto; }
     main { padding:20px 18px; }
     .page-context { align-items:center; }
     .page-context h2 { font-size:20px; }
@@ -1720,9 +2014,9 @@
   .risk-status.warn::before { background:var(--warn); }
   .risk-status.danger { color:var(--danger); background:var(--danger-soft); border-color:rgba(248,113,113,.34); }
   .risk-status.danger::before { background:var(--danger); }
-  .risk-account { display:grid; gap:2px; min-width:150px; }
+  .risk-account { display:grid; gap:2px; min-width:118px; }
   .risk-account small, .risk-reason small { color:var(--mut); font-size:11px; }
-  .risk-reason { min-width:240px; max-width:420px; white-space:normal; line-height:1.45; }
+  .risk-reason { min-width:170px; max-width:360px; white-space:normal; line-height:1.45; }
   .risk-progress { display:grid; grid-template-columns:1fr auto; gap:5px 8px; align-items:center; min-width:120px; }
   .risk-progress-track { height:5px; border-radius:999px; overflow:hidden; background:var(--surface-3); }
   .risk-progress-track i { display:block; height:100%; background:var(--warn); border-radius:inherit; }
@@ -1749,6 +2043,934 @@
     .risk-config-group .form-grid { grid-template-columns:1fr; }
     .risk-event { grid-template-columns:92px 74px 1fr; }
     .risk-event-detail { grid-column:1/-1; }
+  }
+
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+   * CreatorHub Matrix Command Center, Account Matrix & Unified Media Hub Styles
+   * ═══════════════════════════════════════════════════════════════════════════ */
+  .pswitch { flex-wrap:nowrap; max-width:100%; min-width:0; overflow-x:auto; scrollbar-width:none; }
+  .pswitch::-webkit-scrollbar { display:none; }
+  .pswitch button { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; flex:0 0 auto; }
+  .pswitch .ps-ic { width:14px; height:14px; flex:0 0 14px; opacity:.88; }
+  .pswitch button.active[data-pf="all"] {
+    background:var(--acc-soft); color:var(--acc); border-color:var(--acc-ring);
+  }
+  .pswitch button.ps-idle-hidden { display:none !important; }
+  .ps-cnt {
+    font:650 10.5px/1.2 var(--mono); padding:1.5px 5.5px; border-radius:999px;
+    background:color-mix(in srgb,var(--fg) 8%,transparent); color:var(--mut);
+    font-variant-numeric:tabular-nums;
+  }
+  .pswitch button.active .ps-cnt { background:var(--acc-soft); color:var(--acc); }
+  .ps-cnt.warn { background:var(--warn-soft) !important; color:var(--warn) !important; }
+  .ps-cnt.danger { background:var(--danger-soft) !important; color:var(--danger) !important; }
+
+  /* Hide superseded static blocks when interactive Matrix Islands are mounted */
+  .mx-overview-enhanced > .stats,
+  .mx-overview-enhanced > .overview-grid,
+  .mx-overview-enhanced > .platform-callout { display:none !important; }
+  .mx-accounts-enhanced > .wb-list-tools,
+  .mx-accounts-enhanced > .table-wrap,
+  .mx-accounts-enhanced > .empty { display:none !important; }
+
+  .wb-inline-toggle { display:inline-flex; gap:4px; align-items:center; }
+  .wb-inline-toggle button.active {
+    background:var(--acc-soft); color:var(--acc); border-color:var(--acc-ring);
+  }
+
+  /* Custom Radix Liquid Glass SelectBox (replaces all native <select> in React islands) */
+  button.mx-select-trg,
+  .agent-workspace button.mx-select-trg {
+    display:inline-flex; align-items:center; justify-content:space-between; gap:8px;
+    min-width:136px; min-height:38px; padding:6px 9px 6px 12px;
+    border-radius:var(--r-sm);
+    border:1px solid color-mix(in srgb,var(--line) 82%,var(--control-line) 28%);
+    background:var(--control-bg); color:var(--fg);
+    font:540 13px/1.35 var(--sans); text-align:left; white-space:nowrap;
+    box-shadow:inset 0 1px 1.5px rgba(20,22,28,.03), 0 1px 0 var(--glass-rim);
+    cursor:pointer;
+  }
+  button.mx-select-trg.full,
+  .agent-workspace button.mx-select-trg.full {
+    display:flex; width:100%; min-width:0; min-height:var(--control-h);
+  }
+  .agent-chat-toolbar button.mx-select-trg.full { min-height:38px; height:38px; font-size:12px; padding:5px 8px 5px 10px; }
+  button.mx-select-trg:hover:not(:disabled),
+  .agent-workspace button.mx-select-trg:hover:not(:disabled) {
+    background:var(--control-bg-hover);
+    border-color:color-mix(in srgb,var(--line) 48%,var(--fg));
+    color:var(--fg-strong);
+    filter:none;
+  }
+  button.mx-select-trg[data-state="open"],
+  .agent-workspace button.mx-select-trg[data-state="open"] {
+    background:var(--surface);
+    border-color:var(--acc);
+    box-shadow:0 0 0 3px var(--acc-ring);
+  }
+  button.mx-select-trg.is-ph .mx-sel-lbl { color:var(--mut); }
+  .mx-sel-main { display:inline-flex; align-items:center; gap:7px; min-width:0; flex:1; overflow:hidden; }
+  .mx-sel-lbl { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mx-sel-dot { width:8px; height:8px; border-radius:50%; flex:0 0 8px; box-shadow:0 0 0 1px rgba(0,0,0,.1); }
+  .mx-sel-ic, .mx-sel-opt-ic { width:14px !important; height:14px !important; flex:0 0 14px; color:var(--mut); }
+  .mx-sel-cnt {
+    font:600 11px/1.2 var(--mono); padding:1.5px 6px; border-radius:999px;
+    background:var(--surface-2); color:var(--mut); margin-left:4px; flex-shrink:0;
+  }
+  .mx-sel-arr {
+    display:inline-grid; place-items:center; width:18px; height:18px; flex:0 0 18px;
+    border-radius:5px; background:var(--surface-2); color:var(--mut);
+    transition:transform .18s var(--ease-out), color .15s, background-color .15s;
+  }
+  .mx-sel-arr svg { width:13px !important; height:13px !important; }
+  button.mx-select-trg:hover:not(:disabled) .mx-sel-arr,
+  button.mx-select-trg[data-state="open"] .mx-sel-arr {
+    color:var(--acc); background:var(--acc-soft);
+  }
+  button.mx-select-trg[data-state="open"] .mx-sel-arr { transform:rotate(180deg); }
+
+  .wb-menu.mx-select-menu {
+    z-index:360;
+    min-width:max(158px, var(--radix-dropdown-menu-trigger-width, 158px));
+    max-width:min(380px, calc(100vw - 24px));
+    max-height:min(320px, var(--radix-dropdown-menu-content-available-height, 320px));
+    padding:5px;
+    border-radius:13px;
+  }
+  .wb-menu-item.mx-select-opt {
+    display:flex; align-items:center; gap:8px; min-height:35px; padding:7px 10px;
+    border-radius:8px; font-size:13px; font-weight:500; color:var(--fg);
+  }
+  .mx-sel-opt-lbl { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mx-sel-check {
+    width:14px !important; height:14px !important; flex:0 0 14px;
+    opacity:0; color:var(--acc) !important; transform:scale(.8);
+    transition:opacity .12s, transform .15s;
+  }
+  .wb-menu-item.mx-select-opt[data-selected] {
+    color:var(--acc); background:color-mix(in srgb,var(--acc) 9%,transparent); font-weight:620;
+  }
+  .wb-menu-item.mx-select-opt[data-selected] .mx-sel-check { opacity:1; transform:scale(1); }
+  .wb-menu-item.mx-select-opt[data-selected] .mx-sel-opt-ic { color:var(--acc); }
+  .wb-menu-item.mx-select-opt[data-highlighted] { background:var(--surface-2); color:var(--fg-strong); }
+  .wb-menu-item.mx-select-opt[data-selected][data-highlighted] {
+    background:color-mix(in srgb,var(--acc) 14%,var(--surface-2)); color:var(--acc);
+  }
+
+  /* Common Matrix Primitives */
+  .wb-react-island svg { width:15px; height:15px; flex:0 0 auto; }
+  .mx-mini-pf {
+    position:absolute; top:8px; left:8px; z-index:2;
+    padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700;
+    color:#fff; background:var(--pf-c, #fe2c55); box-shadow:0 2px 6px rgba(0,0,0,.28);
+  }
+  .mx-mini-pf.inline {
+    position:static; display:inline-flex; align-items:center; padding:2px 8px;
+    font-size:11px; line-height:1.35; box-shadow:none;
+  }
+  .mx-st-pill {
+    display:inline-flex; align-items:center; gap:5px; padding:2px 8px;
+    border-radius:999px; font-size:11.5px; font-weight:650; white-space:nowrap;
+    border:1px solid var(--line);
+  }
+  .mx-st-pill svg { width:12px !important; height:12px !important; }
+  .mx-st-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex:0 0 6px; }
+  .mx-st-pill.ok { color:var(--success); background:var(--success-soft); border-color:rgba(52,211,153,.3); }
+  .mx-st-pill.warn { color:var(--warn); background:var(--warn-soft); border-color:rgba(251,191,36,.32); }
+  .mx-st-pill.danger { color:var(--danger); background:var(--danger-soft); border-color:rgba(248,113,113,.35); }
+  .mx-st-pill.info { color:var(--acc); background:var(--acc-soft); border-color:var(--acc-ring); }
+  .mx-st-pill.muted { color:var(--mut); background:var(--surface-2); }
+
+  .mx-role-tag {
+    display:inline-flex; align-items:center; padding:2px 7px; border-radius:6px;
+    font-size:11px; font-weight:600; border:1px solid var(--line); color:var(--mut); background:var(--surface-2);
+  }
+  .mx-role-tag.role-publish { color:#059669; background:rgba(16,185,129,.11); border-color:rgba(16,185,129,.28); }
+  .mx-role-tag.role-crawler { color:#d97706; background:rgba(245,158,11,.11); border-color:rgba(245,158,11,.28); }
+  :root[data-theme="dark"] .mx-role-tag.role-publish { color:#34d399; }
+  :root[data-theme="dark"] .mx-role-tag.role-crawler { color:#fbbf24; }
+
+  .mx-num-input {
+    width:112px !important; min-height:38px !important; height:38px;
+    padding:0 11px !important; font-size:13px;
+  }
+  .mx-inline-check {
+    display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:530; color:var(--fg);
+    padding:0 12px; min-height:38px; height:38px;
+    border:1px solid color-mix(in srgb,var(--line) 82%,var(--control-line) 28%);
+    border-radius:var(--r-sm); background:var(--control-bg); cursor:pointer; white-space:nowrap;
+    user-select:none;
+  }
+  .mx-inline-check:hover { background:var(--control-bg-hover); }
+
+  /* ── Command Overview ── */
+  .mx-overview { display:grid; gap:14px; }
+  .mx-ov-topbar {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  .mx-ov-scope, .mx-ov-quick-btns { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .mx-chip-btn {
+    display:inline-flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--line); color:var(--fg); font-size:12.5px;
+  }
+  .mx-chip-btn.active { background:var(--acc-soft); color:var(--acc); border-color:var(--acc-ring); }
+  .mx-scope-current { font-size:12.5px; color:var(--mut); padding:0 4px; }
+
+  .mx-kpi-strip {
+    display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px;
+  }
+  .mx-kpi-box {
+    padding:15px 18px; border-radius:var(--r); background:var(--surface-card, var(--surface));
+    border:1px solid var(--border-card, var(--line)); box-shadow:var(--sh-sm); cursor:pointer;
+    transition:border-color .16s, transform .16s;
+  }
+  .mx-kpi-box:hover { border-color:var(--acc-ring); transform:translateY(-1px); }
+  .mx-kpi-label { font-size:12px; color:var(--mut); font-weight:550; }
+  .mx-kpi-val { display:flex; align-items:baseline; gap:8px; margin:6px 0 4px; }
+  .mx-kpi-val b { font:700 24px/1.15 var(--sans); font-variant-numeric:tabular-nums; color:var(--fg-strong); }
+  .mx-kpi-val small { font-size:12px; color:var(--mut); font-weight:550; }
+  .mx-kpi-val em, .mx-delta { font-style:normal; font-size:12px; font-weight:700; margin-left:4px; }
+  .mx-kpi-val em.up, .mx-delta.up { color:var(--success); }
+  .mx-kpi-val em.down, .mx-delta.down { color:var(--danger); }
+  .mx-kpi-sub { font-size:11.5px; color:var(--mut); }
+
+  .mx-alert-bar { display:flex; flex-wrap:wrap; gap:9px; }
+  .mx-alert-pill {
+    display:inline-flex; align-items:center; gap:9px; padding:9px 13px; border-radius:12px;
+    background:var(--surface-card, var(--surface)); border:1px solid var(--line); color:var(--fg);
+    text-align:left; box-shadow:var(--sh-sm);
+  }
+  .mx-alert-pill.tone-danger { border-color:rgba(248,113,113,.42); background:var(--danger-soft); color:var(--danger); }
+  .mx-alert-pill.tone-warn { border-color:rgba(251,191,36,.38); background:var(--warn-soft); color:var(--warn); }
+  .mx-alert-pill.tone-accent { border-color:var(--acc-ring); background:var(--acc-soft); color:var(--acc); }
+  .mx-alert-text { display:grid; gap:1px; }
+  .mx-alert-text b { font-size:12.5px; line-height:1.25; }
+  .mx-alert-text small { font-size:11px; opacity:.82; font-weight:500; }
+  .mx-alert-ok {
+    width:100%; display:flex; align-items:center; gap:8px; padding:10px 14px;
+    border-radius:12px; background:var(--success-soft); border:1px solid rgba(52,211,153,.28);
+    color:var(--success); font-size:12.5px;
+  }
+
+  .mx-pf-section, .mx-ov-card {
+    padding:16px 18px; border-radius:var(--r); background:var(--surface-card, var(--surface));
+    border:1px solid var(--border-card, var(--line)); box-shadow:var(--sh-sm);
+  }
+  .mx-sec-head {
+    display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap;
+  }
+  .mx-sec-head h3, .mx-sec-head h4 {
+    margin:0; font-size:14.5px; font-weight:700; color:var(--fg-strong);
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .mx-pf-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(195px, 1fr)); gap:10px;
+  }
+  .mx-pf-card {
+    padding:12px 13px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line);
+    cursor:pointer; transition:border-color .15s, transform .15s; display:grid; gap:8px;
+  }
+  .mx-pf-card:hover { transform:translateY(-2px); border-color:var(--acc-ring); }
+  .mx-pf-card.is-danger { border-color:rgba(248,113,113,.45); }
+  .mx-pf-card.is-warn { border-color:rgba(251,191,36,.4); }
+  .mx-pf-card.is-empty { opacity:.68; }
+  .mx-pf-card-top { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  .mx-pf-badge {
+    font-size:12px; font-weight:700; padding:2px 8px; border-radius:6px;
+    color:#fff; background:var(--pf-c, #fe2c55);
+  }
+  .mx-pf-health { font-size:11.5px; font-weight:650; }
+  .mx-pf-health.ok { color:var(--success); }
+  .mx-pf-health.warn { color:var(--warn); }
+  .mx-pf-health.danger { color:var(--danger); }
+  .mx-pf-health.idle { color:var(--mut); }
+  .mx-pf-metrics { display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; }
+  .mx-pf-metrics > div { display:grid; gap:1px; }
+  .mx-pf-metrics span { font-size:10.5px; color:var(--mut); }
+  .mx-pf-metrics b { font:650 13px/1.2 var(--sans); font-variant-numeric:tabular-nums; color:var(--fg-strong); }
+  .mx-pf-tags { display:flex; gap:4px; flex-wrap:wrap; }
+  .mx-mini-tag { font-size:10.5px; font-weight:650; padding:1px 6px; border-radius:999px; }
+  .mx-mini-tag.danger { background:var(--danger-soft); color:var(--danger); }
+  .mx-mini-tag.warn { background:var(--warn-soft); color:var(--warn); }
+  .mx-mini-tag.accent { background:var(--acc-soft); color:var(--acc); }
+  .mx-mini-tag.info { background:var(--surface-3); color:var(--fg); }
+
+  .mx-ov-columns { display:grid; grid-template-columns:minmax(0, 1.75fr) minmax(300px, 1fr); gap:14px; align-items:start; }
+  .mx-ov-side { display:grid; gap:14px; }
+  .mx-mini-gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(158px, 1fr)); gap:11px; }
+  .mx-mini-media {
+    border-radius:12px; overflow:hidden; border:1px solid var(--line); background:var(--surface-2);
+    cursor:pointer; transition:transform .16s, border-color .16s;
+  }
+  .mx-mini-media:hover { transform:translateY(-2px); border-color:var(--acc-ring); }
+  .mx-mini-thumb { position:relative; aspect-ratio:4/5; background:var(--surface-3); overflow:hidden; }
+  .mx-mini-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .mx-mini-ph { width:100%; height:100%; display:grid; place-items:center; color:var(--mut); }
+  .mx-mini-ph svg { width:26px; height:26px; opacity:.55; }
+  .mx-mini-kind {
+    position:absolute; top:8px; right:8px; padding:2px 6px; border-radius:6px;
+    background:rgba(0,0,0,.58); color:#fff; font-size:10.5px; font-weight:600;
+  }
+  .mx-mini-local {
+    position:absolute; bottom:7px; right:7px; padding:2px 6px; border-radius:6px;
+    background:rgba(16,185,129,.88); color:#fff; font-size:10px; font-weight:700;
+  }
+  .mx-mini-local.warn { background:rgba(239,68,68,.92); }
+  .mx-mini-body { padding:9px 10px; }
+  .mx-mini-title {
+    margin:0 0 6px; font-size:12.5px; line-height:1.4; color:var(--fg);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:35px;
+  }
+  .mx-mini-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:11px; color:var(--mut); }
+  .mx-mini-author { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:92px; }
+  .mx-mini-likes { display:inline-flex; align-items:center; gap:3px; color:var(--fg); font-weight:650; }
+  .mx-mini-likes svg { width:12px; height:12px; color:var(--acc); }
+
+  .mx-sched-list { display:grid; gap:8px; }
+  .mx-sched-row {
+    display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:10px;
+    background:var(--surface-2); border:1px solid var(--line-soft); cursor:pointer;
+  }
+  .mx-sched-row:hover { border-color:var(--acc-ring); }
+  .mx-sched-main { flex:1; min-width:0; display:grid; gap:2px; }
+  .mx-sched-main b { font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mx-sched-main small { font-size:11px; color:var(--mut); }
+
+  .mx-mini-bars { display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; padding-top:6px; align-items:end; height:96px; }
+  .mx-bar-col { display:grid; justify-items:center; gap:5px; }
+  .mx-bar-pair { display:flex; align-items:flex-end; gap:3px; height:70px; }
+  .mx-bar-pair i { display:block; width:8px; border-radius:3px 3px 1px 1px; }
+  .mx-bar-pair i.b-content { background:var(--acc); }
+  .mx-bar-pair i.b-comment { background:rgba(56,189,248,.7); }
+  .mx-bar-col span { font:500 10.5px/1 var(--mono); color:var(--mut); }
+
+  /* ── Account Matrix Center ── */
+  .mx-acc-wrap { display:grid; gap:13px; }
+  .mx-add-acc-bar {
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:11px 14px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line);
+  }
+  .mx-add-acc-left, .mx-add-acc-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .mx-bar-kicker { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:700; color:var(--fg-strong); margin-right:4px; }
+
+  .mx-wizard-bar {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    padding:12px 15px; border-radius:12px; background:var(--warn-soft); border:1px solid rgba(251,191,36,.42);
+  }
+  .mx-wizard-bar.info { background:var(--acc-soft); border-color:var(--acc-ring); }
+  .mx-wizard-info { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; }
+  .mx-wizard-actions { display:flex; gap:6px; flex-wrap:wrap; }
+
+  .mx-health-pills { display:flex; gap:7px; flex-wrap:wrap; }
+  .mx-hpill {
+    display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--line); color:var(--fg); font-size:12.5px;
+  }
+  .mx-hpill b { font:700 11.5px/1 var(--mono); padding:2px 6px; border-radius:999px; background:var(--surface-3); }
+  .mx-hpill.zero { opacity:.55; }
+  .mx-hpill.active { border-color:var(--acc-ring); background:var(--acc-soft); color:var(--acc); }
+  .mx-hpill.tone-danger.active { border-color:rgba(248,113,113,.5); background:var(--danger-soft); color:var(--danger); }
+  .mx-hpill.tone-warn.active { border-color:rgba(251,191,36,.5); background:var(--warn-soft); color:var(--warn); }
+
+  .mx-acc-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .mx-search-box {
+    flex:1 1 240px; display:flex; align-items:center; gap:8px; padding:0 12px; min-height:38px; height:38px;
+    border-radius:var(--r-sm);
+    border:1px solid color-mix(in srgb,var(--line) 82%,var(--control-line) 28%);
+    background:var(--control-bg);
+    box-shadow:inset 0 1px 1.5px rgba(20,22,28,.03), 0 1px 0 var(--glass-rim);
+    transition:border-color .16s, box-shadow .16s, background-color .16s;
+  }
+  .mx-search-box:hover { border-color:color-mix(in srgb,var(--line) 48%,var(--fg)); background:var(--control-bg-hover); }
+  .mx-search-box:focus-within { border-color:var(--acc); background:var(--surface); box-shadow:0 0 0 3px var(--acc-ring); }
+  .mx-search-box input {
+    border:0 !important; background:transparent !important; background-image:none !important;
+    box-shadow:none !important; padding:0 !important; min-height:0 !important; height:100%; width:100%; font-size:13px;
+  }
+  .mx-search-box svg { color:var(--mut); width:15px; height:15px; }
+  .mx-search-box:focus-within svg { color:var(--acc); }
+
+  .mx-view-seg {
+    display:inline-flex; padding:3px; min-height:38px; align-items:center;
+    border-radius:var(--r-sm); background:var(--glass-well-bg); border:1px solid var(--glass-border); margin-left:auto;
+  }
+  .mx-view-seg button {
+    display:inline-flex; align-items:center; gap:5px; min-height:30px; padding:5px 11px; border-radius:7px;
+    border:0; background:transparent; color:var(--mut); font-size:12px; font-weight:620; box-shadow:none;
+  }
+  .mx-view-seg button:hover { color:var(--fg-strong); background:color-mix(in srgb,var(--surface) 45%,transparent); }
+  .mx-view-seg button.active { background:var(--glass-pill-bg); color:var(--acc); box-shadow:var(--sh-thumb); }
+
+  .mx-batch-bar {
+    position:sticky; top:74px; z-index:12;
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:10px 14px; border-radius:12px; background:var(--surface);
+    border:1.5px solid var(--acc-ring); box-shadow:var(--sh);
+  }
+  .mx-batch-count, .mx-batch-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+  .mx-groups-stack { display:grid; gap:14px; }
+  .mx-group-card {
+    border:1px solid var(--line); border-radius:14px; background:var(--surface-2); overflow:hidden;
+  }
+  .mx-group-head {
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:11px 15px; background:var(--surface); border-bottom:1px solid var(--line-soft);
+  }
+  .mx-group-title { display:flex; align-items:center; gap:8px; flex-wrap:wrap; cursor:pointer; }
+  .mx-group-title h3 { margin:0; font-size:14.5px; font-weight:700; color:var(--fg-strong); }
+  .mx-group-dot { width:10px; height:10px; border-radius:50%; flex:0 0 10px; }
+  .mx-group-badge { font-size:11.5px; font-weight:650; padding:2px 8px; border-radius:999px; background:var(--surface-3); color:var(--fg); }
+  .mx-group-desc { font-size:12px; color:var(--mut); }
+  .mx-group-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+  .mx-acc-cards {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(282px, 1fr)); gap:11px; padding:13px;
+  }
+  .mx-acc-card {
+    padding:12px 13px; border-radius:12px; background:var(--surface); border:1px solid var(--line);
+    display:grid; gap:9px; transition:border-color .15s, box-shadow .15s;
+  }
+  .mx-acc-card:hover { border-color:var(--acc-ring); }
+  .mx-acc-card.is-selected { border-color:var(--acc); box-shadow:0 0 0 2px var(--acc-soft); }
+  .mx-acc-card.health-invalid { border-color:rgba(248,113,113,.45); }
+  .mx-acc-card-top { display:flex; align-items:center; gap:6px; }
+  .mx-acc-identity { display:flex; align-items:center; gap:10px; min-width:0; }
+  .mx-acc-names { min-width:0; flex:1; display:grid; gap:2px; }
+  .mx-acc-title-row { display:flex; align-items:center; gap:5px; min-width:0; }
+  .mx-acc-title-row b { font-size:14px; color:var(--fg-strong); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mx-acc-names small { font-size:11.5px; color:var(--mut); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mx-pin-btn {
+    display:inline-grid; place-items:center; width:24px; height:24px; min-height:24px;
+    padding:0; border:0; border-radius:6px; background:transparent; color:var(--mut-2, var(--mut));
+    box-shadow:none; cursor:pointer; flex-shrink:0;
+  }
+  .mx-pin-btn svg { width:14px !important; height:14px !important; }
+  .mx-pin-btn:hover { background:var(--surface-2); color:var(--fg-strong); }
+  .mx-pin-btn.pinned { color:#f59e0b; }
+  .mx-pin-btn.pinned svg { fill:currentColor; }
+  .mx-acc-stats-line { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:12px; color:var(--mut); }
+  .mx-acc-stats-line b { color:var(--fg-strong); font-variant-numeric:tabular-nums; }
+  .mx-acc-stats-line em { font-style:normal; font-weight:700; margin-left:3px; }
+  .mx-acc-stats-line em.up { color:var(--success); }
+  .mx-acc-stats-line em.down { color:var(--danger); }
+  .mx-dm-chip {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:1.5px 7px; border-radius:999px; background:var(--acc-soft); color:var(--acc); font-size:11px; font-weight:650;
+  }
+  .mx-dm-chip svg { width:11.5px !important; height:11.5px !important; }
+  .mx-open-chip { padding:1.5px 7px; border-radius:999px; background:var(--success-soft); color:var(--success); font-size:11px; font-weight:650; }
+  .mx-tag-chip, .mx-grp-chip {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:1.5px 7px; border-radius:6px; background:var(--surface-2); border:1px solid var(--line-soft);
+    font-size:11px; color:var(--mut);
+  }
+  .mx-grp-chip svg { width:12px !important; height:12px !important; color:var(--acc); }
+  .mx-acc-env-line { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11.5px; color:var(--mut); }
+  .mx-acc-env-line > span:first-child { display:inline-flex; align-items:center; gap:4px; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mx-acc-card-foot { display:flex; gap:5px; flex-wrap:wrap; padding-top:8px; border-top:1px solid var(--line-soft); }
+  .mx-acc-card-foot button { flex:1 1 auto; padding:5px 8px; font-size:12px; }
+
+  .mx-dense-table tr.is-selected td { background:var(--acc-soft); }
+  .mx-td-acc { display:flex; align-items:center; gap:8px; min-width:180px; }
+  .mx-td-acc .avatar.sm, .mx-td-acc .wb-avatar-fallback.sm { width:30px; height:30px; flex:0 0 30px; font-size:12px; }
+  .mx-td-name { display:flex; align-items:center; gap:5px; }
+  .mx-td-meta { display:flex; align-items:center; gap:5px; flex-wrap:wrap; max-width:220px; }
+  .mx-row-btns { display:inline-flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+
+  .mx-browser-wall-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px; }
+  .mx-browser-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px; }
+  .mx-bcard { padding:13px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line); display:grid; gap:10px; }
+  .mx-bcard.state-open { border-color:rgba(52,211,153,.45); background:var(--surface); }
+  .mx-bcard-head { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  .mx-bcard-main { display:grid; gap:3px; }
+  .mx-bcard-main small { color:var(--mut); font-size:11.5px; }
+  .mx-bcard-actions { display:flex; gap:6px; }
+
+  /* ── Unified Media Hub & Right Split-Pane Quick-Look ── */
+  .mx-media-hub { display:grid; gap:13px; }
+  .mx-source-tabs { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .mx-stab {
+    display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--line); color:var(--fg); font-size:13px;
+  }
+  .mx-stab b { font:700 11px/1 var(--mono); padding:2px 6px; border-radius:999px; background:var(--surface-3); }
+  .mx-stab b.warn { background:var(--danger-soft); color:var(--danger); }
+  .mx-stab b.accent { background:var(--acc-soft); color:var(--acc); }
+  .mx-stab.active { background:var(--acc-soft); color:var(--acc); border-color:var(--acc-ring); }
+  .mx-kbd-hint { margin-left:auto; font-size:12px; color:var(--mut); }
+  .mx-kbd-hint kbd { padding:1px 5px; border-radius:4px; border:1px solid var(--line); background:var(--surface-2); font:600 11px var(--mono); }
+
+  .mx-split-layout {
+    display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(330px, 410px); gap:16px; align-items:start;
+  }
+  .mx-gallery-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(188px, 1fr)); gap:12px;
+  }
+  .mx-gcard {
+    border-radius:14px; overflow:hidden; background:var(--surface-card, var(--surface));
+    border:1px solid var(--border-card, var(--line)); cursor:pointer;
+    transition:transform .15s, border-color .15s, box-shadow .15s; display:flex; flex-direction:column;
+  }
+  .mx-gcard:hover { transform:translateY(-2px); border-color:var(--acc-ring); }
+  .mx-gcard.is-active { border-color:var(--acc); box-shadow:0 0 0 2px var(--acc-ring), var(--sh-sm); }
+  .mx-gcard-cover { position:relative; aspect-ratio:3/4; background:var(--surface-3); overflow:hidden; }
+  .mx-gcard-cover img { width:100%; height:100%; object-fit:cover; display:block; }
+  .mx-gcard-body { padding:10px 11px 11px; display:grid; gap:6px; flex:1; align-content:space-between; }
+  .mx-gcard-title {
+    margin:0; font-size:12.5px; line-height:1.45; color:var(--fg-strong);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .mx-gcard-sub { display:flex; align-items:center; gap:6px; font-size:11px; overflow:hidden; }
+  .mx-gcard-sub .mut { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mx-src-pill { padding:1px 6px; border-radius:5px; background:var(--surface-2); border:1px solid var(--line-soft); white-space:nowrap; color:var(--mut); }
+  .mx-gcard-foot { display:flex; align-items:center; justify-content:space-between; font-size:11.5px; color:var(--mut); padding-top:6px; border-top:1px solid var(--line-soft); }
+  .mx-icon-num { display:inline-flex; align-items:center; gap:4px; font-variant-numeric:tabular-nums; }
+  .mx-icon-num svg { width:12px !important; height:12px !important; opacity:.8; }
+  .mx-metrics-inline { display:inline-flex; align-items:center; gap:9px; font-variant-numeric:tabular-nums; }
+  .mx-metrics-inline b, .mx-metrics-inline span { display:inline-flex; align-items:center; gap:3.5px; }
+  .mx-metrics-inline b { color:var(--acc); font-weight:650; }
+  .mx-metrics-inline svg { width:12.5px !important; height:12.5px !important; }
+  .mx-cmt-like { margin-left:auto; display:inline-flex; align-items:center; gap:3px; color:var(--acc); font-weight:650; }
+  .mx-cmt-like svg { width:12px !important; height:12px !important; }
+
+  .mx-split-detail {
+    position:sticky; top:84px; max-height:calc(100vh - 104px); overflow-y:auto;
+    border-radius:var(--r); background:var(--surface-card, var(--surface));
+    border:1px solid var(--border-card, var(--line)); box-shadow:var(--sh-sm); padding:14px;
+  }
+  .mx-detail-empty { padding:42px 18px; text-align:center; display:grid; justify-items:center; gap:8px; color:var(--mut); font-size:12.5px; }
+  .mx-detail-empty svg { width:28px; height:28px; opacity:.55; }
+  .mx-detail-inner { display:grid; gap:13px; }
+  .mx-detail-player {
+    position:relative; border-radius:12px; overflow:hidden; background:#090b10;
+    aspect-ratio:9/12; max-height:390px; display:grid; place-items:center;
+  }
+  .mx-detail-player video, .mx-detail-player img { width:100%; height:100%; object-fit:contain; display:block; }
+  .mx-slide-bar {
+    position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
+    display:inline-flex; align-items:center; gap:8px; padding:3px 10px; border-radius:999px;
+    background:rgba(0,0,0,.68); color:#fff; font-size:12px;
+  }
+  .mx-detail-badges { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; }
+  .mx-detail-caption {
+    margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--surface-2);
+    border:1px solid var(--line-soft); font-size:12.5px; line-height:1.55; max-height:132px; overflow-y:auto; white-space:pre-wrap;
+  }
+  .mx-detail-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
+  .mx-btn-link {
+    display:inline-flex; align-items:center; gap:5px; text-decoration:none; padding:6px 10px;
+    border-radius:var(--r-sm); border:1px solid var(--line); color:var(--fg); font-size:12px; font-weight:600;
+  }
+  .mx-cmt-list { display:grid; gap:7px; max-height:260px; overflow-y:auto; }
+  .mx-cmt-row { padding:8px 10px; border-radius:9px; background:var(--surface-2); font-size:12px; }
+  .mx-cmt-top { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+  .mx-cmt-like { margin-left:auto; color:var(--acc); font-weight:650; }
+  .mx-cmt-row p { margin:0; color:var(--fg); line-height:1.45; }
+  .mx-pager { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:14px; }
+  .mx-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+  /* ── Matrix Batch Publisher & Modals ── */
+  .mx-pub-wrap { display:grid; gap:16px; }
+  .mx-pub-step { padding:13px 15px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line); display:grid; gap:10px; }
+  .mx-pub-step-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:13px; }
+  .mx-pub-quick-picks { display:flex; gap:6px; flex-wrap:wrap; }
+  .mx-pub-acc-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; max-height:220px; overflow-y:auto; }
+  .mx-pub-acc-item {
+    display:flex; align-items:center; gap:6px; padding:7px 10px; border-radius:9px;
+    background:var(--surface); border:1px solid var(--line); cursor:pointer; font-size:12.5px;
+  }
+  .mx-pub-acc-item.checked { border-color:var(--acc); background:var(--acc-soft); }
+  .mx-pub-acc-item.disabled { opacity:.45; cursor:not-allowed; }
+  .mx-pub-acc-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .mx-role-dot { width:7px; height:7px; border-radius:50%; margin-left:auto; background:var(--mut); }
+  .mx-role-dot.role-publish { background:#10b981; }
+  .mx-role-dot.role-crawler { background:#f59e0b; }
+
+  .mx-pub-columns { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(280px, 1fr); gap:16px; align-items:start; }
+  .mx-pub-side { padding:14px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line); display:grid; gap:12px; }
+  .mx-pub-side h4 { margin:0; font-size:14px; }
+  .mx-pf-overrides { display:grid; gap:10px; }
+  .mx-pf-ov-box { display:grid; gap:6px; padding:9px; border-radius:9px; background:var(--surface); border:1px solid var(--line-soft); }
+  .mx-pf-ov-head { display:flex; align-items:center; justify-content:space-between; font-size:11.5px; }
+  .mx-cap-cnt { color:var(--mut); font-family:var(--mono); }
+  .mx-cap-cnt.warn { color:var(--danger); font-weight:700; }
+  .mx-file-drop {
+    display:flex !important; align-items:center; justify-content:center; gap:8px;
+    min-height:var(--control-h); padding:8px 14px; margin:0 !important;
+    border-radius:var(--r-sm); border:1.5px dashed color-mix(in srgb,var(--line) 72%,var(--acc));
+    background:var(--surface-inset, var(--surface-2)); color:var(--fg); font-size:12.5px; font-weight:560;
+    cursor:pointer; transition:border-color .16s, background-color .16s;
+  }
+  .mx-file-drop:hover { border-color:var(--acc); background:color-mix(in srgb,var(--acc-soft) 45%,var(--surface)); color:var(--acc); }
+  .mx-file-drop input[type="file"] { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+  .mx-label-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px; }
+  .mx-label-row label { margin:0 !important; }
+  .mx-uploaded-pills { display:flex; gap:7px; flex-wrap:wrap; }
+  .mx-file-pill {
+    display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border-radius:8px;
+    background:var(--surface-2); border:1px solid var(--line); font-size:12px;
+  }
+  .mx-file-pill button {
+    display:inline-grid; place-items:center; width:18px; height:18px; min-height:18px;
+    border:0; border-radius:50%; background:transparent; padding:0; color:var(--mut); box-shadow:none;
+  }
+  .mx-file-pill button:hover { background:var(--danger-soft); color:var(--danger); }
+  .mx-file-pill button svg { width:12px !important; height:12px !important; }
+  .mx-inline-warn { display:flex; align-items:center; gap:7px; padding:8px 11px; border-radius:9px; background:var(--warn-soft); color:var(--warn); font-size:12px; }
+  .mx-pub-submit-box button { width:100%; justify-content:center; }
+
+  .mx-empty-box {
+    padding:36px 20px; text-align:center; display:grid; justify-items:center; gap:8px;
+    border-radius:12px; border:1px dashed var(--line); color:var(--mut); font-size:13px;
+  }
+  .mx-empty-box svg { width:28px; height:28px; opacity:.55; }
+  .mx-empty-box b { color:var(--fg-strong); font-size:14px; }
+  .mx-empty-actions { display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+  .mx-empty-compact { padding:16px; text-align:center; color:var(--mut); font-size:12.5px; }
+
+  .mx-modal-backdrop {
+    position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.42);
+    backdrop-filter:blur(14px) saturate(140%); -webkit-backdrop-filter:blur(14px) saturate(140%);
+    display:grid; place-items:center; padding:16px;
+  }
+  .mx-modal-card {
+    width:min(94vw, 540px); padding:22px 24px; border-radius:20px;
+    background:var(--surface-raised, var(--surface)); border:1px solid var(--glass-border, var(--line));
+    box-shadow:var(--sh-lg);
+  }
+  .mx-modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .mx-modal-head h3 { margin:0; font-size:16.5px; color:var(--fg-strong); }
+  .mx-modal-foot { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:18px; padding-top:12px; border-top:1px solid var(--line-soft); }
+
+  @media(max-width:1080px) {
+    .mx-kpi-strip { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .mx-ov-columns, .mx-split-layout, .mx-pub-columns { grid-template-columns:1fr; }
+    .mx-split-detail { position:static; max-height:none; }
+  }
+  @media(max-width:640px) {
+    .mx-kpi-strip { grid-template-columns:1fr; }
+  }
+
+  /* ── 日志与诊断面板（精致工作台风格） ── */
+  .diag-layout { display:grid; gap:14px; }
+
+  /* 1. 顶部问题提报英雄卡片 */
+  .diag-hero {
+    display:grid; gap:13px; padding:18px 20px; border-radius:16px;
+    background:
+      radial-gradient(540px 180px at 0% -10%, color-mix(in srgb,var(--acc) 7.5%,transparent), transparent 72%),
+      var(--surface-card, var(--surface));
+    border:1px solid var(--border-card, var(--line));
+    box-shadow:var(--sh-card, var(--sh-sm));
+  }
+  .diag-hero-top {
+    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  .diag-hero-title-group { display:flex; align-items:flex-start; gap:13px; min-width:0; flex:1 1 340px; }
+  .diag-hero-badge {
+    width:38px; height:38px; flex:0 0 38px; border-radius:11px;
+    display:grid; place-items:center;
+    background:color-mix(in srgb,var(--acc) 12%,var(--surface));
+    border:1px solid var(--acc-ring); color:var(--acc);
+    box-shadow:inset 0 1px 0 var(--glass-rim);
+  }
+  .diag-hero-badge svg { width:18px; height:18px; }
+  .diag-hero-title-group h3 {
+    margin:0; font-size:14.5px; font-weight:700; line-height:1.35; color:var(--fg-strong);
+  }
+  .diag-hero-title-group p {
+    margin:3px 0 0; font-size:12px; line-height:1.45; color:var(--mut);
+  }
+  .diag-hero-actions { display:flex; align-items:center; gap:9px; flex:0 0 auto; flex-wrap:wrap; }
+  .diag-hero-actions button { white-space:nowrap; }
+
+  .diag-note-input-wrap { position:relative; width:100%; }
+  .diag-note-ic {
+    position:absolute; left:13px; top:50%; transform:translateY(-50%);
+    width:15px; height:15px; color:var(--mut-2); pointer-events:none;
+  }
+  .diag-note-input-wrap > input {
+    width:100%; min-height:40px; height:40px;
+    padding:8px 14px 8px 36px; border-radius:10px;
+    background:var(--control-bg); border:1px solid var(--line);
+    font-size:12.5px;
+  }
+  .diag-note-input-wrap > input:focus {
+    background:var(--surface); border-color:var(--acc); box-shadow:0 0 0 3px var(--acc-ring);
+  }
+
+  .diag-privacy-strip {
+    display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+    padding:8px 11px; border-radius:10px;
+    background:color-mix(in srgb,var(--success) 5.5%,var(--surface-2));
+    border:1px solid color-mix(in srgb,var(--success) 20%,var(--line-soft));
+    font-size:11.5px; color:var(--mut);
+  }
+  .diag-privacy-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    color:var(--success); font-weight:650; white-space:nowrap;
+  }
+  .diag-privacy-badge svg { width:14px; height:14px; flex:0 0 14px; }
+  .diag-privacy-text { color:var(--mut); white-space:nowrap; }
+  .diag-privacy-tag {
+    display:inline-flex; align-items:center; padding:1.5px 8px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--line-soft);
+    color:var(--fg); font-size:11px; font-weight:530; white-space:nowrap;
+  }
+
+  /* 2. 四宫格运行指标与快捷控制条 */
+  .diag-kpi-grid {
+    display:grid; grid-template-columns:1.25fr 1fr 1fr 1.2fr; gap:12px;
+  }
+  .diag-stat-card {
+    display:flex; flex-direction:column; justify-content:space-between; gap:8px;
+    padding:14px 16px; border-radius:14px; text-align:left; min-height:108px;
+    background:var(--surface-card, var(--surface));
+    border:1px solid var(--border-card, var(--line));
+    box-shadow:var(--sh-sm);
+  }
+  button.diag-stat-card {
+    font:inherit; color:inherit; cursor:pointer;
+    transition:border-color .16s var(--ease), transform .16s var(--ease), box-shadow .16s var(--ease);
+  }
+  button.diag-stat-card:hover {
+    border-color:var(--acc-ring); transform:translateY(-1px);
+    box-shadow:var(--sh-card-hover, var(--sh)); filter:none; background:var(--surface-card, var(--surface));
+  }
+  button.diag-stat-card.is-active-filter {
+    border-color:var(--acc); box-shadow:0 0 0 2px var(--acc-soft), var(--sh-sm);
+  }
+  .diag-stat-card.has-warn .diag-stat-val b { color:var(--warn); }
+  .diag-stat-card.has-err .diag-stat-val b { color:var(--danger); }
+
+  .diag-stat-head {
+    display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%;
+  }
+  .diag-stat-label { font-size:12px; font-weight:600; color:var(--mut); white-space:nowrap; }
+  .diag-mini-tag {
+    display:inline-flex; align-items:center; padding:2px 7px; border-radius:999px;
+    font:650 10.5px/1.3 var(--mono); white-space:nowrap;
+  }
+  .diag-mini-tag.warn { background:var(--warn-soft); color:var(--warn); }
+  .diag-mini-tag.danger { background:var(--danger-soft); color:var(--danger); }
+  .diag-mini-tag.muted { background:var(--surface-2); color:var(--mut); font-family:var(--sans); font-weight:580; }
+
+  .diag-mode-pill {
+    display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px;
+    font-size:11px; font-weight:650; white-space:nowrap;
+  }
+  .diag-mode-pill .diag-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex:0 0 6px; }
+  .diag-mode-pill.is-info { background:var(--success-soft); color:var(--success); }
+  .diag-mode-pill.is-debug { background:var(--warn-soft); color:var(--warn); }
+  .diag-mode-pill.is-warn { background:var(--surface-2); color:var(--mut); }
+
+  .diag-mode-seg {
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:3px; padding:3px;
+    border-radius:9px; background:var(--glass-well-bg, var(--surface-2));
+    border:1px solid var(--line-soft);
+  }
+  .diag-mode-seg button {
+    min-height:27px; height:27px; padding:0 6px; border:0; border-radius:6.5px;
+    background:transparent; color:var(--mut); box-shadow:none;
+    font-size:11.5px; font-weight:600; white-space:nowrap; justify-content:center;
+  }
+  .diag-mode-seg button:hover:not(.active) { color:var(--fg-strong); background:color-mix(in srgb,var(--surface) 55%,transparent); filter:none; }
+  .diag-mode-seg button.active,
+  .diag-mode-seg button.active:hover {
+    background:var(--glass-pill-bg, var(--surface)); color:var(--acc); font-weight:680;
+    box-shadow:var(--sh-thumb, 0 1px 3px rgba(0,0,0,.1));
+  }
+
+  .diag-stat-val { display:flex; align-items:baseline; gap:5px; }
+  .diag-stat-val b {
+    font:700 22px/1.15 var(--sans); font-variant-numeric:tabular-nums;
+    color:var(--fg-strong); white-space:nowrap;
+  }
+  .diag-stat-val small { font-size:12px; color:var(--mut); font-weight:550; }
+  .diag-stat-sub { font-size:11px; color:var(--mut-2); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .diag-stat-actions { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
+  .diag-stat-actions button.sm {
+    min-height:27px; height:27px; padding:0 9px; font-size:11.5px; border-radius:7px; white-space:nowrap;
+  }
+  .diag-stat-actions button.sm svg { width:13px; height:13px; }
+
+  /* 3. 一体化日志检视控制台 */
+  .diag-console {
+    border-radius:16px; overflow:hidden;
+    background:var(--surface);
+    border:1px solid var(--border-card, var(--line));
+    box-shadow:var(--sh-card, var(--sh-sm));
+  }
+  .diag-console-bar {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    padding:10px 14px;
+    background:color-mix(in srgb,var(--surface-2) 65%,var(--surface));
+    border-bottom:1px solid var(--line-soft);
+  }
+  .diag-console-left, .diag-console-right {
+    display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  }
+  .diag-bar-sep { width:1px; height:20px; background:var(--line); flex:0 0 1px; }
+
+  .diag-seg {
+    display:inline-flex; align-items:center; gap:3px; padding:3px;
+    border-radius:10px; background:var(--glass-well-bg, var(--surface-2));
+    border:1px solid var(--line-soft); flex:0 0 auto;
+  }
+  .diag-seg button {
+    display:inline-flex; align-items:center; gap:6px;
+    min-height:30px; height:30px; padding:0 11px; border:0; border-radius:7.5px;
+    background:transparent; color:var(--mut); box-shadow:none;
+    font-size:12px; font-weight:580; white-space:nowrap;
+  }
+  .diag-seg button:hover:not(.active) { color:var(--fg-strong); background:color-mix(in srgb,var(--surface) 50%,transparent); filter:none; }
+  .diag-seg button.active,
+  .diag-seg button.active:hover {
+    background:var(--glass-pill-bg, var(--surface)); color:var(--acc); font-weight:660;
+    box-shadow:var(--sh-thumb, 0 1px 3px rgba(0,0,0,.1));
+  }
+  .diag-seg-cnt {
+    padding:0.5px 6px; border-radius:999px;
+    font:650 10.5px/1.35 var(--mono); font-variant-numeric:tabular-nums;
+    background:color-mix(in srgb,var(--fg) 8%,transparent); color:var(--mut);
+  }
+  .diag-seg button.active .diag-seg-cnt { background:var(--acc-soft); color:var(--acc); }
+
+  .cs.diag-source-select, select.diag-source-select { width:196px; flex:0 0 196px; }
+  .cs.diag-source-select .cs-trg {
+    min-height:34px; height:34px; padding:4px 10px; border-radius:9px;
+    font-size:12px; background:var(--surface);
+  }
+
+  .diag-search-box {
+    position:relative; display:inline-flex; align-items:center; width:246px; flex:0 0 auto;
+  }
+  .diag-search-ic {
+    position:absolute; left:10px; width:14px; height:14px; color:var(--mut-2); pointer-events:none;
+  }
+  .diag-search-box > input {
+    width:100%; min-height:34px; height:34px;
+    padding:4px 28px 4px 31px; border-radius:9px;
+    background:var(--surface); border:1px solid var(--line); font-size:12px;
+  }
+  .diag-search-box > input::-webkit-search-cancel-button { -webkit-appearance:none; display:none; }
+  .diag-search-clear {
+    position:absolute; right:5px; width:22px; height:22px; min-height:0; padding:0;
+    border:0; border-radius:6px; background:transparent; color:var(--mut); box-shadow:none;
+    display:grid; place-items:center;
+  }
+  .diag-search-clear[hidden] { display:none; }
+  .diag-search-clear:hover { background:var(--surface-2); color:var(--fg); filter:none; }
+  .diag-search-clear svg { width:13px; height:13px; }
+  .diag-refresh-btn.sm { min-height:34px; height:34px; padding:0 12px; border-radius:9px; white-space:nowrap; }
+
+  .diag-log-viewport {
+    min-height:230px; max-height:440px; overflow-y:auto;
+    background:var(--surface);
+    font-family:var(--mono); font-size:12px; line-height:1.55;
+  }
+  .diag-empty-state {
+    display:grid; justify-items:center; align-content:center; gap:8px;
+    min-height:230px; padding:36px 20px; text-align:center; font-family:var(--sans);
+  }
+  .diag-empty-halo {
+    width:46px; height:46px; border-radius:50%; display:grid; place-items:center;
+    background:var(--success-soft); color:var(--success);
+    border:1px solid color-mix(in srgb,var(--success) 24%,transparent);
+    margin-bottom:2px;
+  }
+  .diag-empty-halo.is-neutral {
+    background:var(--surface-2); color:var(--mut); border-color:var(--line);
+  }
+  .diag-empty-halo svg { width:22px; height:22px; }
+  .diag-empty-title { font-size:14.5px; font-weight:680; color:var(--fg-strong); }
+  .diag-empty-sub { font-size:12.5px; color:var(--mut); max-width:440px; line-height:1.5; }
+  .diag-empty-act { margin-top:6px; }
+
+  .diag-log-row {
+    position:relative;
+    display:grid; grid-template-columns:152px 62px 134px minmax(0,1fr) auto;
+    gap:10px; align-items:baseline; padding:8.5px 14px;
+    border-bottom:1px solid var(--line-soft);
+    border-left:3px solid transparent;
+    transition:background .12s;
+  }
+  .diag-log-row:last-child { border-bottom:0; }
+  .diag-log-row:hover { background:color-mix(in srgb,var(--fg) 2.5%,transparent); }
+  .diag-log-row.lvl-error {
+    border-left-color:var(--danger);
+    background:color-mix(in srgb,var(--danger) 5.5%,transparent);
+  }
+  .diag-log-row.lvl-warn {
+    border-left-color:var(--warn);
+    background:color-mix(in srgb,var(--warn) 5%,transparent);
+  }
+  .diag-log-ts { color:var(--mut-2); white-space:nowrap; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .diag-log-mod {
+    display:inline-block; max-width:134px; padding:1px 7px; border-radius:6px;
+    background:var(--surface-2); color:var(--info);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; font-weight:580;
+  }
+  .diag-log-msg { color:var(--fg); word-break:break-word; white-space:pre-wrap; }
+  .diag-log-req {
+    display:inline-block; margin-right:6px; padding:0.5px 5.5px; border-radius:4px;
+    background:var(--surface-2); border:1px solid var(--line-soft);
+    color:var(--mut); font-size:10.5px;
+  }
+  .diag-row-copy {
+    opacity:0; min-height:22px; height:22px; padding:0 6px; border-radius:6px;
+    border:1px solid var(--line-soft); background:var(--surface); color:var(--mut);
+    font:550 11px/1 var(--sans); box-shadow:none; transition:opacity .12s;
+  }
+  .diag-log-row:hover .diag-row-copy, .diag-row-copy:focus-visible { opacity:1; }
+  .diag-row-copy:hover { color:var(--fg-strong); border-color:var(--line); filter:none; }
+
+  .diag-log-exc {
+    grid-column:1 / -1; margin-top:5px; padding:8px 11px;
+    border-radius:8px; background:var(--surface-2);
+    border:1px solid var(--line-soft); color:var(--mut);
+  }
+  .diag-log-exc summary {
+    cursor:pointer; color:var(--danger); font-family:var(--sans);
+    font-size:12px; font-weight:620; user-select:none;
+  }
+  .diag-log-exc pre {
+    margin:7px 0 0; white-space:pre-wrap; word-break:break-all;
+    font-family:var(--mono); font-size:11px; line-height:1.48; color:var(--fg);
+  }
+
+  .diag-console-foot {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    padding:9px 14px;
+    background:color-mix(in srgb,var(--surface-2) 55%,var(--surface));
+    border-top:1px solid var(--line-soft); font-size:11.5px; color:var(--mut);
+  }
+  .diag-foot-path { display:flex; align-items:center; gap:7px; min-width:0; flex-wrap:wrap; }
+  .diag-foot-path > svg { width:14px; height:14px; flex:0 0 14px; color:var(--mut-2); }
+  .diag-foot-path code {
+    padding:2px 7px; border-radius:6px; background:var(--surface);
+    border:1px solid var(--line-soft); font-family:var(--mono); font-size:11px; color:var(--fg);
+    max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .diag-path-copy {
+    width:24px; height:24px; min-height:0; padding:0; border:0; border-radius:6px;
+    background:transparent; color:var(--mut); box-shadow:none; display:grid; place-items:center;
+  }
+  .diag-path-copy:hover { background:var(--surface); color:var(--fg-strong); filter:none; }
+  .diag-path-copy svg { width:13px; height:13px; }
+  .diag-foot-rule { color:var(--mut-2); }
+
+  @media(max-width:1100px) {
+    .diag-kpi-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  }
+  @media(max-width:780px) {
+    .diag-kpi-grid { grid-template-columns:1fr; }
+    .diag-bar-sep { display:none; }
+    .diag-search-box, .cs.diag-source-select { width:100%; flex:1 1 100%; }
+    .diag-log-row { grid-template-columns:1fr; gap:4px; }
+    .diag-row-copy { opacity:1; justify-self:start; }
   }
 </style>
 <link rel="stylesheet" href="/static/appearance.css">
@@ -1824,6 +3046,9 @@
   <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <path d="M7 12h10" /></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></symbol>
   <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1" /> <rect width="7" height="7" x="14" y="3" rx="1" /> <rect width="7" height="7" x="14" y="14" rx="1" /> <rect width="7" height="7" x="3" y="14" rx="1" /></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
 </svg>
 
 <header>
@@ -1837,11 +3062,16 @@
     </div>
   </div>
   <div class="pswitch" role="tablist" aria-label="平台切换">
+    <button role="tab" data-pf="all" data-base-label="全平台" onclick="switchPlatform('all')" title="跨 9 大平台全局汇总与矩阵管理"><svg class="ps-ic" aria-hidden="true"><use href="#i-globe"/></svg><span class="ps-lbl">全平台</span></button>
     <button role="tab" data-pf="douyin" onclick="switchPlatform('douyin')">抖音</button>
     <button role="tab" data-pf="xhs" onclick="switchPlatform('xhs')">小红书</button>
+    <button role="tab" data-pf="rednote" onclick="switchPlatform('rednote')" title="海外小红书 (Rednote)">海外小红书</button>
     <button role="tab" data-pf="kuaishou" onclick="switchPlatform('kuaishou')">快手</button>
     <button role="tab" data-pf="shipinhao" onclick="switchPlatform('shipinhao')">视频号</button>
     <button role="tab" data-pf="tiktok" onclick="switchPlatform('tiktok')">TikTok</button>
+    <button role="tab" data-pf="bilibili" onclick="switchPlatform('bilibili')">哔哩哔哩</button>
+    <button role="tab" data-pf="instagram" onclick="switchPlatform('instagram')">Instagram</button>
+    <button role="tab" data-pf="twitter" onclick="switchPlatform('twitter')">Twitter</button>
   </div>
   <div class="header-actions">
     <button class="ghost command-trigger" id="command-trigger" type="button" aria-label="搜索功能" aria-haspopup="dialog" aria-controls="command-dialog" aria-keyshortcuts="Control+k Meta+k" title="搜索功能（Ctrl / ⌘ K）"><svg aria-hidden="true"><use href="#i-logo"/></svg><span>搜索功能</span><kbd>Ctrl K</kbd></button>
@@ -1851,7 +3081,7 @@
       <button type="button" data-theme-choice="system" aria-label="跟随系统主题" aria-pressed="true" title="跟随系统"><svg aria-hidden="true"><use href="#i-monitor"/></svg></button>
     </div>
   </div>
-  <span class="engine" id="engine-status" role="status" aria-live="polite" title="后台任务引擎正在运行"><span class="dot live"></span><span class="engine-label">引擎运行中</span></span>
+  <span class="engine" id="engine-status" role="status" aria-live="polite" title="后台任务引擎正在运行"><span class="dot live"></span><span class="engine-label">服务已连接</span></span>
   </div>
 </header>
 
@@ -1860,24 +3090,25 @@
 <aside class="sidebar" id="main-sidebar" aria-label="功能导航">
   <div class="sidebar-mobile-head"><b>工作台导航</b><button class="ghost" id="nav-close" type="button" aria-label="关闭导航"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
   <nav class="nav" aria-label="主导航">
-    <button class="navitem" data-tab="overview" onclick="switchTab('overview', true)"><svg><use href="#i-overview"/></svg><span class="nav-label">工作概览</span></button>
-    <button class="navitem" data-tab="accounts" onclick="switchTab('accounts', true)"><svg><use href="#i-card"/></svg><span class="nav-label">平台账号</span><span class="nav-badge" id="tb-acc">0</span></button>
-    <button class="navitem notsh-only" data-tab="monitors" onclick="switchTab('monitors', true)"><svg><use href="#i-target"/></svg><span class="nav-label">作品监控</span><span class="nav-badge" id="tb-mon">0</span></button>
-    <button class="navitem collect-only" data-tab="collections" onclick="switchTab('collections', true)"><svg><use href="#i-hash"/></svg><span class="nav-label" id="nav-collections-label">关键词采集</span><span class="nav-badge" id="tb-col">0</span></button>
-    <button class="navitem notsh-only" data-tab="comments" onclick="switchTab('comments', true)"><svg><use href="#i-msg"/></svg><span class="nav-label">评论监控</span><span class="nav-badge" id="tb-watch">0</span></button>
-    <button class="navitem dy-only" data-tab="danmaku" onclick="switchTab('danmaku', true)"><svg><use href="#i-captions"/></svg><span class="nav-label">弹幕监控</span><span class="nav-badge" id="tb-danmaku">0</span></button>
-    <div class="nav-sep">本账号</div>
-    <button class="navitem" data-tab="hub" onclick="switchTab('hub', true)"><svg><use href="#i-library"/></svg><span class="nav-label">本账号管理</span></button>
-    <div class="nav-sep">工具</div>
+    <button class="navitem" data-tab="overview" onclick="switchTab('overview', true)"><svg><use href="#i-overview"/></svg><span class="nav-label">指挥概览</span></button>
+    <button class="navitem" data-tab="media-hub" onclick="switchTab('media-hub', true)"><svg><use href="#i-image"/></svg><span class="nav-label">汇总预览库</span></button>
+    <button class="navitem" data-tab="accounts" onclick="switchTab('accounts', true)"><svg><use href="#i-card"/></svg><span class="nav-label">账号矩阵</span><span class="nav-badge" id="tb-acc">0</span></button>
+    <div class="nav-sep single-pf-only" id="nav-sep-collect">采集与监控</div>
+    <button class="navitem single-pf-only notsh-only" data-tab="monitors" onclick="switchTab('monitors', true)"><svg><use href="#i-target"/></svg><span class="nav-label">作品监控</span><span class="nav-badge" id="tb-mon">0</span></button>
+    <button class="navitem single-pf-only collect-only" data-tab="collections" onclick="switchTab('collections', true)"><svg><use href="#i-hash"/></svg><span class="nav-label" id="nav-collections-label">关键词采集</span><span class="nav-badge" id="tb-col">0</span></button>
+    <button class="navitem single-pf-only notsh-only" data-tab="comments" onclick="switchTab('comments', true)"><svg><use href="#i-msg"/></svg><span class="nav-label">评论监控</span><span class="nav-badge" id="tb-watch">0</span></button>
+    <button class="navitem single-pf-only danmaku-only" data-tab="danmaku" onclick="switchTab('danmaku', true)"><svg><use href="#i-captions"/></svg><span class="nav-label">弹幕监控</span><span class="nav-badge" id="tb-danmaku">0</span></button>
+    <div class="nav-sep">运营与分发</div>
+    <button class="navitem" data-tab="hub" onclick="switchTab('hub', true)"><svg><use href="#i-library"/></svg><span class="nav-label" id="nav-hub-label">矩阵数据与私信</span></button>
+    <button class="navitem single-pf-only tk-only" data-tab="tiktok-tools" onclick="switchTab('tiktok-tools', true)"><svg><use href="#i-user"/></svg><span class="nav-label">用户互动</span></button>
+    <button class="navitem pub-only" data-tab="publish" onclick="switchTab('publish', true)"><svg><use href="#i-send"/></svg><span class="nav-label" id="nav-publish-label">内容发布</span><span class="nav-badge" id="tb-pub">0</span></button>
+    <button class="navitem single-pf-only notsh-only tk-hide rn-hide" data-tab="autocomment" onclick="switchTab('autocomment', true)"><svg><use href="#i-automation"/></svg><span class="nav-label">自动评论</span><span class="nav-badge" id="tb-ac">0</span></button>
     <button class="navitem" data-tab="queue" onclick="switchTab('queue', true)"><svg><use href="#i-list"/></svg><span class="nav-label">任务队列</span><span class="nav-badge" id="tb-queue">0</span></button>
-    <button class="navitem tk-only" data-tab="tiktok-tools" onclick="switchTab('tiktok-tools', true)"><svg><use href="#i-user"/></svg><span class="nav-label">用户互动</span></button>
-    <button class="navitem pub-only" data-tab="publish" onclick="switchTab('publish', true)"><svg><use href="#i-send"/></svg><span class="nav-label">发布</span><span class="nav-badge" id="tb-pub">0</span></button>
-    <button class="navitem notsh-only tk-hide" data-tab="autocomment" onclick="switchTab('autocomment', true)"><svg><use href="#i-automation"/></svg><span class="nav-label">自动评论</span><span class="nav-badge" id="tb-ac">0</span></button>
     <button class="navitem" data-tab="share-download" onclick="switchTab('share-download', true)"><svg><use href="#i-download"/></svg><span class="nav-label">链接下载</span></button>
-    <button class="navitem" data-tab="notifications" onclick="switchTab('notifications', true)"><svg><use href="#i-bell"/></svg><span class="nav-label">通知</span></button>
-    <button class="navitem" data-tab="settings" onclick="switchTab('settings', true)"><svg><use href="#i-settings"/></svg><span class="nav-label">设置</span></button>
-    <div class="nav-sep">安全</div>
+    <div class="nav-sep">安全与系统</div>
     <button class="navitem" data-tab="risk-control" onclick="switchTab('risk-control', true)"><svg><use href="#i-shield"/></svg><span class="nav-label">风控中心</span><span class="nav-badge" id="tb-risk">0</span></button>
+    <button class="navitem" data-tab="notifications" onclick="switchTab('notifications', true)"><svg><use href="#i-bell"/></svg><span class="nav-label">通知渠道</span></button>
+    <button class="navitem" data-tab="settings" onclick="switchTab('settings', true)"><svg><use href="#i-settings"/></svg><span class="nav-label">系统设置</span></button>
   </nav>
 </aside>
 <main id="main-content" tabindex="-1">
@@ -1938,8 +3169,12 @@
   </div>
   <div class="platform-callout" role="note">
     <svg aria-hidden="true"><use href="#i-info"/></svg>
-    <div><b>平台数据彼此独立</b><p>切换平台后，账号、采集与任务数据会独立展示；通知和下载设置全局共用。TikTok 已提供登录、关键词采集、本账号作品与数据、单视频发布、用户搜索及受控写操作，暂不含直播。</p></div>
+    <div><b>平台数据彼此独立</b><p>切换平台后，账号、采集与任务数据会独立展示；通知和下载设置全局共用。TikTok、哔哩哔哩、Instagram 与 Twitter 均已提供登录、采集、本账号作品与数据、发布及受控写操作，暂不含直播。</p></div>
   </div>
+  </section>
+
+  <section data-panel="media-hub">
+    <div id="wb-media-hub-root" class="wb-react-island"></div>
   </section>
 
   <section data-panel="accounts">
@@ -1947,8 +3182,9 @@
     <div class="card" data-section="accounts">
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-user"/></svg></span>
-        <h2>账号 <span class="sub">登录 / 管理</span></h2>
+        <h2>账号矩阵 <span class="sub">多平台分组 / 批量运维 / 登录管理</span></h2>
       </div>
+      <div id="wb-account-matrix-root" class="wb-react-island"></div>
       <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
         <button class="dy-only" onclick="startLogin()"><svg><use href="#i-qr"/></svg>扫码登录</button>
         <button class="ghost dy-only" onclick="startCreatorLogin()"><svg><use href="#i-login"/></svg>创作者登录</button>
@@ -1956,11 +3192,20 @@
         <button class="xhs-only" onclick="startXhsLogin()"><svg><use href="#i-qr"/></svg>小红书扫码登录</button>
         <button class="ghost xhs-only" onclick="startXhsCreatorLogin()"><svg><use href="#i-send"/></svg>小红书创作者登录</button>
         <button class="ghost xhs-only" onclick="toggleCookie()">Cookie 粘贴</button>
+        <button class="rn-only" onclick="startRednoteLogin()"><svg><use href="#i-qr"/></svg>海外小红书扫码登录</button>
+        <button class="ghost rn-only" onclick="startRednoteCreatorLogin()"><svg><use href="#i-send"/></svg>海外小红书创作者登录</button>
+        <button class="ghost rn-only" onclick="toggleCookie()">Cookie 粘贴</button>
         <button class="ks-only" onclick="startKsLogin()"><svg><use href="#i-qr"/></svg>快手扫码登录</button>
         <button class="ghost ks-only" onclick="startKsCreatorLogin()" title="普通快手扫码登录已可用于发布；仅在创作平台仍提示登录时使用"><svg><use href="#i-send"/></svg>创作平台登录（备用）</button>
         <button class="ghost ks-only" onclick="toggleCookie()">Cookie 粘贴</button>
         <button class="sh-only" onclick="startChannelsLogin()"><svg><use href="#i-login"/></svg>视频号登录</button>
         <button class="tk-only" onclick="startTikTokLogin()"><svg><use href="#i-login"/></svg>TikTok 登录</button>
+        <button class="bili-only" onclick="startBilibiliLogin()"><svg><use href="#i-qr"/></svg>哔哩哔哩扫码登录</button>
+        <button class="ghost bili-only" onclick="toggleCookie()">Cookie 粘贴</button>
+        <button class="ig-only" onclick="startInstagramLogin()"><svg><use href="#i-login"/></svg>Instagram 登录</button>
+        <button class="tw-only" onclick="startTwitterLogin()"><svg><use href="#i-login"/></svg>Twitter 登录</button>
+        <button class="ghost tw-only" onclick="toggleCookie()">Token / Cookie 登录</button>
+        <button class="ghost ig-only" onclick="toggleCookie()">Cookie 粘贴</button>
       </div>
       <div id="qrbox" style="display:none;margin-bottom:14px">
         <div class="mut" id="qrstatus">准备中…</div>
@@ -1976,17 +3221,7 @@
         </div>
         <button onclick="saveCookie()"><svg><use href="#i-check"/></svg>保存</button>
       </div>
-      <div class="table-wrap mini-table"><table id="acc-table" aria-label="平台账号列表"><tbody></tbody></table></div>
-    </div>
-
-    <!-- 暂时隐藏聚合私信入口与内容，保留功能；移除 hidden 即可恢复。 -->
-    <div class="card notsh-only" data-section="inbox" hidden>
-      <div class="card-head">
-        <span class="card-ic"><svg><use href="#i-send"/></svg></span>
-        <h2>聚合私信 <span class="sub">当前平台所有账号 · 人工处理</span></h2>
-        <div class="right"><button class="ghost sm" type="button" onclick="refreshAccounts()"><svg><use href="#i-bolt"/></svg>刷新</button></div>
-      </div>
-      <div class="table-wrap"><table aria-label="跨账号私信收件箱"><thead><tr><th>账号</th><th>会话</th><th>最近消息</th><th>时间</th><th>操作</th></tr></thead><tbody id="dm-inbox-table"></tbody></table></div>
+      <div class="table-wrap mini-table"><table id="acc-table" aria-label="平台账号列表"><thead><tr><th>账号与环境</th><th>状态与负载</th><th style="text-align:right">操作</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <!-- 指纹 Chromium 多版本内核 -->
@@ -1998,71 +3233,114 @@
       <p class="mut" style="font-size:12px;margin:-4px 0 12px">
         扫描当前机器的 Chromium 安装目录，或手动添加 <code>chrome.exe</code> / <code>chrome</code>。
         每台机器可以使用不同路径；每个账号可在上方「环境」中固定选择一个版本，不同版本使用独立 Profile。
-        新指纹环境首次登录或手动打开时会附带 BrowserScan 体检标签；该第三方页面会获取当前出口 IP 与浏览器特征。
+        新指纹环境首次登录或手动打开时会附带环境体检标签；外部检测页会读取当前出口 IP 与浏览器特征。
         <br>当前扫描目录：<code id="runtime-root">读取中…</code>
       </p>
       <div class="form-actions">
         <button class="ghost" onclick="scanBrowserRuntimes()"><svg><use href="#i-eye"/></svg>扫描内核目录</button>
         <button class="ghost" onclick="addBrowserRuntime()"><svg><use href="#i-plus"/></svg>手动添加 chrome.exe</button>
       </div>
-      <div class="table-wrap mini-table"><table id="runtime-table" aria-label="浏览器内核列表"><tbody></tbody></table></div>
+      <div class="table-wrap mini-table"><table id="runtime-table" aria-label="浏览器内核列表"><thead><tr><th>内核与路径</th><th style="text-align:right">操作</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <!-- 代理池(提前配置好,账号从池里关联) -->
     <div class="card" data-section="proxies">
-      <div class="card-head">
-        <span class="card-ic"><svg><use href="#i-shield"/></svg></span>
-        <h2>代理池 <span class="sub">提前配置 · 账号关联使用</span></h2>
-      </div>
-      <p class="mut proxy-pool-intro">
-        添加后可为账号分配独立代理。测试仅验证网络连通性，不代表所有平台均可访问。
-      </p>
-      <div class="form-grid proxy-input-grid">
-        <div class="form-field"><label for="px-label">代理备注</label><input id="px-label" placeholder="例如：住宅-广东-01"></div>
-        <div class="form-field"><label for="px-proto">默认协议</label><select id="px-proto" title="未带协议的地址按此协议解析；已带协议时忽略">
-            <option value="http">HTTP</option><option value="socks5">SOCKS5</option>
-        </select></div>
-        <div class="form-field"><label for="px-format">输入格式</label><select id="px-format" aria-describedby="px-input-hint">
-            <option value="auto">自动识别（推荐）</option>
-            <option value="host_colon">主机:端口:用户名:密码</option>
-            <option value="host_csv">主机,端口,用户名,密码</option>
-            <option value="host_at">主机:端口@用户名:密码</option>
-            <option value="auth_colon">用户名:密码:主机:端口</option>
-            <option value="auth_at">用户名:密码@主机:端口</option>
-            <option value="host_hash">主机:端口##用户名##密码</option>
-        </select></div>
-        <div class="form-field proxy-address-field">
-          <div class="proxy-address-label">
-            <label for="px-url">代理地址</label>
-            <details class="proxy-format-disclosure" id="px-format-help" ontoggle="syncProxyFormatHelp(this)">
-              <summary id="px-format-toggle" aria-controls="px-format-panel">格式示例</summary>
-              <div class="proxy-format-panel" id="px-format-panel" role="note" aria-labelledby="px-format-title">
-                <strong id="px-format-title">代理地址格式</strong>
-                <p id="px-input-hint">任选一种粘贴，默认自动识别。有歧义时在「输入格式」中指定。</p>
-                <ul class="proxy-format-examples" id="px-format-examples" aria-label="六种代理地址格式">
-                  <li><code>主机:端口:用户名:密码</code></li>
-                  <li><code>主机,端口,用户名,密码</code></li>
-                  <li><code>主机:端口@用户名:密码</code></li>
-                  <li><code>用户名:密码:主机:端口</code></li>
-                  <li><code>用户名:密码@主机:端口</code></li>
-                  <li><code>主机:端口##用户名##密码</code></li>
-                </ul>
-                <p>无账密可只填「主机:端口」。标准地址可带 <code>http://</code> 或 <code>socks5://</code> 前缀。</p>
-              </div>
-            </details>
+      <div class="card-head px-card-head">
+        <div class="px-head-main">
+          <span class="card-ic"><svg><use href="#i-shield"/></svg></span>
+          <div>
+            <h2>代理池 <span class="sub">提前配置 · 账号关联使用</span></h2>
+            <p class="mut proxy-pool-intro">推荐一号一独立代理防多号关联；支持 HTTP / SOCKS5 及多种服务商账密导出格式自动识别。</p>
           </div>
-          <input id="px-url" aria-describedby="px-input-hint" autocomplete="off" spellcheck="false" placeholder="例：用户名:密码@主机:端口">
+        </div>
+        <div class="px-head-actions">
+          <button type="button" class="ghost sm" onclick="importProxies()" title="多行粘贴批量导入代理"><svg><use href="#i-plus"/></svg>批量导入</button>
+          <button type="button" class="ghost sm" id="px-btn-test-all" onclick="testAllProxies()" title="并发检测全部节点连通性与出口归属地"><svg><use href="#i-bolt"/></svg>全部测试</button>
+          <button type="button" class="ghost sm" onclick="assignAllProxies()" title="给所有未配置代理的账号按空闲优先自动分配"><svg><use href="#i-network"/></svg>给无代理账号分配</button>
         </div>
       </div>
-      <div class="form-actions">
-        <button class="ghost" onclick="detectProxy()" title="自动判别 HTTP/SOCKS5 与是否需要认证"><svg><use href="#i-eye"/></svg>自动判别</button>
-        <button class="ghost sm" onclick="importProxies()" title="多行粘贴批量导入">批量导入</button>
-        <button class="ghost sm" onclick="testAllProxies()" title="逐个测试池内代理连通性">全部测试</button>
-        <button class="ghost sm" onclick="assignAllProxies()" title="给所有未配代理的账号自动分配(均衡)">给账号批量分配</button>
-        <span class="actions-spacer"></span>
-        <button onclick="addProxy()"><svg><use href="#i-plus"/></svg>加入代理池</button>
+
+      <div id="px-kpi-bar" class="px-kpi-bar" role="tablist" aria-label="代理池筛选与统计"></div>
+
+      <div class="px-quick-add">
+        <div class="px-quick-grid">
+          <div class="form-field px-url-col">
+            <label for="px-url">代理地址 <span class="mut" style="font-weight:400">（自动识别协议与 6 种账密格式）</span></label>
+            <input id="px-url" aria-describedby="px-input-hint" autocomplete="off" spellcheck="false"
+                   placeholder="粘贴地址，例：socks5://user:pass@host:port 或 主机:端口:用户名:密码"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addProxy();}">
+          </div>
+          <div class="form-field px-lbl-col">
+            <label for="px-label">节点备注 <span class="mut" style="font-weight:400">（留空按地区自动命名）</span></label>
+            <input id="px-label" placeholder="例如：美区静态-01 / 广东住宅"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addProxy();}">
+          </div>
+          <div class="px-quick-btns">
+            <button type="button" class="ghost" id="px-btn-detect" onclick="detectProxy()" title="自动探测 HTTP/SOCKS5 协议并查询出口 IP 归属地"><svg><use href="#i-eye"/></svg>检测并识别</button>
+            <button type="button" onclick="addProxy()"><svg><use href="#i-plus"/></svg>加入代理池</button>
+          </div>
+        </div>
+
+        <div id="px-detect-banner" class="px-detect-banner" hidden></div>
+
+        <details class="px-adv-details" id="px-format-help" ontoggle="syncProxyFormatHelp(this)">
+          <summary id="px-format-toggle">解析选项、补充说明与支持格式示例</summary>
+          <div class="px-adv-body">
+            <div class="form-grid px-adv-grid">
+              <div class="form-field"><label for="px-proto">未带协议时默认按</label><select id="px-proto" title="未带协议的地址按此协议解析；已带协议时保留原值">
+                  <option value="http">HTTP</option><option value="socks5">SOCKS5</option>
+              </select></div>
+              <div class="form-field"><label for="px-format">账密分隔格式</label><select id="px-format" aria-describedby="px-input-hint">
+                  <option value="auto">自动识别（推荐）</option>
+                  <option value="host_colon">主机:端口:用户名:密码</option>
+                  <option value="host_csv">主机,端口,用户名,密码</option>
+                  <option value="host_at">主机:端口@用户名:密码</option>
+                  <option value="auth_colon">用户名:密码:主机:端口</option>
+                  <option value="auth_at">用户名:密码@主机:端口</option>
+                  <option value="host_hash">主机:端口##用户名##密码</option>
+              </select></div>
+              <div class="form-field"><label for="px-note">补充说明（可选）</label><input id="px-note" placeholder="如：独享住宅 / 2026-12 到期 / TikTok 专用"></div>
+            </div>
+            <div class="px-fmt-hint" id="px-input-hint">
+              <span>支持粘贴格式：</span>
+              <code>主机:端口:账:密</code>
+              <code>主机,端口,账,密</code>
+              <code>主机:端口@账:密</code>
+              <code>账:密:主机:端口</code>
+              <code>账:密@主机:端口</code>
+              <code>主机:端口##账##密</code>
+              <code>http/socks5://...</code>
+            </div>
+          </div>
+        </details>
       </div>
-      <div class="table-wrap mini-table"><table id="proxy-table" aria-label="代理池列表"><tbody></tbody></table></div>
+
+      <div id="px-batch-bar" class="px-batch-bar" hidden>
+        <span class="px-batch-count">已选 <b id="px-sel-count">0</b> 个节点</span>
+        <div class="px-batch-actions">
+          <button type="button" class="ghost sm" onclick="batchTestPoolProxies()"><svg><use href="#i-bolt"/></svg>批量测试</button>
+          <button type="button" class="ghost sm" onclick="batchAutoNameProxies()" title="将已选且未命名的节点按出口归属地自动生成备注名"><svg><use href="#i-sparkles"/></svg>按地区自动命名</button>
+          <button type="button" class="ghost sm" onclick="batchTogglePoolProxies(true)">批量启用</button>
+          <button type="button" class="ghost sm" onclick="batchTogglePoolProxies(false)">批量停用</button>
+          <button type="button" class="ghost sm danger" onclick="batchDeletePoolProxies()"><svg><use href="#i-trash"/></svg>批量删除</button>
+          <button type="button" class="ghost sm" onclick="clearProxySelection()">取消选择</button>
+        </div>
+      </div>
+
+      <div class="table-wrap mini-table">
+        <table id="proxy-table" aria-label="代理池列表">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="px-check-all" onchange="toggleSelectAllProxies(this.checked)" aria-label="全选当前显示代理"></th>
+              <th>代理节点</th>
+              <th>归属地 / 出口网络</th>
+              <th>关联账号</th>
+              <th style="text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -2076,15 +3354,17 @@
         <span class="card-ic"><svg><use href="#i-user"/></svg></span>
         <h2>TikTok 用户搜索与互动 <span class="sub">搜索用户后关注 / 取关 / 私信</span></h2>
       </div>
-      <div class="form-grid cols-4">
-        <div class="form-field"><label for="tk-account">执行账号</label><select id="tk-account"></select></div>
-        <div class="form-field"><label for="tk-user-query">用户关键词</label><input id="tk-user-query" type="search" placeholder="昵称或 @unique_id" onkeydown="if(event.key==='Enter'){event.preventDefault();searchTikTokUsers()}"></div>
-        <div class="form-field"><label for="tk-user-limit">结果上限</label><input id="tk-user-limit" type="number" min="1" max="100" value="30"></div>
-        <div class="form-field"><label>执行方式</label><label class="check-row"><input id="tk-action-run-now" type="checkbox"><span>立即打开浏览器执行</span></label></div>
+      <div class="stack">
+        <div class="form-grid tk-search-grid">
+          <div class="form-field"><label for="tk-account">执行账号</label><select id="tk-account"></select></div>
+          <div class="form-field"><label for="tk-user-query">用户关键词</label><input id="tk-user-query" type="search" placeholder="昵称或 @unique_id" onkeydown="if(event.key==='Enter'){event.preventDefault();searchTikTokUsers()}"></div>
+          <div class="form-field"><label for="tk-user-limit">结果上限</label><input id="tk-user-limit" type="number" min="1" max="100" value="30"></div>
+          <div class="form-field"><label>执行方式</label><label class="check-row"><input id="tk-action-run-now" type="checkbox"><span>立即打开浏览器执行</span></label></div>
+        </div>
+        <div class="form-actions"><span class="status-text" id="tk-user-status" role="status" aria-live="polite"></span><button type="button" onclick="searchTikTokUsers()"><svg><use href="#i-search"/></svg>搜索用户</button></div>
+        <div class="table-wrap"><table aria-label="TikTok 用户搜索结果"><thead><tr><th>用户</th><th>账号标识</th><th>数据</th><th>简介</th><th style="text-align:right">操作</th></tr></thead><tbody id="tk-user-results"></tbody></table></div>
+        <div class="form-note"><svg aria-hidden="true"><use href="#i-info"/></svg><span>用于查找其他 TikTok 用户并创建关注、取关或私信任务，不是本账号资料页。</span></div>
       </div>
-      <div class="form-actions"><span class="status-text" id="tk-user-status" role="status" aria-live="polite"></span><button type="button" onclick="searchTikTokUsers()"><svg><use href="#i-search"/></svg>搜索用户</button></div>
-      <div class="table-wrap" style="margin-top:12px"><table aria-label="TikTok 用户搜索结果"><thead><tr><th>用户</th><th>账号标识</th><th>数据</th><th>简介</th><th>操作</th></tr></thead><tbody id="tk-user-results"></tbody></table></div>
-      <div class="form-note" style="margin-top:12px"><svg aria-hidden="true"><use href="#i-info"/></svg><span>用于查找其他 TikTok 用户并创建关注、取关或私信任务，不是本账号资料页。</span></div>
     </div>
 
     <div class="card" data-section="tiktok-comment">
@@ -2092,17 +3372,19 @@
         <span class="card-ic"><svg><use href="#i-msg"/></svg></span>
         <h2>TikTok 手动评论任务 <span class="sub">指定作品创建评论或回复任务</span></h2>
       </div>
-      <div class="form-grid cols-4">
-        <div class="form-field"><label for="tk-comment-account">执行账号</label><select id="tk-comment-account"></select></div>
-        <div class="form-field"><label for="tk-aweme-id">作品链接 / ID</label><input id="tk-aweme-id" placeholder="https://www.tiktok.com/@user/video/... 或 video id"></div>
-        <div class="form-field"><label for="tk-author-id">作者 @username <span class="field-scope">仅填 ID 时必填</span></label><input id="tk-author-id" placeholder="例如 creator_name"></div>
-        <div class="form-field"><label for="tk-target-comment-id">目标评论 ID <span class="field-scope">回复时填写</span></label><input id="tk-target-comment-id" placeholder="顶层评论可留空"></div>
-        <div class="form-field"><label for="tk-target-nick">目标昵称 <span class="field-scope">可选</span></label><input id="tk-target-nick" placeholder="用于任务记录"></div>
+      <div class="stack">
+        <div class="form-grid cols-auto">
+          <div class="form-field"><label for="tk-comment-account">执行账号</label><select id="tk-comment-account"></select></div>
+          <div class="form-field"><label for="tk-aweme-id">作品链接 / ID</label><input id="tk-aweme-id" placeholder="https://www.tiktok.com/@user/video/... 或 video id"></div>
+          <div class="form-field"><label for="tk-author-id">作者 @username <span class="field-scope">仅填 ID 时必填</span></label><input id="tk-author-id" placeholder="例如 creator_name"></div>
+          <div class="form-field"><label for="tk-target-comment-id">目标评论 ID <span class="field-scope">回复时填写</span></label><input id="tk-target-comment-id" placeholder="顶层评论可留空"></div>
+          <div class="form-field"><label for="tk-target-nick">目标昵称 <span class="field-scope">可选</span></label><input id="tk-target-nick" placeholder="用于任务记录"></div>
+        </div>
+        <div class="form-field"><label for="tk-comment-content">评论内容</label><textarea id="tk-comment-content" rows="3" placeholder="输入要发布的评论或回复"></textarea></div>
+        <div class="form-field"><label for="tk-target-text">目标评论原文 <span class="field-scope">回复任务必填，用于在页面定位回复区</span></label><textarea id="tk-target-text" rows="2" placeholder="顶层评论可留空"></textarea></div>
+        <div class="form-actions"><label class="check-row"><input id="tk-comment-run-now" type="checkbox"><span>立即执行</span></label><span class="actions-spacer"></span><button type="button" onclick="createTikTokCommentTask()"><svg><use href="#i-send"/></svg>创建评论任务</button></div>
+        <div class="form-note"><svg aria-hidden="true"><use href="#i-info"/></svg><span>这是主动写入工具，因此与账号资料分开；任务结果在「任务队列」查看。</span></div>
       </div>
-      <div class="form-field"><label for="tk-comment-content">评论内容</label><textarea id="tk-comment-content" rows="3" placeholder="输入要发布的评论或回复"></textarea></div>
-      <div class="form-field"><label for="tk-target-text">目标评论原文 <span class="field-scope">回复任务必填，用于在页面定位回复区</span></label><textarea id="tk-target-text" rows="2" placeholder="顶层评论可留空"></textarea></div>
-      <div class="form-actions"><label class="check-row"><input id="tk-comment-run-now" type="checkbox"><span>立即执行</span></label><span class="actions-spacer"></span><button type="button" onclick="createTikTokCommentTask()"><svg><use href="#i-send"/></svg>创建评论任务</button></div>
-      <div class="form-note" style="margin-top:12px"><svg aria-hidden="true"><use href="#i-info"/></svg><span>这是主动写入工具，因此与账号资料分开；任务结果在「任务队列」查看。</span></div>
     </div>
   </section>
 
@@ -2133,10 +3415,10 @@
         <span class="filter-count" id="risk-filter-count" role="status" aria-live="polite"></span>
         <span class="spacer"></span>
         <button class="ghost sm" id="risk-admin-token-btn" type="button" onclick="setRiskAdminToken()" style="display:none"><svg><use href="#i-shield"/></svg>管理口令</button>
-        <button class="ghost sm" type="button" onclick="refreshRiskCenter(true)"><svg><use href="#i-play"/></svg>刷新状态</button>
+        <button class="ghost sm" type="button" onclick="refreshRiskCenter(true)"><svg><use href="#i-refresh"/></svg>刷新状态</button>
       </div>
       <div class="table-wrap"><table aria-label="账号风险状态列表">
-        <thead><tr><th>账号</th><th>状态</th><th>等级</th><th>原因</th><th>等待 / 探测</th><th>恢复</th><th>任务</th><th>网络</th><th>操作</th></tr></thead>
+        <thead><tr><th>账号</th><th>状态 / 等级</th><th>原因</th><th>冷却 / 恢复进度</th><th>任务</th><th>网络</th><th style="text-align:right">操作</th></tr></thead>
         <tbody id="risk-account-table"></tbody>
       </table></div>
     </div>
@@ -2240,7 +3522,7 @@
         <div class="form-field"><label for="queue-type">队列类型</label><select id="queue-type" onchange="refreshTaskQueue(true)"><option value="">全部队列</option><option value="collections">关键词采集</option><option value="publishes">内容发布</option><option value="comments">自动评论</option><option value="actions">账号动作</option><option value="monitor_downloads">监控下载</option><option value="collection_downloads">采集下载</option></select></div>
         <div class="form-field"><label for="queue-state">任务状态</label><select id="queue-state" onchange="refreshTaskQueue(true)"><option value="active">活动任务</option><option value="pending">等待执行</option><option value="running">正在执行</option><option value="blocked">风控延后</option><option value="failed">失败任务</option><option value="completed">已完成</option><option value="all">全部状态</option></select></div>
         <div class="form-field"><label for="queue-query">搜索</label><input id="queue-query" type="search" placeholder="任务内容、账号、错误或风控原因" onkeydown="if(event.key==='Enter'){event.preventDefault();refreshTaskQueue(true)}"></div>
-        <button type="button" class="ghost" onclick="refreshTaskQueue(true)"><svg><use href="#i-bolt"/></svg>刷新</button>
+        <button type="button" class="ghost" onclick="refreshTaskQueue(true)"><svg><use href="#i-refresh"/></svg>刷新</button>
         <button type="button" class="ghost danger" id="queue-batch-stop" onclick="batchStopSelectedTasks()"><svg><use href="#i-x"/></svg>停止所选</button>
       </div>
       <div class="table-wrap" id="queue-table-wrap">
@@ -2272,7 +3554,21 @@
         <div class="form-grid cols-4">
           <div class="form-field"><label for="col-source">采集来源</label><select id="col-source" onchange="collectionSourceChanged()"><option value="keyword">关键词搜索</option><option value="creator">创作者主页</option><option value="favorite_all" data-xhs-source>全部收藏</option><option value="favorite_board" data-xhs-source>指定收藏夹</option><option value="account_works" data-channels-source>本账号作品</option></select></div>
           <div class="form-field xhs-only" id="col-board-wrap" style="display:none"><label for="col-board">收藏夹</label><select id="col-board"><option value="">先选择账号并加载</option></select><p class="hint" id="col-board-help"></p></div>
-          <div class="form-field" id="col-source-ref-wrap" style="display:none"><label for="col-source-ref">创作者用户 ID</label><input id="col-source-ref" placeholder="抖音 sec_uid / 小红书 user_id / 快手 user_id 或主页链接或短链"><p class="hint">使用公开主页作品列表，评论和下载继续沿用下方设置。快手可粘贴完整分享文案或 v.kuaishou.com 短链自动解析。</p></div>
+          <div class="form-field" id="col-source-ref-wrap" style="display:none">
+            <label for="col-source-ref" id="col-source-ref-label">创作者用户 ID / 主页或视频链接</label>
+            <div class="smart-target-input">
+              <input id="col-source-ref" maxlength="100000" autocomplete="off"
+                placeholder="抖音 sec_uid / 小红书 user_id / 快手 user_id 或主页链接或短链"
+                onpaste="handleCollectionCreatorPaste()" oninput="resetCollectionCreatorState()">
+              <button type="button" class="smart-target-action" onclick="normalizeCollectionCreatorTarget(this)"
+                aria-label="识别并清洗创作者链接" title="识别并提取创作者标识">
+                <svg><use href="#i-bolt"/></svg><span>识别</span>
+              </button>
+            </div>
+            <div class="smart-target-feedback" id="col-source-ref-feedback" role="status" aria-live="polite">
+              使用公开主页作品列表；视频号可粘贴 v2_...@finder、主页链接或单条视频 weixin.qq.com/sph/... 链接（自动反查作者）
+            </div>
+          </div>
         </div>
         <div class="form-field" id="col-keywords-wrap">
           <label for="col-keywords">关键词 <span class="field-scope">必填 · 最多 20 个</span></label>
@@ -2280,7 +3576,7 @@
           <p class="hint" id="col-keywords-help">支持换行或逗号分隔；任务会按关键词逐个执行并自动去重。</p>
         </div>
         <div class="form-grid cols-4">
-          <div class="form-field"><label for="col-account">使用账号</label><select id="col-account" required onchange="collectionAccountChanged()"></select></div>
+          <div class="form-field" id="col-account-wrap"><label for="col-account">使用账号</label><select id="col-account" onchange="collectionAccountChanged()"></select></div>
           <div class="form-field"><label for="col-content-limit" id="col-content-limit-label">每词作品上限</label><input id="col-content-limit" type="number" min="1" max="100" value="20" inputmode="numeric"></div>
           <div class="form-field"><label for="col-comment-limit">每作品评论上限</label><input id="col-comment-limit" type="number" min="0" max="200" value="20" inputmode="numeric"></div>
           <div class="form-field dy-only"><label for="col-quality">视频画质</label><select id="col-quality"><option value="highest">原画 / 最高</option><option value="1080">1080P</option><option value="720">720P</option><option value="540">540P</option><option value="lowest">最低省流</option></select></div>
@@ -2311,7 +3607,7 @@
         </div>
         <div class="platform-callout" role="note">
           <svg aria-hidden="true"><use href="#i-info"/></svg>
-          <div><b id="collection-callout-title">作品上限、采集深度和停止条件任一满足即结束</b><p id="collection-callout-copy">平台筛选后会在本地复核类型、时间和数据门槛；任务默认串行执行，可随时取消，已入库结果会保留。</p></div>
+          <div><b id="collection-callout-title">作品上限、采集深度和停止条件任一满足即结束</b><p id="collection-callout-copy">平台筛选后会在本地复核类型、时间和数据门槛；任务默认串行执行，可随时取消，已入库结果会保留。</p><div class="channels-proto-inline-tools sh-only hidden"><button type="button" class="ghost sm" onclick="openChannelsProtocolSettings()"><svg aria-hidden="true"><use href="#i-network"/></svg>配置本地微信通道</button></div></div>
         </div>
         <div class="form-actions">
           <span class="status-text" id="col-create-msg" role="status" aria-live="polite"></span>
@@ -2324,7 +3620,6 @@
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-list"/></svg></span>
         <h2>采集任务 <span class="sub">进度、编辑、续跑与导出</span></h2>
-        <div class="right"><button class="ghost sm" type="button" onclick="refreshCollections()"><svg><use href="#i-bolt"/></svg>刷新</button></div>
       </div>
       <div class="collection-task-list" id="collection-job-table" role="list" aria-label="关键词采集任务列表" aria-live="polite"></div>
     </div>
@@ -2358,7 +3653,7 @@
         <h2 id="mon-add-title">添加作品监控 <span class="sub">监控并下载新作品</span></h2>
       </div>
       <div class="stack">
-        <div class="xhs-only">
+        <div class="xhs-rn-only">
           <label class="field" for="t-kind">监控类型</label>
           <select id="t-kind" aria-label="监控类型" onchange="applyMonitorForm()">
             <option value="creator">创作者笔记(盯一个博主)</option>
@@ -2400,7 +3695,7 @@
           </div>
         </div>
         <div class="form-grid cols-auto">
-          <div class="form-field"><label for="t-acc">使用账号</label><select id="t-acc"></select></div>
+          <div class="form-field" id="t-acc-wrap"><label for="t-acc">使用账号</label><select id="t-acc"></select></div>
           <div class="form-field"><label for="t-interval">检查频率</label><select id="t-interval" aria-describedby="t-interval-help">
               <option value="1">每 1 秒</option><option value="5">每 5 秒</option><option value="10">每 10 秒</option>
               <option value="15">每 15 秒</option><option value="30">每 30 秒</option><option value="60">每 1 分钟</option>
@@ -2413,7 +3708,7 @@
               <option value="1080">1080P</option><option value="720">720P</option>
               <option value="540">540P</option><option value="lowest">最低省流</option>
           </select></div>
-          <div class="form-field dy-only"><label for="t-backfill">首次历史回填</label><select id="t-backfill">
+          <div class="form-field" id="t-backfill-wrap"><label for="t-backfill">首次历史回填</label><select id="t-backfill">
               <option value="">跟随全局设置</option>
               <option value="0">不下载历史作品</option><option value="5">最近 5 条</option>
               <option value="20">最近 20 条</option><option value="-1">尽可能全量</option>
@@ -2531,7 +3826,7 @@
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-download"/></svg></span>
         <h2>下载历史 <span class="sub" id="sd-history-count">0 条</span></h2>
-        <button class="ghost sm" onclick="refreshShareHistory()"><svg><use href="#i-clock"/></svg>刷新</button>
+        <button class="ghost sm" onclick="refreshShareHistory()"><svg><use href="#i-refresh"/></svg>刷新</button>
       </div>
       <div class="manage-toolbar share-history-toolbar">
         <input type="search" id="sd-history-search" placeholder="搜索作品描述 / 作者 / ID" aria-label="搜索链接下载历史" oninput="renderShareHistoryRows(true)">
@@ -2546,7 +3841,6 @@
         </select>
         <span class="filter-count" id="sd-history-filter-count" role="status" aria-live="polite"></span>
         <div class="toolbar-actions"><span class="toolbar-actions-label">操作</span>
-          <button class="ghost sm" onclick="refreshShareHistory()"><svg><use href="#i-clock"/></svg>刷新</button>
           <button class="ghost sm" id="sd-history-selall-btn" onclick="shareHistorySelAllToggle()">全选</button>
           <span id="sd-history-selbar" style="display:none;align-items:center;gap:8px">
             <span class="mut" id="sd-history-selcount">已选 0</span>
@@ -2564,11 +3858,11 @@
         <colgroup>
           <col class="content-col-check"><col class="content-col-cover"><col class="content-col-desc">
           <col class="content-col-type"><col class="content-col-time"><col class="content-col-data">
-          <col class="content-col-actions"><col class="content-col-local">
+          <col class="content-col-local"><col class="content-col-actions">
         </colgroup>
         <thead><tr>
           <th><input type="checkbox" id="sd-history-selall" onchange="shareHistoryToggleAll(this.checked)" aria-label="全选"></th>
-          <th>封面</th><th>作品描述</th><th>类型</th><th>发布时间</th><th>数据</th><th>状态 / 操作</th><th>本地文件</th>
+          <th>封面</th><th>作品描述</th><th>规格</th><th>发布时间</th><th>互动数据</th><th>状态 / 本地文件</th><th style="text-align:right">操作</th>
         </tr></thead><tbody id="sd-history-body"></tbody>
       </table></div>
       <div id="sd-history-pager" class="danmaku-pager" hidden>
@@ -2731,6 +4025,13 @@
             <p class="field-help" id="engine-xhs-read-help">默认使用 API 直连且不会打开页面；需要页面兼容时可切换为浏览器获取。</p>
           </div>
           <div class="form-field">
+            <label for="engine-rednote_read_mode">海外小红书读取方式</label>
+            <select id="engine-rednote_read_mode" name="rednote_read_mode" disabled aria-describedby="engine-rednote-read-help">
+              <option value="hybrid">API 优先，普通失败浏览器回退（推荐）</option><option value="api">仅 API 直连（XYS/XYW + b1）</option><option value="browser">仅浏览器获取</option>
+            </select>
+            <p class="field-help" id="engine-rednote-read-help">默认优先走 rednote.com 独立四域 XYS/XYW + b1 签名协议直连，普通兼容或验证失败时自动回退已登录浏览器，绝不混用国内小红书 Cookie。</p>
+          </div>
+          <div class="form-field">
             <label for="engine-douyin_read_mode">抖音读取方式</label>
             <select id="engine-douyin_read_mode" name="douyin_read_mode" disabled aria-describedby="engine-douyin-read-help">
               <option value="hybrid">API 优先，普通失败浏览器回退（推荐）</option><option value="api">仅 API，不打开浏览器</option><option value="browser">仅浏览器</option>
@@ -2743,6 +4044,34 @@
               <option value="native">全程离线 API，不打开浏览器（推荐）</option><option value="auto">离线 API 失败后浏览器回退</option><option value="browser">仅已授权浏览器页面</option>
             </select>
             <p class="field-help" id="engine-tiktok-read-help">native 模式的关键词、评论和二级回复均使用本账号 Cookie、UA、代理与离线 X-Dynosaur/X-Gnarly，全程不打开浏览器；只有手动选择 auto/browser 才可能打开页面。</p>
+          </div>
+          <div class="form-field">
+            <label for="engine-channels_read_mode">视频号读取方式</label>
+            <select id="engine-channels_read_mode" name="channels_read_mode" disabled aria-describedby="engine-channels-read-help">
+              <option value="auto">原生协议优先，本账号回退创作者助手（推荐）</option><option value="protocol">仅微信本地 Finder 协议</option><option value="browser">仅创作者助手浏览器页面</option>
+            </select>
+            <p class="field-help" id="engine-channels-read-help">配置本地微信 Finder CDP 端点后，支持关键词搜索、创作者主页、主评论与二级回复独立分页及 WxIsaac64 视频解密下载；未配置时本账号作品仍可通过创作者助手读取。<a class="channels-inline-jump" href="#channels-protocol-card" onclick="event.preventDefault();openChannelsProtocolSettings()">去配置微信通道 →</a></p>
+          </div>
+          <div class="form-field">
+            <label for="engine-bilibili_read_mode">哔哩哔哩读取方式</label>
+            <select id="engine-bilibili_read_mode" name="bilibili_read_mode" disabled aria-describedby="engine-bili-read-help">
+              <option value="hybrid">WBI API 优先，普通失败浏览器回退（推荐）</option><option value="api">仅 WBI API，不打开浏览器</option><option value="browser">仅浏览器页面</option>
+            </select>
+            <p class="field-help" id="engine-bili-read-help">关键词搜索、UP 主空间、视频与图文动态详情、评论及 XML 弹幕均优先走离线 WBI 签名接口；普通兼容失败才回退浏览器。</p>
+          </div>
+          <div class="form-field">
+            <label for="engine-instagram_read_mode">Instagram 读取方式</label>
+            <select id="engine-instagram_read_mode" name="instagram_read_mode" disabled aria-describedby="engine-ig-read-help">
+              <option value="hybrid">API 直连优先，普通失败浏览器回退（推荐）</option><option value="api">仅 API，不打开浏览器</option><option value="browser">仅浏览器页面</option>
+            </select>
+            <p class="field-help" id="engine-ig-read-help">使用当前账号会话直连 Instagram Mobile v1 / Web API 获取主页、Reels、标签搜索、stream_comments 评论、关注/粉丝与 Direct v2 私信。</p>
+          </div>
+          <div class="form-field">
+            <label for="engine-twitter_read_mode">Twitter (X) 读取方式</label>
+            <select id="engine-twitter_read_mode" name="twitter_read_mode" disabled aria-describedby="engine-tw-read-help">
+              <option value="hybrid">轻量协议优先，时间线走隔离浏览器（推荐）</option><option value="browser">全程使用隔离浏览器页面</option><option value="api">仅轻量协议（资料/单帖/私信）</option>
+            </select>
+            <p class="field-help" id="engine-tw-read-help">公开单帖下载与本账号资料/私信优先走 Syndication 与 REST 通道；主页时间线、搜索与评论自动在隔离浏览器内拦截原生 GraphQL 响应。</p>
           </div>
           <div class="form-field">
             <label for="engine-monitor_initial_backfill_count">抖音新监控的历史作品数量</label>
@@ -2805,8 +4134,12 @@
             <div class="form-field"><label for="engine-xhs_request_jitter">读取间隔随机延长比例</label><input id="engine-xhs_request_jitter" name="xhs_request_jitter" type="number" min="0" max="1" step="0.01" required disabled><p class="field-help">0.35 表示最多额外等待 35%，不会缩短原有间隔。</p></div>
             <div class="form-field"><label for="engine-comment_max_scrolls">评论区默认翻页次数</label><input id="engine-comment_max_scrolls" name="comment_max_scrolls" type="number" min="1" max="30" step="1" required disabled><p class="field-help">更多翻页会增加耗时；单个监控可单独调整。</p></div>
             <div class="form-field"><label for="engine-xhs_publish_mode">小红书发布方式</label><select id="engine-xhs_publish_mode" name="xhs_publish_mode" disabled><option value="browser">浏览器发布（推荐）</option><option value="api">API 直连（兼容模式）</option></select><p class="field-help">仅影响发布，不改变作品监控的获取方式；原生身份账号仍使用浏览器发布。</p></div>
+            <div class="form-field"><label for="engine-rednote_publish_mode">海外小红书发布方式</label><select id="engine-rednote_publish_mode" name="rednote_publish_mode" disabled><option value="browser">创作者中心页面发布（推荐）</option><option value="api">API 纯协议直发（实验通道 · XYS + b1）</option></select><p class="field-help">实验通道自动提取或合成 rednote.com 专属 b1 环境并走 COS + webapi.rednote.com/web_api/sns/v2/note 单次提交，失败不自动重发。</p></div>
             <div class="form-field"><label for="engine-xhs_comment_write_mode">小红书评论发送方式</label><select id="engine-xhs_comment_write_mode" name="xhs_comment_write_mode" disabled><option value="browser">浏览器发送（推荐）</option><option value="manual">只保存草稿</option><option value="api">API 直连（兼容模式）</option></select></div>
-            <div class="form-field"><label for="engine-douyin_write_mode">抖音写入方式</label><select id="engine-douyin_write_mode" name="douyin_write_mode" disabled><option value="hybrid">API 优先，明确失败后浏览器回退（推荐）</option><option value="api">仅 API，不打开浏览器</option><option value="browser">仅浏览器</option></select><p class="field-help">影响评论、回复、关注/取关和已有会话私信；发布作品仍使用创作中心浏览器流程。网络结果不确定时不会重复提交或回退。</p></div>
+            <div class="form-field"><label for="engine-douyin_write_mode">抖音写入方式</label><select id="engine-douyin_write_mode" name="douyin_write_mode" disabled><option value="browser">仅真机浏览器拟人操作（推荐 · 防风控）</option><option value="hybrid">API 优先，明确失败后浏览器回退</option><option value="api">仅 API，不打开浏览器</option></select><p class="field-help">影响评论、回复、关注/取关和私信发送；推荐走真实浏览器拟人操作以对齐 bdms / a_bogus 原生行为栈。</p></div>
+            <div class="form-field"><label for="engine-bilibili_write_mode">哔哩哔哩写入方式</label><select id="engine-bilibili_write_mode" name="bilibili_write_mode" disabled><option value="hybrid">API 优先，明确失败后浏览器回退（推荐）</option><option value="api">仅 API，不打开浏览器</option><option value="browser">仅浏览器</option></select><p class="field-help">影响评论、回复、关注/取关、稿件可见性与私信发送；发布视频和图文动态走创作中心浏览器流程。网络结果不确定时不会重复提交或回退。</p></div>
+            <div class="form-field"><label for="engine-instagram_write_mode">Instagram 写入与发布方式</label><select id="engine-instagram_write_mode" name="instagram_write_mode" disabled><option value="hybrid">API 优先，明确失败后浏览器回退（推荐）</option><option value="api">仅 API，不打开浏览器</option><option value="browser">仅浏览器</option></select><p class="field-help">支持 Photo / Reels / Story / Carousel 两阶段 rupload + configure 直连发布、user_breadcrumb 评论与回复、关注/取关及 Direct v2 私信；网络结果不确定时不会重复提交或回退。</p></div>
+            <div class="form-field"><label for="engine-twitter_write_mode">Twitter 写入与发布方式</label><select id="engine-twitter_write_mode" name="twitter_write_mode" disabled><option value="browser">独立浏览器环境（推荐 · 原生生成 x-client-transaction-id）</option></select><p class="field-help">支持纯文本、最多 4 图或单视频/GIF 推文发布、回复权限控制、首评自回复串推、点赞、转推/引用、关注/取关与私信发送；网络结果不确定时不会重复提交。</p></div>
             <div class="form-field"><label class="switch-row" for="engine-comment_browser_headed"><input id="engine-comment_browser_headed" name="comment_browser_headed" type="checkbox" disabled><span class="switch-copy"><b>评论操作显示浏览器窗口</b><span>推荐开启，遇到登录或验证时可以直接处理；关闭后在后台运行。</span></span></label></div>
             <div class="form-field"><label class="switch-row" for="engine-xhs_comment_review_before_publish"><input id="engine-xhs_comment_review_before_publish" name="xhs_comment_review_before_publish" type="checkbox" disabled><span class="switch-copy"><b>小红书评论先审核</b><span>推荐开启。关闭后，新生成的评论可能直接进入发送队列。</span></span></label></div>
           </div>
@@ -2857,10 +4190,11 @@
         </div>
       </details>
       <details class="collection-advanced" id="engine-settings-isolation">
-        <summary>代理校验与写入门禁</summary>
+        <summary>代理防关联提醒与写入门禁</summary>
         <div class="collection-advanced-body stack">
-          <p class="field-help">用于多账号环境隔离的运行开关。新建 native 账号的写操作会按这里的门禁检查浏览器和代理基线。</p>
+          <p class="field-help">防关联提醒策略：系统不强制要求「一号一代理」，也不阻断「本机直连」——多号复用同一代理或无代理本机直连均可正常登录与运行任务，仅在登录选择、账号矩阵和风控中心高亮提示共用出口 IP / 直连风险。同平台多账号与海外平台仍强烈建议尽量配置独立住宅代理。</p>
           <div class="form-grid">
+            <div class="form-field"><label class="switch-row" for="engine-quiet_hours_include_reads"><input id="engine-quiet_hours_include_reads" name="quiet_hours_include_reads" type="checkbox" disabled><span class="switch-copy"><b>夜间休眠覆盖后台监控与采集</b><span>推荐开启。活跃时段外同步静默非交互式定时监控、采集与探活，并为每个账号生成每日随机苏醒偏移。</span></span></label></div>
             <div class="form-field"><label class="switch-row" for="engine-verify_proxy_region"><input id="engine-verify_proxy_region" name="verify_proxy_region" type="checkbox" disabled><span class="switch-copy"><b>校验代理出口地区</b><span>将代理出口国家与账号时区进行比对并记录告警。</span></span></label></div>
             <div class="form-field"><label class="switch-row" for="engine-native_write_gate_enabled"><input id="engine-native_write_gate_enabled" name="native_write_gate_enabled" type="checkbox" disabled><span class="switch-copy"><b>启用 native 写入门禁</b><span>写操作前检查账号浏览器和网络基线。</span></span></label></div>
             <div class="form-field"><label class="switch-row" for="engine-native_write_require_system_chrome"><input id="engine-native_write_require_system_chrome" name="native_write_require_system_chrome" type="checkbox" disabled><span class="switch-copy"><b>写入必须使用系统 Chrome</b><span>提高多账号浏览器环境一致性。</span></span></label></div>
@@ -2909,9 +4243,287 @@
       </div>
     </details>
   </div>
+  <!-- 视频号本机微信通道可视化配置 -->
+  <div class="card" id="channels-protocol-card" data-section="channels">
+    <div class="card-head">
+      <span class="card-ic"><svg aria-hidden="true"><use href="#i-network"/></svg></span>
+      <h2>视频号微信通道 <span class="sub">一键连接本机微信 · 重启自动恢复</span></h2>
+    </div>
+    <div class="stack">
+      <div class="channels-oneclick-panel stack" id="channels-proxy-panel">
+        <div class="row-between gap-wrap">
+          <div class="row gap-wrap">
+            <span class="pill pending" id="ch-proto-badge">正在读取…</span>
+            <span class="field-help" id="ch-proto-summary-text" style="margin:0">正在检查本机微信通道配置与能力状态…</span>
+          </div>
+          <button type="button" class="ghost sm" id="ch-proto-refresh-btn" onclick="CreatorHubChannelsProtocol.load()"><svg aria-hidden="true"><use href="#i-refresh"/></svg>刷新状态</button>
+        </div>
+        <div class="channels-proto-caps" id="ch-proto-caps" aria-label="视频号双通道当前能力"></div>
+
+        <div id="ch-proxy-pages" class="channels-proxy-pages" aria-label="微信连接引导与已连接页面" hidden></div>
+
+        <div class="form-actions channels-proxy-actions">
+          <span class="status-text" id="ch-proto-msg" role="status" aria-live="polite"></span>
+          <button type="button" id="ch-proxy-start-btn" onclick="CreatorHubChannelsProtocol.startProxy()"><svg aria-hidden="true"><use href="#i-play"/></svg>一键连接本机微信</button>
+          <button type="button" class="ghost danger" id="ch-proxy-stop-btn" onclick="CreatorHubChannelsProtocol.stopProxy()" hidden disabled><svg aria-hidden="true"><use href="#i-x"/></svg>断开并关闭</button>
+        </div>
+      </div>
+
+      <details class="collection-advanced" id="channels-advanced-details">
+        <summary>高级设置、证书管理与调试选项（一般用户无需展开）</summary>
+        <div class="collection-advanced-body stack">
+          <div class="channels-proxy-ca-box stack">
+            <div class="row-between gap-wrap">
+              <div class="row gap-wrap">
+                <b>本机代理与根证书状态</b>
+                <span class="pill skipped" id="ch-proxy-badge">未启动</span>
+                <span class="pill skipped" id="ch-proxy-ca-badge">根证书未安装</span>
+              </div>
+              <div class="channels-proto-inline-tools" style="margin-top:0">
+                <button type="button" class="ghost sm" id="ch-proxy-probe-btn" onclick="CreatorHubChannelsProtocol.probe('proxy')"><svg aria-hidden="true"><use href="#i-bolt"/></svg>手动检测连通</button>
+                <button type="button" class="ghost sm" id="ch-proxy-ca-install-btn" onclick="CreatorHubChannelsProtocol.installProxyCert()"><svg aria-hidden="true"><use href="#i-shield"/></svg>安装根证书</button>
+                <button type="button" class="ghost sm" id="ch-proxy-ca-download-btn" onclick="CreatorHubChannelsProtocol.downloadProxyCert()"><svg aria-hidden="true"><use href="#i-download"/></svg>下载证书</button>
+                <button type="button" class="ghost sm danger" id="ch-proxy-ca-uninstall-btn" onclick="CreatorHubChannelsProtocol.uninstallProxyCert()" disabled>卸载证书</button>
+              </div>
+            </div>
+            <p class="field-help" id="ch-proxy-status-text" style="margin:0">仅拦截 channels.weixin.qq.com，其余网站流量原样加密直通，停止或退出软件时自动恢复系统代理。</p>
+            <p class="field-help" id="ch-proxy-ca-text" style="margin:0">点击上方「一键连接本机微信」时会自动检查并安装本机根证书；仅排障时需在此手动管理。</p>
+            <div class="channels-proto-probe" id="ch-proto-probe-box" hidden></div>
+            <label class="switch-row" for="ch-proxy-manage-sysproxy">
+              <input id="ch-proxy-manage-sysproxy" type="checkbox" checked>
+              <span class="switch-copy"><b>自动托管 Windows 系统代理（推荐）</b><span>启动时备份原设置并指向本地代理，退出软件时自动恢复；若使用外部代理规则手动将 <code>channels.weixin.qq.com</code> 分流至 <code>127.0.0.1:2023</code>，可取消勾选。</span></span>
+            </label>
+          </div>
+      <form id="channels-protocol-form" class="stack" novalidate onsubmit="event.preventDefault();CreatorHubChannelsProtocol.save()">
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="ch-proto-read-mode">视频号读取策略</label>
+            <select id="ch-proto-read-mode" aria-describedby="ch-proto-read-mode-help">
+              <option value="auto">原生协议优先，本账号回退创作者助手（推荐）</option>
+              <option value="protocol">仅微信本地 Finder 协议</option>
+              <option value="browser">仅创作者助手浏览器页面</option>
+            </select>
+            <p class="field-help" id="ch-proto-read-mode-help">与「采集与运行 → 视频号读取方式」同步联动；保存后立即用于后续任务。</p>
+          </div>
+          <div class="form-field">
+            <label for="ch-proto-mode">本机微信连接方式</label>
+            <select id="ch-proto-mode" onchange="CreatorHubChannelsProtocol.onModeChange()" aria-describedby="ch-proto-mode-help">
+              <option value="proxy">内置本机微信代理桥接（推荐，免改微信）</option>
+              <option value="none">暂不连接（仅用创作者助手 / 公开预览）</option>
+              <option value="endpoint">直连本机回环 CDP 端点（http / ws）</option>
+              <option value="endpoint_file">WMPF 控制口令文件（wmpf_cdp）</option>
+            </select>
+            <p class="field-help" id="ch-proto-mode-help">内置代理仅拦截 <code>channels.weixin.qq.com</code>，其余 HTTPS 流量原样加密直通，绝不导出账号凭据。</p>
+          </div>
+        </div>
+
+        <div class="form-field" id="ch-proto-proxy-wrap" hidden>
+          <label for="ch-proto-proxy-port">内置本机代理端口（127.0.0.1）</label>
+          <input id="ch-proto-proxy-port" type="number" min="1024" max="65535" step="1" value="2023" aria-describedby="ch-proto-proxy-help">
+          <p class="field-help" id="ch-proto-proxy-help">仅监听本机回环 <code>127.0.0.1</code>（默认 <code>2023</code>）；启动下方内置代理后，在桌面微信中打开一次视频号页面即可自动建立协议桥接。</p>
+        </div>
+
+        <div class="form-field" id="ch-proto-endpoint-wrap">
+          <label for="ch-proto-endpoint">本机回环 CDP 端点地址</label>
+          <input id="ch-proto-endpoint" type="url" inputmode="url" autocomplete="off" placeholder="http://127.0.0.1:9222 或 ws://127.0.0.1:9422/cdp/..." aria-describedby="ch-proto-endpoint-help">
+          <div class="channels-proto-inline-tools">
+            <button type="button" class="ghost sm" id="ch-proto-scan-btn" onclick="CreatorHubChannelsProtocol.discover()"><svg aria-hidden="true"><use href="#i-search"/></svg>扫描本机 CDP 端口</button>
+            <button type="button" class="ghost sm" onclick="CreatorHubChannelsProtocol.fillEndpoint('http://127.0.0.1:9222')">填入 127.0.0.1:9222</button>
+          </div>
+          <p class="field-help" id="ch-proto-endpoint-help">填写桌面微信或 WMPF 调试环境暴露的本机回环地址，也可点击上方按钮自动探测常见端口。</p>
+          <div class="channels-proto-discovered" id="ch-proto-discovered" hidden></div>
+        </div>
+
+        <div class="form-field" id="ch-proto-file-wrap">
+          <label for="ch-proto-endpoint-file">WMPF 控制口令文件路径</label>
+          <input id="ch-proto-endpoint-file" autocomplete="off" placeholder="./data/channels_wmpf_endpoint.json" aria-describedby="ch-proto-file-help">
+          <p class="field-help" id="ch-proto-file-help">指向 <code>wmpf_cdp.LoopbackBridge</code> 生成的 JSON 描述文件；若使用下方托管桥接会自动填入。</p>
+        </div>
+
+        <div class="form-actions channels-proto-actions">
+          <button type="button" class="ghost" id="ch-proto-probe-btn" onclick="CreatorHubChannelsProtocol.probe()"><svg aria-hidden="true"><use href="#i-bolt"/></svg>测试通道连接</button>
+          <button type="button" class="ghost" id="ch-proto-reset-btn" onclick="CreatorHubChannelsProtocol.reset()">恢复默认</button>
+          <button type="submit" id="ch-proto-save-btn"><svg aria-hidden="true"><use href="#i-check"/></svg>保存通道配置</button>
+        </div>
+      </form>
+
+      <details class="collection-advanced" id="channels-bridge-panel">
+        <summary>WMPF 本地回环桥接托管（wmpf_cdp）</summary>
+        <div class="collection-advanced-body stack">
+          <div class="row-between gap-wrap">
+            <div class="row gap-wrap">
+              <span class="pill pending" id="ch-bridge-badge">未启动</span>
+              <span class="field-help" id="ch-bridge-status-text" style="margin:0">仅在需要由 CreatorHub 托管本机 127.0.0.1 WMPF 转发桥时启动。</span>
+            </div>
+            <button type="button" class="ghost sm" id="ch-bridge-refresh-btn" onclick="CreatorHubChannelsProtocol.discover()"><svg aria-hidden="true"><use href="#i-refresh"/></svg>刷新微信进程</button>
+          </div>
+          <div id="ch-bridge-procs" class="channels-proc-chips" aria-label="检测到的微信与 WMPF 进程"></div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="ch-bridge-debug-port">WMPF 调试监听端口</label>
+              <input id="ch-bridge-debug-port" type="number" min="1024" max="65535" step="1" value="9421">
+              <p class="field-help">供本机桌面微信 WMPF 客户端接入（默认 9421，校验 PID 白名单）。</p>
+            </div>
+            <div class="form-field">
+              <label for="ch-bridge-cdp-port">CDP 转发端口</label>
+              <input id="ch-bridge-cdp-port" type="number" min="1024" max="65535" step="1" value="9422">
+              <p class="field-help">仅供 CreatorHub 通过带控制口令的本地 WebSocket 接入（默认 9422）。</p>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="ch-bridge-pids">允许接入的微信 PID（留空自动识别）</label>
+            <input id="ch-bridge-pids" autocomplete="off" placeholder="留空自动绑定上方检测到的 Weixin.exe / WeChat.exe / WeChatAppEx.exe PID；多个用逗号分隔">
+          </div>
+          <div class="form-actions channels-bridge-actions">
+            <button type="button" id="ch-bridge-start-btn" onclick="CreatorHubChannelsProtocol.startBridge()"><svg aria-hidden="true"><use href="#i-play"/></svg>启动桥接并应用</button>
+            <button type="button" class="ghost danger" id="ch-bridge-stop-btn" onclick="CreatorHubChannelsProtocol.stopBridge()" disabled><svg aria-hidden="true"><use href="#i-x"/></svg>停止桥接</button>
+          </div>
+        </div>
+      </details>
+        </div>
+      </details>
+
+      <div class="form-note">
+        <svg aria-hidden="true"><use href="#i-info"/></svg>
+        <span>首次点击「一键连接本机微信」后，只需在电脑微信「文件传输助手」粘贴并点开一次桥接链接（保持窗口最小化即可）；此后重启 CreatorHub 会自动恢复连接，无需重复配置。</span>
+      </div>
+    </div>
+  </div>
+  <!-- 系统日志与问题排查诊断 -->
+  <div class="card diag-card" id="diagnostics-card" data-section="diagnostics">
+    <div class="card-head">
+      <span class="card-ic"><svg aria-hidden="true"><use href="#i-shield"/></svg></span>
+      <h2>日志与诊断 <span class="sub">精简运行记录 · 自动脱敏 · 一键导出反馈</span></h2>
+    </div>
+    <div class="diag-layout">
+      <!-- 1. 顶部问题反馈与一键导出工作区 -->
+      <div class="diag-hero">
+        <div class="diag-hero-top">
+          <div class="diag-hero-title-group">
+            <span class="diag-hero-badge" aria-hidden="true"><svg><use href="#i-sparkles"/></svg></span>
+            <div>
+              <h3>遇到问题需要向开发者反馈？</h3>
+              <p>补充现象说明后一键导出诊断压缩包，或复制精简摘要直接粘贴到微信 / Issue，无需手动翻找日志文件。</p>
+            </div>
+          </div>
+          <div class="diag-hero-actions">
+            <button type="button" class="ghost" id="diag-copy-report-btn" onclick="CreatorHubDiagnostics.copyReport()"><svg aria-hidden="true"><use href="#i-copy"/></svg>复制排查摘要</button>
+            <button type="button" id="diag-export-zip-btn" onclick="CreatorHubDiagnostics.exportZip()"><svg aria-hidden="true"><use href="#i-download"/></svg>导出脱敏诊断包 (.zip)</button>
+          </div>
+        </div>
+        <div class="diag-note-input-wrap">
+          <svg class="diag-note-ic" aria-hidden="true"><use href="#i-edit"/></svg>
+          <input id="diag-issue-note" maxlength="500" autocomplete="off" aria-label="问题现象简述（选填）" placeholder="选填：简述问题现象（会自动写入诊断报告开头），例如：小红书图文点击发布后提示未找到上传框…">
+        </div>
+        <div class="diag-privacy-strip" aria-label="自动隐私脱敏说明">
+          <span class="diag-privacy-badge"><svg aria-hidden="true"><use href="#i-shield"/></svg>自动脱敏已启用</span>
+          <span class="diag-privacy-text">导出时自动剥离：</span>
+          <span class="diag-privacy-tag">Cookie / 登录态</span>
+          <span class="diag-privacy-tag">API Key / 代理密码</span>
+          <span class="diag-privacy-tag">账号昵称 / UID</span>
+          <span class="diag-privacy-tag">私信与评论正文</span>
+          <span class="diag-privacy-tag">本机系统用户名</span>
+        </div>
+      </div>
+
+      <!-- 2. 四宫格运行指标与快捷控制条 -->
+      <div class="diag-kpi-grid">
+        <div class="diag-stat-card">
+          <div class="diag-stat-head">
+            <span class="diag-stat-label">记录模式</span>
+            <span class="diag-mode-pill is-info" id="diag-level-pill"><i class="diag-dot"></i>INFO 精简</span>
+          </div>
+          <div class="diag-mode-seg" role="group" aria-label="切换运行日志级别">
+            <button type="button" class="active" data-diag-mode="info" onclick="CreatorHubDiagnostics.changeLevel('info')">精简</button>
+            <button type="button" data-diag-mode="debug" onclick="CreatorHubDiagnostics.changeLevel('debug')">调试</button>
+            <button type="button" data-diag-mode="warning" onclick="CreatorHubDiagnostics.changeLevel('warning')">仅告警</button>
+          </div>
+          <div class="diag-stat-sub" id="diag-mode-hint">默认静默高频页面轮询请求</div>
+        </div>
+
+        <button type="button" class="diag-stat-card is-interactive" id="diag-card-warn" onclick="CreatorHubDiagnostics.setFilter('warn')">
+          <div class="diag-stat-head">
+            <span class="diag-stat-label">本次运行告警</span>
+            <span class="diag-mini-tag warn">WARN</span>
+          </div>
+          <div class="diag-stat-val"><b id="diag-warn-num">0</b><small>条</small></div>
+          <div class="diag-stat-sub">通道回退 · 风控冷却 · 慢请求</div>
+        </button>
+
+        <button type="button" class="diag-stat-card is-interactive" id="diag-card-err" onclick="CreatorHubDiagnostics.setFilter('error')">
+          <div class="diag-stat-head">
+            <span class="diag-stat-label">本次异常错误</span>
+            <span class="diag-mini-tag danger">ERROR</span>
+          </div>
+          <div class="diag-stat-val"><b id="diag-err-num">0</b><small>条</small></div>
+          <div class="diag-stat-sub">任务执行失败 · 未捕获异常栈</div>
+        </button>
+
+        <div class="diag-stat-card">
+          <div class="diag-stat-head">
+            <span class="diag-stat-label">本地日志占用</span>
+            <span class="diag-mini-tag muted" id="diag-file-cnt">0 个文件</span>
+          </div>
+          <div class="diag-stat-val"><b id="diag-size-val">0 KB</b></div>
+          <div class="diag-stat-actions">
+            <button type="button" class="ghost sm" onclick="CreatorHubDiagnostics.openDir()"><svg aria-hidden="true"><use href="#i-folder"/></svg>打开目录</button>
+            <button type="button" class="ghost sm danger" onclick="CreatorHubDiagnostics.clearLogs()"><svg aria-hidden="true"><use href="#i-trash"/></svg>清理日志</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 一体化日志检视控制台 -->
+      <div class="diag-console">
+        <div class="diag-console-bar">
+          <div class="diag-console-left">
+            <div class="diag-seg" role="group" aria-label="日志级别筛选">
+              <button type="button" class="active" data-diag-lvl="warn" onclick="CreatorHubDiagnostics.setFilter('warn')">告警与错误 <span class="diag-seg-cnt" id="diag-cnt-warn">0</span></button>
+              <button type="button" data-diag-lvl="error" onclick="CreatorHubDiagnostics.setFilter('error')">仅错误 <span class="diag-seg-cnt" id="diag-cnt-err">0</span></button>
+              <button type="button" data-diag-lvl="all" onclick="CreatorHubDiagnostics.setFilter('all')">全部记录 <span class="diag-seg-cnt" id="diag-cnt-all">0</span></button>
+            </div>
+            <span class="diag-bar-sep" aria-hidden="true"></span>
+            <select id="diag-source-select" class="diag-source-select" onchange="CreatorHubDiagnostics.setSource(this.value)" aria-label="日志读取来源">
+              <option value="memory">实时内存缓冲</option>
+              <option value="error.log">error.log · 历史错误</option>
+              <option value="app.log">app.log · 历史运行</option>
+            </select>
+          </div>
+          <div class="diag-console-right">
+            <div class="diag-search-box">
+              <svg class="diag-search-ic" aria-hidden="true"><use href="#i-search"/></svg>
+              <input id="diag-search-input" type="search" placeholder="搜索模块、状态码或错误关键字…" oninput="CreatorHubDiagnostics.onSearchInput()" aria-label="搜索日志">
+              <button type="button" class="diag-search-clear" id="diag-search-clear" hidden onclick="CreatorHubDiagnostics.clearSearch()" aria-label="清除搜索"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+            </div>
+            <button type="button" class="ghost sm diag-refresh-btn" id="diag-refresh-btn" onclick="CreatorHubDiagnostics.load()"><svg aria-hidden="true"><use href="#i-refresh"/></svg>刷新</button>
+          </div>
+        </div>
+
+        <div class="diag-log-viewport" id="diag-log-list" role="log" aria-live="off" aria-label="系统运行日志列表">
+          <div class="diag-empty-state">
+            <div class="diag-empty-title">正在读取运行日志…</div>
+          </div>
+        </div>
+
+        <div class="diag-console-foot">
+          <div class="diag-foot-path">
+            <svg aria-hidden="true"><use href="#i-folder"/></svg>
+            <code id="diag-dir-code">./logs</code>
+            <button type="button" class="diag-path-copy" id="diag-copy-path-btn" onclick="CreatorHubDiagnostics.copyDirPath()" title="复制日志目录路径" aria-label="复制日志目录路径"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>
+            <span class="diag-foot-rule">app.log (≤5MB×4) · error.log (≤2MB×3) 自动滚动限容</span>
+          </div>
+          <span class="status-text" id="diag-status-msg" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+  </div>
   </section>
 
   <section data-panel="publish">
+    <!-- 跨平台 / 多账号矩阵群发 -->
+    <div class="card" data-section="matrix">
+      <div id="wb-matrix-publish-root" class="wb-react-island"></div>
+    </div>
+
     <!-- 发布到小红书 -->
     <div class="card" data-section="editor">
       <div class="card-head">
@@ -2934,7 +4546,7 @@
           </div>
         </div>
         <div>
-          <label class="field" for="pub-title">标题(≤20 字)</label>
+          <label class="field" for="pub-title"><span id="pub-title-label-text">标题(≤20 字)</span></label>
           <input id="pub-title" maxlength="20" placeholder="给作品起个标题">
         </div>
         <div>
@@ -2948,7 +4560,7 @@
         <div class="form-field sh-only">
           <label for="pub-location">位置（可选）</label><input id="pub-location" placeholder="城市或地点名，例如：东莞市 / 杭州西湖">
         </div>
-        <fieldset class="publish-permissions dy-only" id="pub-dy-opts">
+        <fieldset class="publish-permissions" id="pub-dy-opts">
           <legend>互动与权限</legend>
           <div class="publish-permission">
             <label class="field" for="pub-visibility">谁可以看</label>
@@ -2958,7 +4570,7 @@
               <option value="private">仅自己可见</option>
             </select>
           </div>
-          <div class="publish-permission">
+          <div class="publish-permission dy-only">
             <label class="field" for="pub-allowsave">保存权限</label>
             <select id="pub-allowsave" aria-label="保存权限">
               <option value="1">允许他人保存</option>
@@ -2995,6 +4607,131 @@
             </select>
           </div>
         </fieldset>
+        <fieldset class="publish-permissions bili-only" id="pub-bili-opts">
+          <legend>哔哩哔哩投稿与互动设置</legend>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-tid">投稿分区</label>
+            <select id="pub-bili-tid" aria-label="哔哩哔哩投稿分区">
+              <option value="21">生活 · 日常</option>
+              <option value="17">游戏 · 单机游戏</option>
+              <option value="95">科技 · 数码</option>
+              <option value="122">科技 · 野生技术协会</option>
+              <option value="208">知识 · 科学科普</option>
+              <option value="138">生活 · 搞笑</option>
+              <option value="161">生活 · 手工</option>
+              <option value="76">美食 · 美食制作</option>
+              <option value="183">影视 · 影视杂谈</option>
+              <option value="28">音乐 · 原创音乐</option>
+              <option value="27">动画 · 综合</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-copyright">稿件类型</label>
+            <select id="pub-bili-copyright" aria-label="哔哩哔哩稿件类型" onchange="onBiliCopyrightChange()">
+              <option value="1">自制</option>
+              <option value="2">转载</option>
+            </select>
+          </div>
+          <div class="publish-permission" id="pub-bili-source-wrap" style="display:none">
+            <label class="field" for="pub-bili-source">转载来源</label>
+            <input id="pub-bili-source" maxlength="200" placeholder="转载时必填原视频链接或出处">
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-statement">创作声明</label>
+            <select id="pub-bili-statement" aria-label="哔哩哔哩创作声明">
+              <option value="-1">内容无需标注</option>
+              <option value="1">含AI生成内容</option>
+              <option value="2">含虚构演绎内容</option>
+              <option value="3">内容含营销信息</option>
+              <option value="4">个人观点，仅供参考</option>
+              <option value="-2">内容为转载</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-recreate">二创权限</label>
+            <select id="pub-bili-recreate" aria-label="哔哩哔哩二创权限">
+              <option value="-1">默认（不开启二创）</option>
+              <option value="1">允许二创</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-visibility">可见范围</label>
+            <select id="pub-bili-visibility" aria-label="哔哩哔哩可见范围">
+              <option value="public">公开可见</option>
+              <option value="private">仅自己可见</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-close-danmu">弹幕权限</label>
+            <select id="pub-bili-close-danmu" aria-label="哔哩哔哩弹幕权限">
+              <option value="0">开启弹幕</option>
+              <option value="1">关闭弹幕</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-close-reply">评论权限</label>
+            <select id="pub-bili-close-reply" aria-label="哔哩哔哩评论权限">
+              <option value="0">开启评论</option>
+              <option value="1">关闭评论</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-bili-selection-reply">评论精选</label>
+            <select id="pub-bili-selection-reply" aria-label="哔哩哔哩评论精选">
+              <option value="0">普通评论区</option>
+              <option value="1">精选评论后展示</option>
+            </select>
+          </div>
+        </fieldset>
+        <fieldset class="publish-permissions tw-only" id="pub-tw-opts">
+          <legend>Twitter 推文与互动设置</legend>
+          <div class="publish-permission">
+            <label class="field" for="pub-tw-reply-perm">谁可以回复</label>
+            <select id="pub-tw-reply-perm" aria-label="Twitter 回复权限">
+              <option value="everyone">所有人</option>
+              <option value="following">你关注的账号</option>
+              <option value="verified">认证账号</option>
+              <option value="mentioned">仅你提及的账号</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-tw-long">字数上限</label>
+            <select id="pub-tw-long" aria-label="Twitter 字数上限" onchange="applyPlatformUI()">
+              <option value="0">标准推文（≤280 权重字符）</option>
+              <option value="1">X Premium 长推文（≤4000 权重字符）</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-tw-first-comment">发布后首评串推（可选）</label>
+            <input id="pub-tw-first-comment" maxlength="280" placeholder="发布成功后自动在主推文下追加一条自回复（如外链或补充说明）">
+          </div>
+        </fieldset>
+        <fieldset class="publish-permissions ig-only" id="pub-ig-opts">
+          <legend>Instagram 发布形态与互动设置</legend>
+          <div class="publish-permission">
+            <label class="field" for="pub-ig-kind">发布形态</label>
+            <select id="pub-ig-kind" aria-label="Instagram 发布形态">
+              <option value="auto">动态帖子 / Reels / 多图轮播（自动识别）</option>
+              <option value="reels">Reels 短视频（configure_to_clips）</option>
+              <option value="feed">普通视频动态（configure）</option>
+              <option value="story">Story 快拍（configure_to_story）</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-ig-share-feed">Reels 同步主页</label>
+            <select id="pub-ig-share-feed" aria-label="Instagram Reels 同步主页">
+              <option value="1">同步展示到个人主页网格</option>
+              <option value="0">仅展示在 Reels 标签页</option>
+            </select>
+          </div>
+          <div class="publish-permission">
+            <label class="field" for="pub-ig-comment">评论权限</label>
+            <select id="pub-ig-comment" aria-label="Instagram 评论权限">
+              <option value="1">开启评论</option>
+              <option value="0">关闭评论</option>
+            </select>
+          </div>
+        </fieldset>
         <div class="form-actions">
           <span class="status-text" id="pub-msg" role="status" aria-live="polite"></span>
           <button onclick="addPublish()"><svg><use href="#i-send"/></svg>加入发布队列</button>
@@ -3007,15 +4744,15 @@
     <div class="card" data-section="records">
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-list"/></svg></span>
-        <h2>发布记录 / 队列</h2>
+        <h2>发布记录 <span class="sub">排队中与历史发布任务</span></h2>
       </div>
       <div class="table-wrap"><table aria-label="发布任务列表"><thead><tr>
-        <th>标题</th><th>类型</th><th>媒体</th><th>来源</th><th>计划时间</th><th>状态</th><th>操作</th>
+        <th>标题</th><th>发布账号</th><th>类型 / 素材</th><th>来源</th><th>计划时间</th><th>状态</th><th style="text-align:right">操作</th>
       </tr></thead><tbody id="pub-table"></tbody></table></div>
     </div>
 
     <!-- 已发布作品(创作平台)· 仅小红书 -->
-    <div class="card xhs-only" data-section="published">
+    <div class="card xhs-rn-only" data-section="published">
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-film"/></svg></span>
         <h2>已发布作品 <span class="sub">小红书创作平台</span></h2>
@@ -3088,8 +4825,10 @@
 
     <!-- 任务列表 -->
     <div class="card" data-section="tasks">
-      <div class="card-head"><span class="card-ic"><svg><use href="#i-msg"/></svg></span><h2>评论任务 / 记录</h2>
-        <select id="ac-task-filter" onchange="refreshCommentTasks()" style="margin-left:auto;max-width:160px;flex:0 0 auto" aria-label="按状态筛选评论任务">
+      <div class="card-head"><span class="card-ic"><svg><use href="#i-msg"/></svg></span><h2>任务与审核 <span class="sub">待审草稿与自动发送记录</span></h2></div>
+      <div class="wb-list-tools">
+        <label class="wb-search-field"><svg aria-hidden="true"><use href="#i-logo"/></svg><input type="search" id="ac-task-search" placeholder="搜索文案、作品 ID 或昵称" aria-label="搜索评论任务" oninput="renderCommentTaskRows()"></label>
+        <select id="ac-task-filter" onchange="refreshCommentTasks()" style="max-width:170px;flex:0 0 auto" aria-label="按状态筛选评论任务">
           <option value="">全部状态</option>
           <option value="draft">草稿待审</option>
           <option value="pending">排队中</option>
@@ -3098,20 +4837,21 @@
           <option value="failed">失败</option>
           <option value="canceled">已取消</option>
         </select>
+        <span class="filter-count" id="ac-task-count" role="status" aria-live="polite"></span>
       </div>
-      <div id="ac-draft-bar" class="hint" style="display:none;align-items:center;gap:10px;border-left:3px solid var(--info);padding:8px 10px;margin-bottom:10px">
+      <div id="ac-draft-bar" class="hint" style="display:none;align-items:center;gap:10px;border-left:3px solid var(--info);padding:8px 12px;margin-bottom:10px;background:var(--info-soft);border-radius:var(--r-xs)">
         <span id="ac-draft-count" style="flex:1"></span>
         <button class="sm" onclick="approveAllDrafts()"><svg><use href="#i-check"/></svg>全部通过</button>
       </div>
       <div class="table-wrap"><table aria-label="自动评论任务记录"><thead><tr>
-        <th>文案</th><th>目标作品</th><th>对象</th><th>计划时间</th><th>通道</th><th>状态</th><th>操作</th>
+        <th>评论文案</th><th>目标与账号</th><th>互动类型</th><th>计划时间</th><th>执行通道</th><th>状态</th><th style="text-align:right">操作</th>
       </tr></thead><tbody id="ac-task-table"></tbody></table></div>
     </div>
   </section>
 
   <section data-panel="notifications">
   <!-- 通知推送 -->
-  <div class="card">
+  <div class="card" data-section="channels">
     <div class="card-head">
       <span class="card-ic"><svg><use href="#i-bell"/></svg></span>
       <h2>通知推送 <span class="sub">新作品 / 新评论时提醒</span></h2>
@@ -3141,9 +4881,9 @@
     </div>
     <div class="section-divider"></div>
     <div class="data-section-head"><b>已配置渠道</b><span>可单独测试、停用或编辑</span></div>
-    <div class="table-wrap mini-table"><table id="n-table" aria-label="通知渠道列表"><tbody></tbody></table></div>
+    <div class="table-wrap mini-table"><table id="n-table" aria-label="通知渠道列表"><thead><tr><th>渠道名称 / 类型</th><th>状态</th><th style="text-align:right">操作</th></tr></thead><tbody></tbody></table></div>
   </div>
-  <div class="card">
+  <div class="card" data-section="webhooks">
     <div class="card-head">
       <span class="card-ic"><svg><use href="#i-bolt"/></svg></span>
       <h2>Webhook 事件中心 <span class="sub">账号操作、群成员变化与直播线索</span></h2>
@@ -3174,11 +4914,12 @@
       <input type="search" id="mon-search" placeholder="搜索用户或别名" aria-label="搜索监控目标" oninput="onMonitorFilter()">
       <select id="mon-group" aria-label="按分组筛选监控" onchange="onMonitorFilter()"><option value="">全部分组</option></select>
       <select id="mon-tag" aria-label="按标签筛选监控" onchange="onMonitorFilter()"><option value="">全部标签</option></select>
+      <select id="mon-status" aria-label="按运行状态筛选监控" onchange="onMonitorFilter()"><option value="">全部状态</option><option value="enabled">监控中</option><option value="paused">已暂停</option><option value="error">有异常</option></select>
       <span class="filter-count" id="mon-filter-count" role="status" aria-live="polite"></span>
       <div class="toolbar-actions"><span class="toolbar-actions-label">操作</span><div class="export-actions" role="group" aria-label="监控列表 Excel 导出"><span class="export-caption" title="导出当前模块数据"><svg aria-hidden="true"><use href="#i-download"/></svg>Excel</span><button type="button" class="export-btn filtered" onclick="exportModuleReport('monitors', false, this)" title="导出当前条件下的全部匹配记录" aria-label="导出监控列表当前结果"><svg aria-hidden="true"><use href="#i-download"/></svg>当前结果</button><button type="button" class="export-btn full" onclick="exportModuleReport('monitors', true, this)" title="导出当前平台全部记录" aria-label="导出监控列表全部数据"><svg aria-hidden="true"><use href="#i-download"/></svg>全部数据</button></div></div>
     </div>
     <div class="table-wrap"><table aria-label="作品监控列表"><thead><tr>
-      <th>用户</th><th>分组 / 标签</th><th>作品数</th><th>间隔</th><th>下载设置</th><th>上次扫描</th><th>状态</th><th></th>
+      <th>监控对象</th><th>分组 / 标签</th><th>已采记录</th><th>检查间隔</th><th>抓取与下载策略</th><th>上次扫描</th><th>状态</th><th style="text-align:right">操作</th>
     </tr></thead><tbody id="mon-table"></tbody></table></div>
   </div>
 
@@ -3187,6 +4928,10 @@
     <div class="card-head">
       <span class="card-ic"><svg><use href="#i-film"/></svg></span>
       <h2 id="content-title">作品记录</h2>
+      <div class="right wb-inline-toggle" role="group" aria-label="作品展示模式">
+        <button type="button" class="ghost sm" id="content-view-cards" onclick="setContentViewMode('cards')"><svg><use href="#i-image"/></svg>封面画廊</button>
+        <button type="button" class="ghost sm" id="content-view-table" onclick="setContentViewMode('table')"><svg><use href="#i-list"/></svg>紧凑表格</button>
+      </div>
     </div>
     <div class="content-scope">
       <div class="content-scope-copy"><span class="content-origin-label">当前查看范围</span>
@@ -3244,11 +4989,11 @@
       <colgroup>
         <col class="content-col-check"><col class="content-col-cover"><col class="content-col-desc">
         <col class="content-col-type"><col class="content-col-time"><col class="content-col-data">
-        <col class="content-col-actions"><col class="content-col-local">
+        <col class="content-col-local"><col class="content-col-actions">
       </colgroup>
       <thead><tr>
         <th><input type="checkbox" id="content-selall" onchange="contentToggleAll(this.checked)" aria-label="全选"></th>
-        <th>封面</th><th>作品 / 来源任务</th><th>类型</th><th>抓取 / 发布时间</th><th>数据</th><th>状态 / 操作</th><th>本地文件</th>
+        <th>封面</th><th>作品 / 来源任务</th><th>规格</th><th>抓取 / 发布时间</th><th>互动数据</th><th>状态 / 本地文件</th><th style="text-align:right">操作</th>
       </tr></thead><tbody id="content-table"></tbody>
      </table></div>
     <div id="content-cards" class="xhs-grid" style="display:none"></div>
@@ -3298,13 +5043,13 @@
           </div>
         </div>
         <div class="form-grid cols-auto">
-          <div class="form-field"><label for="w-kind">监控对象类型</label><select id="w-kind">
+          <div class="form-field"><label for="w-kind">监控对象类型</label><select id="w-kind" onchange="resetWatchTargetState()">
               <option value="auto">自动识别</option><option value="video">单条视频</option><option value="user">账号近期作品</option>
           </select></div>
           <div class="form-field dy-only"><label for="w-mode">评论来源</label><select id="w-mode" onchange="populateWatchAccount()">
               <option value="public">公开评论区</option><option value="creator">创作中心（仅自有账号）</option>
           </select></div>
-          <div class="form-field"><label for="w-acc">使用账号</label><select id="w-acc"></select></div>
+          <div class="form-field" id="w-acc-wrap"><label for="w-acc">使用账号</label><select id="w-acc"></select></div>
           <div class="form-field"><label for="w-interval">检查频率</label><select id="w-interval" aria-describedby="w-interval-help">
               <option value="1">每 1 秒</option><option value="5">每 5 秒</option><option value="10">每 10 秒</option>
               <option value="15">每 15 秒</option><option value="30">每 30 秒</option><option value="60">每 1 分钟</option>
@@ -3357,11 +5102,12 @@
       <input type="search" id="watch-search" placeholder="搜索对象或别名" aria-label="搜索评论监控" oninput="onWatchFilter()">
       <select id="watch-group" aria-label="按分组筛选评论监控" onchange="onWatchFilter()"><option value="">全部分组</option></select>
       <select id="watch-tag" aria-label="按标签筛选评论监控" onchange="onWatchFilter()"><option value="">全部标签</option></select>
+      <select id="watch-status" aria-label="按状态筛选评论监控" onchange="onWatchFilter()"><option value="">全部状态</option><option value="enabled">监控中</option><option value="paused">已暂停</option><option value="error">有异常</option></select>
       <span class="filter-count" id="watch-filter-count" role="status" aria-live="polite"></span>
       <div class="toolbar-actions"><span class="toolbar-actions-label">操作</span><div class="export-actions" role="group" aria-label="评论监控 Excel 导出"><span class="export-caption" title="导出当前模块数据"><svg aria-hidden="true"><use href="#i-download"/></svg>Excel</span><button type="button" class="export-btn filtered" onclick="exportModuleReport('comment-watches', false, this)" title="导出当前条件下的全部匹配记录" aria-label="导出评论监控当前结果"><svg aria-hidden="true"><use href="#i-download"/></svg>当前结果</button><button type="button" class="export-btn full" onclick="exportModuleReport('comment-watches', true, this)" title="导出当前平台全部记录" aria-label="导出评论监控全部数据"><svg aria-hidden="true"><use href="#i-download"/></svg>全部数据</button></div></div>
       </div>
       <div class="table-wrap"><table aria-label="评论监控列表"><thead><tr>
-        <th>对象</th><th>分组 / 标签</th><th>类型</th><th>来源</th><th>评论数</th><th>间隔</th><th>上次扫描</th><th>状态</th><th>操作</th>
+        <th>监控对象</th><th>分组 / 标签</th><th>类型 / 来源</th><th>已采评论</th><th>检查间隔</th><th>上次扫描</th><th>状态</th><th style="text-align:right">操作</th>
       </tr></thead><tbody id="watch-table"></tbody></table></div>
     </div>
 
@@ -3369,7 +5115,7 @@
   <div class="card" data-section="records">
     <div class="card-head">
       <span class="card-ic"><svg><use href="#i-msg"/></svg></span>
-      <h2>抓到的评论</h2>
+      <h2>评论记录 <span class="sub">按来源任务与入库时间检索</span></h2>
     </div>
     <div class="content-scope">
       <div class="content-scope-copy"><span class="content-origin-label">当前查看范围</span>
@@ -3396,7 +5142,7 @@
     </div>
     <div class="manage-toolbar">
         <input type="search" id="comment-query" placeholder="搜索评论 / 用户 / 地区 / 作品 ID" aria-label="搜索评论内容" oninput="refreshComments(true)">
-        <input type="search" id="comment-ip-label" placeholder="地区" aria-label="按评论地区筛选" oninput="refreshComments(true)">
+        <input type="text" id="comment-ip-label" placeholder="地区（如：广东）" aria-label="按评论地区筛选" oninput="refreshComments(true)">
         <select id="comment-group" onchange="onCommentMetaFilter()" aria-label="按分组筛选评论"><option value="">全部分组</option></select>
         <select id="comment-tag" onchange="onCommentMetaFilter()" aria-label="按标签筛选评论"><option value="">全部标签</option></select>
         <select id="comment-type" onchange="refreshComments(true)" aria-label="按评论类型筛选">
@@ -3411,13 +5157,16 @@
         <div class="toolbar-actions"><span class="toolbar-actions-label">操作</span>
           <div class="export-actions" role="group" aria-label="评论数据 Excel 导出"><span class="export-caption" title="导出当前模块数据"><svg aria-hidden="true"><use href="#i-download"/></svg>Excel</span><button type="button" class="export-btn filtered" onclick="exportModuleReport('comments', false, this)" title="导出当前条件下的全部匹配记录" aria-label="导出评论数据当前结果"><svg aria-hidden="true"><use href="#i-download"/></svg>当前结果</button><button type="button" class="export-btn full" onclick="exportModuleReport('comments', true, this)" title="导出当前平台全部记录" aria-label="导出评论数据全部数据"><svg aria-hidden="true"><use href="#i-download"/></svg>全部数据</button></div>
           <button class="ghost sm" id="comment-selall-btn" onclick="commentSelAllToggle()">全选</button>
-          <span class="mut" id="comment-selcount" style="display:none">已选 0</span>
-          <button class="sm danger" id="comment-batchbtn" style="display:none" onclick="commentBatchDelete()"><svg><use href="#i-trash"/></svg>批量删除</button>
+          <span id="comment-selbar" style="display:none;align-items:center;gap:8px">
+            <span class="mut" id="comment-selcount">已选 0</span>
+            <button class="ghost sm" type="button" onclick="commentSelClear()">取消</button>
+            <button class="sm danger" id="comment-batchbtn" onclick="commentBatchDelete()"><svg><use href="#i-trash"/></svg>批量删除</button>
+          </span>
           <button class="ghost sm danger" onclick="clearComments()"><svg><use href="#i-trash"/></svg>清空评论</button>
         </div>
     </div>
     <div class="table-wrap" id="comment-table-wrap"><table class="watch-record-table comment-record-table" aria-label="已抓取评论、来源任务与抓取时间"><thead><tr>
-      <th style="width:30px"><input type="checkbox" id="comment-selall" onchange="commentToggleAll(this.checked)" aria-label="全选"></th>
+      <th><input type="checkbox" id="comment-selall" onchange="commentToggleAll(this.checked)" aria-label="全选"></th>
       <th>评论 / 来源任务</th><th>用户</th><th>赞</th><th>抓取 / 评论时间</th><th>操作</th>
     </tr></thead><tbody id="comment-table"></tbody></table></div>
     <div id="comment-pager" class="danmaku-pager" hidden>
@@ -3441,21 +5190,21 @@
   </div>
   </section>
 
-  <section data-panel="danmaku" class="dy-only">
+  <section data-panel="danmaku" class="danmaku-only">
     <div class="card">
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-msg"/></svg></span>
         <h2>添加弹幕监控 <span class="sub">监控视频内时间点弹幕，不是评论区评论</span></h2>
       </div>
       <div class="hint" style="margin-bottom:14px">
-        自己的视频选择「创作中心」并绑定创作者账号；别人的公开视频选择「播放页」。首次扫描会建立历史基线，后续只推送新增弹幕。
+        自己的抖音视频可选择「创作中心」并绑定创作者账号；抖音与哔哩哔哩公开视频选择「公开视频播放页」。首次扫描会建立历史基线，后续只推送新增弹幕。
       </div>
       <div class="stack">
         <div>
           <label class="field" for="d-w-url" id="d-w-url-label">视频 / 账号主页 / 完整分享文案 / ID</label>
           <div class="smart-target-input">
             <input id="d-w-url" maxlength="100000" autocomplete="off"
-              placeholder="直接粘贴整段抖音分享文案，将自动提取视频或主页链接"
+              placeholder="直接粘贴整段抖音或哔哩哔哩分享文案，将自动提取视频或主页链接"
               onpaste="handleDanmakuTargetPaste()" oninput="resetDanmakuTargetState()"
               onkeydown="handleDanmakuTargetKeydown(event)">
             <button type="button" class="smart-target-action" onclick="normalizeDanmakuTarget(this)"
@@ -3464,7 +5213,7 @@
             </button>
           </div>
           <div class="smart-target-feedback" id="d-w-url-feedback" role="status" aria-live="polite">
-            支持完整抖音分享文案、视频链接、账号主页、短链或 ID
+            支持完整抖音 / 哔哩哔哩分享文案、BV/av 号、视频链接、空间主页或短链
           </div>
         </div>
         <div class="form-grid cols-auto">
@@ -3472,7 +5221,7 @@
             <option value="auto">自动识别</option><option value="video">单条视频</option><option value="user">账号近期作品</option>
           </select></div>
           <div class="form-field"><label for="d-w-mode">弹幕来源</label><select id="d-w-mode" onchange="applyDanmakuForm()">
-            <option value="public">公开视频播放页</option><option value="creator">创作中心（自己的视频）</option>
+            <option value="public">公开视频播放页</option><option value="creator" class="dy-only">创作中心（自己的视频）</option>
           </select></div>
           <div class="form-field"><label for="d-w-acc" id="d-w-acc-label">播放页账号（可选）</label><select id="d-w-acc"></select></div>
           <div class="form-field"><label for="d-w-interval">检查频率</label><select id="d-w-interval" aria-describedby="d-w-interval-help">
@@ -3533,18 +5282,19 @@
         <input type="search" id="danmaku-watch-search" placeholder="搜索对象或别名" aria-label="搜索弹幕监控" oninput="renderDanmakuWatchRows()">
         <select id="danmaku-watch-group" aria-label="按分组筛选弹幕监控" onchange="renderDanmakuWatchRows()"><option value="">全部分组</option></select>
         <select id="danmaku-watch-tag" aria-label="按标签筛选弹幕监控" onchange="renderDanmakuWatchRows()"><option value="">全部标签</option></select>
+        <select id="danmaku-watch-status" aria-label="按状态筛选弹幕监控" onchange="renderDanmakuWatchRows()"><option value="">全部状态</option><option value="enabled">监控中</option><option value="paused">已暂停</option><option value="error">有异常</option></select>
         <span class="filter-count" id="danmaku-watch-filter-count"></span>
         <div class="toolbar-actions"><span class="toolbar-actions-label">操作</span><div class="export-actions" role="group" aria-label="弹幕监控 Excel 导出"><span class="export-caption" title="导出当前模块数据"><svg aria-hidden="true"><use href="#i-download"/></svg>Excel</span><button type="button" class="export-btn filtered" onclick="exportModuleReport('danmaku-watches', false, this)" title="导出当前条件下的全部匹配记录" aria-label="导出弹幕监控当前结果"><svg aria-hidden="true"><use href="#i-download"/></svg>当前结果</button><button type="button" class="export-btn full" onclick="exportModuleReport('danmaku-watches', true, this)" title="导出当前平台全部记录" aria-label="导出弹幕监控全部数据"><svg aria-hidden="true"><use href="#i-download"/></svg>全部数据</button></div></div>
       </div>
       <div class="table-wrap"><table aria-label="弹幕监控列表"><thead><tr>
-        <th>对象</th><th>类型</th><th>来源</th><th>弹幕数</th><th>间隔</th><th>上次扫描</th><th>状态</th><th>操作</th>
+        <th>监控对象</th><th>分组 / 标签</th><th>类型 / 来源</th><th>已采弹幕</th><th>检查间隔</th><th>上次扫描</th><th>状态</th><th style="text-align:right">操作</th>
       </tr></thead><tbody id="danmaku-watch-table"></tbody></table></div>
     </div>
 
     <div class="card" data-section="records">
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-msg"/></svg></span>
-        <h2>抓到的弹幕</h2>
+        <h2>弹幕记录 <span class="sub">按视频时间点与来源任务检索</span></h2>
       </div>
       <div class="content-scope">
         <div class="content-scope-copy"><span class="content-origin-label">当前查看范围</span>
@@ -3583,9 +5333,8 @@
           <button class="ghost sm danger" onclick="clearDanmaku()"><svg><use href="#i-trash"/></svg>清空弹幕</button>
         </div>
       </div>
-      <div class="hint" style="margin:8px 0 10px">“来源任务”是抓取该记录的监控配置；“获取渠道”是播放页或创作中心；“视频内时间”表示弹幕在视频中的出现位置。</div>
       <div class="table-wrap" id="danmaku-table-wrap"><table class="watch-record-table danmaku-record-table" aria-label="已抓取弹幕、来源任务与抓取时间"><thead><tr>
-        <th>弹幕 / 来源任务</th><th>用户</th><th>视频内时间</th><th>获取渠道</th><th>抓取 / 发送时间</th><th>操作</th>
+        <th title="弹幕文本与抓取该记录的监控任务">弹幕 / 来源任务</th><th>用户</th><th title="弹幕在视频播放轴中的出现位置">视频内时间</th><th title="公开视频播放页或创作者中心">获取渠道</th><th>抓取 / 发送时间</th><th style="text-align:right">操作</th>
       </tr></thead><tbody id="danmaku-table"></tbody></table></div>
       <div id="danmaku-pager" class="danmaku-pager" hidden>
         <div class="danmaku-pager-left">
@@ -3609,21 +5358,22 @@
     </div>
   </section>
 
-  <!-- ───────── 账号管理(独立面板:本账号的作品/关注/粉丝/私信,数据按所选账号隔离) ───────── -->
+  <!-- ───────── 账号管理(矩阵跨号对比大盘 + 聚合私信 + 单账号明细) ───────── -->
   <section data-panel="hub">
-    <div class="card">
+    <div id="wb-hub-matrix-root" class="wb-react-island"></div>
+    <div class="card" id="hub-single-account-card">
       <div class="card-head">
         <span class="card-ic"><svg><use href="#i-user"/></svg></span>
-        <h2>本账号管理 <span class="sub">本账号的作品、数据与已支持的关系功能</span></h2>
+        <h2>单账号精细管理 <span class="sub">所选账号的作品、关注、粉丝、私信与趋势</span></h2>
         <div class="right" style="display:flex;gap:8px;align-items:center">
           <select id="hub-acc" onchange="onHubAcc()" style="width:auto;min-width:190px" aria-label="选择账号"></select>
         </div>
       </div>
       <div class="tabbar" style="position:static;margin-bottom:14px">
         <button class="tab active" data-hubtab="myworks" onclick="switchHubTab('myworks')"><svg><use href="#i-film"/></svg>我的作品 <span class="tab-badge" id="hb-myworks">0</span></button>
-        <button class="tab notsh-only tk-hide" data-hubtab="following" onclick="switchHubTab('following')"><svg><use href="#i-user"/></svg>关注 <span class="tab-badge" id="hb-following">0</span></button>
-        <button class="tab notsh-only tk-hide" data-hubtab="fans" onclick="switchHubTab('fans')"><svg><use href="#i-heart"/></svg>粉丝 <span class="tab-badge" id="hb-fans">0</span></button>
-        <button class="tab notsh-only tk-hide" data-hubtab="dm" onclick="switchHubTab('dm')"><svg><use href="#i-send"/></svg>私信 <span class="tab-badge" id="hb-dm">0</span></button>
+        <button class="tab notsh-only tk-hide rn-hide" data-hubtab="following" onclick="switchHubTab('following')"><svg><use href="#i-user"/></svg>关注 <span class="tab-badge" id="hb-following">0</span></button>
+        <button class="tab notsh-only tk-hide rn-hide" data-hubtab="fans" onclick="switchHubTab('fans')"><svg><use href="#i-heart"/></svg>粉丝 <span class="tab-badge" id="hb-fans">0</span></button>
+        <button class="tab notsh-only tk-hide rn-hide" data-hubtab="dm" onclick="switchHubTab('dm')"><svg><use href="#i-send"/></svg>私信 <span class="tab-badge" id="hb-dm">0</span></button>
         <button class="tab" data-hubtab="stats" onclick="switchHubTab('stats')"><svg><use href="#i-eye"/></svg>数据 <span class="tab-badge" id="hb-stats">0</span></button>
       </div>
 

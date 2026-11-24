@@ -77,6 +77,30 @@ TRANSPORT_SPECS: tuple[dict[str, Any], ...] = (
     {"platform": "xhs", "operation": "follows", "label": "关注/粉丝列表",
      "setting": "", "fixed": "unavailable", "api": False, "browser": False,
      "note": "网页端未提供该列表"},
+    # Rednote (海外小红书): strictly isolated rednote.com 4-domain boundary + XYS/XYW+b1 API & RPA.
+    {"platform": "rednote", "operation": "public_monitor", "label": "作品/关键词/收藏与公开评论读取",
+     "setting": "rednote_read_mode", "default": "hybrid", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "rednote.com Cookie + XYS / XYW + b1 / dsllt + a1",
+     "wire_protocol": "HTTPS JSON + SSR __INITIAL_STATE__"},
+    {"platform": "rednote", "operation": "account_works", "label": "本账号资料/作品同步与可见性删除管理",
+     "setting": "rednote_read_mode", "default": "hybrid", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "webapi.rednote.com + creator.rednote.com XYS/XYW + b1",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "rednote", "operation": "publish", "label": "图文与视频笔记发布",
+     "setting": "rednote_publish_mode", "default": "browser", "api": True, "browser": True,
+     "auth_protocol": "creator.rednote.com RPA / 实验性 XYS + b1 + x-rap-param (//webapi.rednote.com)",
+     "wire_protocol": "COS upload + HTTPS JSON"},
+    {"platform": "rednote", "operation": "comment_write", "label": "评论写入与自动计划",
+     "setting": "", "fixed": "unavailable", "api": False, "browser": False,
+     "note": "海外小红书暂未开放评论写入与自动计划"},
+    {"platform": "rednote", "operation": "dm_sync", "label": "私信会话/自动回复",
+     "setting": "", "fixed": "unavailable", "api": False, "browser": False,
+     "note": "海外小红书暂未开放国内 RWP 私信协议通道"},
+    {"platform": "rednote", "operation": "follows", "label": "关注/粉丝列表",
+     "setting": "", "fixed": "unavailable", "api": False, "browser": False,
+     "note": "网页端未提供该列表"},
     # Platforms without a supported direct transport remain explicit rather
     # than being silently grouped under a global API selector.
     {"platform": "kuaishou", "operation": "account_management", "label": "作品/评论/关注/写入",
@@ -85,12 +109,203 @@ TRANSPORT_SPECS: tuple[dict[str, Any], ...] = (
      "setting": "", "fixed": "browser", "api": False, "browser": True,
      "auth_protocol": "X-WECHAT-UIN + device fingerprint + plugin session",
      "wire_protocol": "JSON / form requests"},
+    {"platform": "shipinhao", "operation": "finder_protocol", "label": "搜索/创作者/全量评论协议采集",
+     "setting": "channels_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "requires_channels_cdp": True,
+     "auth_protocol": "WeixinJSBridge finderH5ExtTransfer (cmdid 10753) + WMPF loopback CDP",
+     "wire_protocol": "Loopback CDP / WMPF protobuf + JSON",
+     "note": "auto 模式优先复用已登录桌面微信原生 Finder 服务，不可达时回退创作者助手页面"},
+    {"platform": "shipinhao", "operation": "share_download", "label": "分享解析与加密视频 WxIsaac64 解码",
+     "setting": "channels_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "requires_channels_cdp": True,
+     "auth_protocol": "finderGetCommentDetail + finder-preview API + WxIsaac64 128KiB XOR",
+     "wire_protocol": "HTTPS JSON + encrypted MP4 stream"},
+    # Bilibili WBI / Cookie / Broadcast Protobuf + member.bilibili.com RPA.
+    {"platform": "bilibili", "operation": "public_monitor", "label": "空间/搜索/评论/弹幕读取",
+     "setting": "bilibili_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "WBI w_rid/wts + buvid3/4 + SESSDATA",
+     "wire_protocol": "HTTPS JSON + deflate XML danmaku"},
+    {"platform": "bilibili", "operation": "account_works", "label": "本账号资料/创作中心稿件/统计",
+     "setting": "bilibili_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "SESSDATA + bili_jct + RSA-OAEP correspond refresh",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "bilibili", "operation": "following_list", "label": "关注列表同步",
+     "setting": "bilibili_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "SESSDATA + /x/relation/followings",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "bilibili", "operation": "followers_list", "label": "粉丝列表同步",
+     "setting": "bilibili_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "SESSDATA + /x/relation/followers",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "bilibili", "operation": "dm_sync", "label": "私信会话/历史与 Broadcast 推送",
+     "setting": "bilibili_read_mode", "api": True, "browser": False,
+     "auth_protocol": "SESSDATA + WBI new_sessions + Broadcast AuthReq",
+     "wire_protocol": "HTTPS JSON + WSS 8-type Protobuf WatchNotify"},
+    {"platform": "bilibili", "operation": "comment_write", "label": "评论/回复/点赞/删除与关注",
+     "setting": "bilibili_write_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "bili_jct CSRF + SESSDATA",
+     "wire_protocol": "x-www-form-urlencoded"},
+    {"platform": "bilibili", "operation": "dm_send", "label": "私信发送",
+     "setting": "bilibili_write_mode", "api": True, "browser": False,
+     "auth_protocol": "WBI (w_sender_uid/w_receiver_id/w_dev_id) + bili_jct",
+     "wire_protocol": "x-www-form-urlencoded"},
+    {"platform": "bilibili", "operation": "publish", "label": "视频投稿与图文动态发布",
+     "setting": "", "fixed": "browser", "api": False, "browser": True,
+     "auth_protocol": "member.bilibili.com RPA + add/v3 payload merge",
+     "wire_protocol": "UPOS + HTTPS JSON"},
+    # Instagram Mobile API v1 (Bearer IGT:2 + SIGNATURE.) + Web Session HTTP + Web RPA.
+    {"platform": "instagram", "operation": "public_monitor", "label": "主页/话题/Reels/评论读取",
+     "setting": "instagram_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "Bearer IGT:2 + Web Cookie / X-CSRFToken",
+     "wire_protocol": "HTTPS JSON + chunked NDJSON (clips/user)"},
+    {"platform": "instagram", "operation": "account_works", "label": "本账号资料与作品列表同步",
+     "setting": "instagram_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "Bearer IGT:2 + response header token writeback",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "instagram", "operation": "following_list", "label": "关注列表同步",
+     "setting": "instagram_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "Bearer IGT:2 + RankTokenCache (/friendships/following/)",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "instagram", "operation": "followers_list", "label": "粉丝列表同步",
+     "setting": "instagram_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "Bearer IGT:2 + RankTokenCache (/friendships/followers/)",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "instagram", "operation": "dm_sync", "label": "Direct v2 私信收件箱与历史同步",
+     "setting": "instagram_read_mode", "api": True, "browser": False,
+     "auth_protocol": "Bearer IGT:2 + Web direct_v2/inbox fallback",
+     "wire_protocol": "HTTPS JSON (microsecond timestamp)"},
+    {"platform": "instagram", "operation": "comment_write", "label": "评论/回复/点赞与关注",
+     "setting": "instagram_write_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "signed_body=SIGNATURE. + HMAC-SHA256 user_breadcrumb",
+     "wire_protocol": "x-www-form-urlencoded"},
+    {"platform": "instagram", "operation": "dm_send", "label": "Direct v2 私信发送(文本/链接/图视)",
+     "setting": "instagram_write_mode", "api": True, "browser": False,
+     "auth_protocol": "Bearer IGT:2 + unique_time_id client_context",
+     "wire_protocol": "x-www-form-urlencoded (broadcast/text | link | configure_*)"},
+    {"platform": "instagram", "operation": "publish", "label": "图文/轮播/Reels/快拍发布",
+     "setting": "instagram_write_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first", "native_browser_override": True,
+     "auth_protocol": "rupload_igphoto/igvideo + %20 SIGNATURE. configure + Web RPA",
+     "wire_protocol": "Binary stream + x-www-form-urlencoded"},
+    # X (Twitter): Syndication/REST v1.1 lightweight HTTP + isolated Browser GraphQL interception & RPA.
+    {"platform": "twitter", "operation": "public_monitor", "label": "主页/关键词/推文详情与评论读取",
+     "setting": "twitter_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "Syndication token + auth_token/ct0 + Browser GraphQL interception",
+     "wire_protocol": "HTTPS JSON (UserTweets / SearchTimeline / TweetDetail)"},
+    {"platform": "twitter", "operation": "account_works", "label": "本账号资料与推文列表同步",
+     "setting": "twitter_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "OAuth2Session Bearer + ct0 CSRF + Browser UserTweets",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "twitter", "operation": "following_list", "label": "关注列表同步",
+     "setting": "twitter_read_mode", "api": False, "browser": True,
+     "note": "X Following GraphQL 需浏览器 x-client-transaction-id 签名",
+     "auth_protocol": "Isolated Browser Session (Following GraphQL + UserCell)",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "twitter", "operation": "followers_list", "label": "粉丝列表同步",
+     "setting": "twitter_read_mode", "api": False, "browser": True,
+     "note": "X Followers GraphQL 需浏览器 x-client-transaction-id 签名",
+     "auth_protocol": "Isolated Browser Session (Followers GraphQL + UserCell)",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "twitter", "operation": "dm_sync", "label": "X 私信收件箱与会话历史同步",
+     "setting": "twitter_read_mode", "api": True, "browser": True,
+     "hybrid_order": "api_first",
+     "auth_protocol": "OAuth2Session Bearer + ct0 (/i/api/1.1/dm/inbox_initial_state) + Browser fallback",
+     "wire_protocol": "HTTPS JSON"},
+    {"platform": "twitter", "operation": "comment_write", "label": "回复/点赞/转推/引用与关注",
+     "setting": "twitter_write_mode", "fixed": "browser", "api": False, "browser": True,
+     "auth_protocol": "Isolated Browser RPA + CreateTweet/FavoriteTweet/CreateRetweet confirm",
+     "wire_protocol": "Browser GraphQL JSON"},
+    {"platform": "twitter", "operation": "dm_send", "label": "X 私信发送",
+     "setting": "twitter_write_mode", "fixed": "browser", "api": False, "browser": True,
+     "auth_protocol": "Isolated Browser RPA + dm/new2.json confirm",
+     "wire_protocol": "Browser REST/GraphQL JSON"},
+    {"platform": "twitter", "operation": "publish", "label": "纯文本/图集(≤4)/视频推文发布与首评",
+     "setting": "twitter_write_mode", "fixed": "browser", "api": False, "browser": True,
+     "auth_protocol": "x.com/compose/post RPA + CreateTweet rest_id interception",
+     "wire_protocol": "Chunked media upload + GraphQL CreateTweet"},
 )
 
 
 def _setting_value(cfg: Any, name: str, default: str = "browser") -> str:
     engine = getattr(cfg, "engine", cfg)
     return str(getattr(engine, name, default) or default).strip().lower()
+
+
+def _channels_cdp_readiness(cfg: Any) -> dict[str, Any]:
+    engine = getattr(cfg, "engine", cfg)
+    proxy_enabled = bool(getattr(engine, "channels_proxy_enabled", False))
+    endpoint = str(getattr(engine, "channels_cdp_endpoint", "") or "").strip()
+    endpoint_file = str(getattr(engine, "channels_cdp_endpoint_file", "") or "").strip()
+    if proxy_enabled:
+        from .platforms.channels.proxy_bridge import get_active_proxy_manager
+
+        mgr = get_active_proxy_manager()
+        if mgr is None or not mgr.running:
+            return {
+                "configured": True,
+                "ready": False,
+                "source": "proxy",
+                "error": "已启用内置视频号代理模式，但本地代理尚未启动",
+            }
+        st = mgr.status()
+        if int(st.get("ready_pages") or 0) > 0:
+            return {
+                "configured": True,
+                "ready": True,
+                "source": "proxy",
+                "error": "",
+            }
+        if int(st.get("connected_pages") or 0) > 0:
+            return {
+                "configured": True,
+                "ready": False,
+                "source": "proxy",
+                "error": "已连接微信视频号页面，正在等待协议运行时加载完成",
+            }
+        return {
+            "configured": True,
+            "ready": False,
+            "source": "proxy",
+            "error": "内置视频号代理已运行，请在桌面微信中打开一次视频号页面",
+        }
+    if endpoint_file:
+        from .platforms.channels.wmpf_cdp import inspect_endpoint_file
+
+        info = inspect_endpoint_file(endpoint_file)
+        ready = bool(info.get("exists") and info.get("valid"))
+        return {
+            "configured": True,
+            "ready": ready,
+            "source": "endpoint_file",
+            "error": "" if ready else str(info.get("error") or "口令文件不可用"),
+        }
+    if endpoint:
+        return {
+            "configured": True,
+            "ready": True,
+            "source": "endpoint",
+            "error": "",
+        }
+    return {
+        "configured": False,
+        "ready": False,
+        "source": "none",
+        "error": "",
+    }
 
 
 def transport_spec(platform: str, operation: str) -> dict[str, Any]:
@@ -105,8 +320,9 @@ def resolve_transport(cfg: Any, platform: str, operation: str,
     """Return configured and effective transport for one operation."""
     spec = transport_spec(platform, operation)
     setting = str(spec.get("setting") or "")
+    fallback_default = str(spec.get("default") or "browser")
     configured = str(spec.get("fixed") or (
-        _setting_value(cfg, setting) if setting else "browser"))
+        _setting_value(cfg, setting, fallback_default) if setting else fallback_default))
     effective = configured
     reason = ""
 
@@ -115,9 +331,15 @@ def resolve_transport(cfg: Any, platform: str, operation: str,
             and configured == "api"):
         effective = "browser"
         reason = "原生身份账号固定使用浏览器通道"
+    elif configured in {"protocol", "native"}:
+        if spec.get("api"):
+            effective = "api"
+        else:
+            effective = "unavailable"
+            reason = str(spec.get("note") or "该操作不支持原生协议")
     elif configured == "manual" and spec.get("manual"):
         effective = "manual"
-    elif configured == "hybrid":
+    elif configured in {"hybrid", "auto"}:
         if spec.get("api") and spec.get("browser"):
             effective = "hybrid"
         elif spec.get("api"):
@@ -136,6 +358,27 @@ def resolve_transport(cfg: Any, platform: str, operation: str,
     elif configured not in {"api", "browser", "manual", "unavailable"}:
         effective = "unavailable"
         reason = "配置值无效"
+
+    if spec.get("requires_channels_cdp") and effective not in {"browser", "unavailable"}:
+        readiness = _channels_cdp_readiness(cfg)
+        if not readiness["ready"]:
+            prefix = f"{readiness['error']}；" if readiness["error"] else "未配置本机微信 CDP 端点；"
+            if configured in {"protocol", "native"}:
+                effective = "unavailable"
+                reason = readiness["error"] or "未配置本机微信 Finder CDP 端点，请在「设置 → 视频号微信通道」配置"
+            elif operation == "finder_protocol":
+                effective = "browser"
+                reason = prefix + "当前仅回退创作者助手读取本账号作品与评论"
+            else:
+                effective = "api"
+                reason = prefix + "分享解析仅走公开预览接口（加密视频解码需连接微信通道）"
+        elif not reason:
+            if readiness["source"] == "proxy":
+                reason = "已通过内置本机代理连接桌面微信视频号协议通道"
+            elif readiness["source"] == "endpoint_file":
+                reason = "已就绪 WMPF 控制口令文件，可连接本机微信 Finder 协议"
+            else:
+                reason = "已配置本机微信 Finder CDP 端点"
 
     fallback = (
         "browser_on_confirmed_failure" if effective == "hybrid" else "none")
@@ -187,25 +430,49 @@ def _state_fingerprint(account: Any) -> str:
 
 
 def build_transport_matrix(cfg: Any, accounts: Iterable[Any]) -> dict[str, Any]:
+    from app.browser.manager import normalize_proxy
+
     accounts = list(accounts)
     rows = [resolve_transport(cfg, spec["platform"], spec["operation"])
             for spec in TRANSPORT_SPECS]
     profile_keys = [_normalized_path(str(getattr(a, "profile_dir", "") or ""))
                     for a in accounts]
-    proxy_keys = [str(getattr(a, "proxy", "") or "").strip() for a in accounts]
+    proxy_keys = [normalize_proxy(str(getattr(a, "proxy", "") or "").strip()) for a in accounts]
+    exit_keys = [str(getattr(a, "exit_ip", "") or "").strip() for a in accounts]
     state_keys = [_state_fingerprint(a) for a in accounts]
     profile_counts = Counter(value for value in profile_keys if value)
     proxy_counts = Counter(value for value in proxy_keys if value)
+    exit_counts = Counter(value for value in exit_keys if value)
+    same_pf_proxy_counts = Counter(
+        (str(getattr(a, "platform", "") or ""), p)
+        for a, p in zip(accounts, proxy_keys)
+        if p
+    )
+    same_pf_exit_counts = Counter(
+        (str(getattr(a, "platform", "") or ""), ip)
+        for a, ip in zip(accounts, exit_keys)
+        if ip
+    )
     state_counts = Counter(value for value in state_keys if value)
     isolation = []
-    for account, profile_key, proxy_key, state_key in zip(
-            accounts, profile_keys, proxy_keys, state_keys):
+    for account, profile_key, proxy_key, exit_key, state_key in zip(
+            accounts, profile_keys, proxy_keys, exit_keys, state_keys):
+        pf = str(getattr(account, "platform", "") or "")
         profile_isolated = bool(profile_key and profile_counts[profile_key] == 1)
         credential_isolated = bool(state_key and state_counts[state_key] == 1)
-        network_isolated = bool(proxy_key and proxy_counts[proxy_key] == 1)
+        same_pf_shared = bool(
+            (proxy_key and same_pf_proxy_counts[(pf, proxy_key)] > 1)
+            or (exit_key and same_pf_exit_counts[(pf, exit_key)] > 1)
+        )
+        network_isolated = bool(
+            proxy_key
+            and proxy_counts[proxy_key] == 1
+            and (not exit_key or exit_counts[exit_key] == 1)
+            and not same_pf_shared
+        )
         environment_seed = "|".join((
             str(getattr(account, "id", "") or ""), state_key,
-            str(getattr(account, "ua", "") or ""), proxy_key,
+            str(getattr(account, "ua", "") or ""), proxy_key, exit_key,
             str(getattr(account, "locale", "") or ""),
             str(getattr(account, "viewport_w", "") or ""),
             str(getattr(account, "viewport_h", "") or ""),
@@ -215,18 +482,27 @@ def build_transport_matrix(cfg: Any, accounts: Iterable[Any]) -> dict[str, Any]:
             warnings.append("浏览器 Profile 缺失或重复")
         if not credential_isolated:
             warnings.append("登录态缺失或与其他账号重复")
-        if not network_isolated:
-            warnings.append("API 与浏览器仍共享本机/重复代理出口")
+        if not proxy_key:
+            warnings.append("风险提醒：未绑定代理（当前走本机直连，海外或多号同平台建议配置独立代理防关联）")
+        elif same_pf_shared:
+            warnings.append("风险提醒：同平台多个账号正共用同一代理或相同出口 IP（未拦截，建议尽量一号一代理）")
+        elif not network_isolated:
+            warnings.append("提醒：跨平台多个账号复用同一代理或出口 IP")
         isolation.append({
             "account_id": getattr(account, "id", None),
-            "platform": str(getattr(account, "platform", "") or ""),
+            "platform": pf,
             "nickname": str(getattr(account, "nickname", "") or ""),
             "status": str(getattr(account, "status", "") or ""),
             "profile_isolated": profile_isolated,
             "credential_isolated": credential_isolated,
             "api_session_isolated": True,
             "network_isolated": network_isolated,
-            "network_scope": "专属代理" if network_isolated else "共享出口",
+            "network_scope": (
+                "专属代理" if network_isolated
+                else "未配代理" if not proxy_key
+                else "同平台共享出口" if same_pf_shared
+                else "跨平台复用代理"
+            ),
             "api_environment_aligned": bool(
                 getattr(account, "ua", "") and getattr(account, "locale", "")
                 and getattr(account, "viewport_w", 0)
@@ -235,6 +511,7 @@ def build_transport_matrix(cfg: Any, accounts: Iterable[Any]) -> dict[str, Any]:
                 environment_seed.encode("utf-8")).hexdigest()[:12],
             "warnings": warnings,
         })
+    channels_readiness = _channels_cdp_readiness(cfg)
     return {
         "settings": {
             "douyin_read_mode": _setting_value(cfg, "douyin_read_mode", "hybrid"),
@@ -246,9 +523,19 @@ def build_transport_matrix(cfg: Any, accounts: Iterable[Any]) -> dict[str, Any]:
             "douyin_publish_mode": _setting_value(cfg, "douyin_publish_mode", "browser"),
             "douyin_write_mode": _setting_value(cfg, "douyin_write_mode", "hybrid"),
             "xhs_read_mode": _setting_value(cfg, "xhs_read_mode", "api"),
+            "rednote_read_mode": _setting_value(cfg, "rednote_read_mode", "hybrid"),
+            "rednote_publish_mode": _setting_value(cfg, "rednote_publish_mode", "browser"),
             "xhs_publish_mode": _setting_value(cfg, "xhs_publish_mode", "browser"),
             "xhs_comment_write_mode": _setting_value(
                 cfg, "xhs_comment_write_mode", "browser"),
+            "channels_read_mode": _setting_value(cfg, "channels_read_mode", "auto"),
+            "bilibili_read_mode": _setting_value(cfg, "bilibili_read_mode", "hybrid"),
+            "bilibili_write_mode": _setting_value(cfg, "bilibili_write_mode", "hybrid"),
+            "instagram_read_mode": _setting_value(cfg, "instagram_read_mode", "hybrid"),
+            "instagram_write_mode": _setting_value(cfg, "instagram_write_mode", "hybrid"),
+            "channels_cdp_configured": channels_readiness["configured"],
+            "channels_cdp_ready": channels_readiness["ready"],
+            "channels_cdp_source": channels_readiness["source"],
         },
         "rows": rows,
         "accounts": isolation,

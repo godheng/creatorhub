@@ -1,4 +1,4 @@
-"""数据模型 (SQLModel)。精简自逆向的 DouyinAccount / MonitorTarget / ContentRecord。"""
+"""SQLModel 持久化数据模型定义。"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -87,7 +87,9 @@ class DouyinAccount(SQLModel, table=True):
     status: str = "active"         # active | invalid
     # ── 设备/网络画像(防多账号关联风控:登录时生成一次,之后永久固定)──
     profile_dir: str = ""          # 独立持久化用户目录(Chromium user-data-dir)
-    proxy: str = ""               # 该账号专属代理 http://user:pass@host:port / socks5://...
+    proxy_id: Optional[int] = Field(default=None, index=True)  # 关联 ProxyPool.id(支持停用/改址同步)
+    proxy: str = ""               # 该账号绑定代理 http://user:pass@host:port / socks5://...（留空走本机直连）
+    require_proxy: bool = False   # 兼容保留列（默认不强制拦截无代理直连，仅作提醒参考）
     ua: str = ""                  # 该账号固定 User-Agent
     viewport_w: int = 1280
     viewport_h: int = 800
@@ -134,6 +136,24 @@ class DouyinAccount(SQLModel, table=True):
     browser_backend: str = "default"
     # fingerprint_chromium 下绑定的具体内核运行时；空=跟随默认内核。
     browser_runtime_id: str = ""
+    # ── 矩阵组织、职能角色与展示排序 ──
+    alias: str = ""                                     # 内部备注名(优先展示/搜索)
+    group_name: str = Field(default="", index=True)     # 跨平台矩阵组 / 业务分组名
+    tags: str = "[]"                                    # JSON 字符串数组,多维标签
+    account_role: str = Field(default="hybrid", index=True)  # publish | crawler | hybrid
+    pinned: bool = Field(default=False, index=True)     # 置顶标记
+    sort_order: int = 0                                 # 自定义排序权重
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MatrixGroup(SQLModel, table=True):
+    """跨平台账号矩阵组 / IP 人设组配置。"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(default="", index=True, unique=True)
+    color: str = "blue"             # blue | rose | emerald | amber | violet | cyan
+    description: str = ""           # 人设定位 / 运营备注
+    preferred_country: str = ""     # 期望代理国家/地区代码(可选)
+    sort_order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -279,7 +299,7 @@ class RiskAdminAudit(SQLModel, table=True):
 
 
 class NotificationChannel(SQLModel, table=True):
-    """通知渠道。对应逆向 model.NotificationChannel。"""
+    """外部消息通知渠道配置表。"""
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = ""
     type: str = "bark"             # bark | dingtalk | telegram
@@ -307,6 +327,7 @@ class ContentRecord(SQLModel, table=True):
     xsec_source: str = ""              # 与令牌配套的来源；旧记录为空时按监控类型处理
     download_status: str = "pending"   # pending | downloading | done | failed
     retry_count: int = 0               # 已重试次数
+    next_retry_at: Optional[datetime] = None  # 指数退避下次允许重试时间(UTC)
     local_path: str = ""
     error: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -366,6 +387,9 @@ class PublishTask(SQLModel, table=True):
     allow_comment: bool = True                         # TikTok:允许评论
     allow_duet: bool = True                            # TikTok:允许 Duet
     allow_stitch: bool = True                          # TikTok:允许 Stitch
+    bili_options_json: str = "{}"                      # B站投稿扩展参数(tid/copyright/source/recreate/声明/互动开关等)
+    ig_options_json: str = "{}"                        # Instagram发布扩展参数(post_kind=auto|reel|post|story, share_to_feed等)
+    tw_options_json: str = "{}"                        # Twitter发布扩展参数(reply_permission/first_comment/long_text等)
     scheduled_at: Optional[datetime] = None            # UTC；空=尽快发
     scheduled_at_is_utc: bool = True  # 存量无时区预约需要人工确认，不自动猜时区
     status: str = "pending"        # draft | pending | publishing | uncertain | done | failed | canceled
@@ -919,3 +943,7 @@ class ShareDownloadRecord(SQLModel, table=True):
     metadata_json: str = "{}"
     error: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+# 语义化多平台账号模型别名（底层物理表名保留 douyinaccount 以兼容存量 SQLite 数据库）
+PlatformAccount = DouyinAccount

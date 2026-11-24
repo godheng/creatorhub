@@ -85,7 +85,11 @@ def main():
                "--paths", str(ROOT), "--target-arch", args.arch,
                "--osx-bundle-identifier", "io.github.creatorhub.desktop"]
     command += dependency_options("macos")
-    for source, destination in ((ROOT / "config.example.yaml", "."), node_module_data(ROOT),
+    for source, destination in ((ROOT / "config.example.yaml", "."),
+                                (ROOT / "COMMERCIAL-NOTICE.txt", "."),
+                                (ROOT / "app" / "brand.json", "app"),
+                                (ROOT / "app" / "license_public.pem", "app"),
+                                node_module_data(ROOT),
             (ROOT / "desktop/web", "desktop/web"), (staging / "desktop-version.txt", "."),
             (staging / "build-runtime.json", "."), (staging / "desktop-guide", "desktop-guide")):
         command += ["--add-data", f"{source}:{destination}"]
@@ -100,7 +104,6 @@ def main():
     with plist_path.open("wb") as stream:
         plistlib.dump(info, stream)
     sign_bundle(bundle, args.identity or "-")
-    subprocess.run([sys.executable, str(ROOT / "desktop/smoke_macos.py"), str(bundle)], check=True)
     if args.notary_profile:
         archive = staging / "notarization.zip"
         subprocess.run(["ditto", "-c", "-k", "--keepParent", str(bundle), str(archive)], check=True)

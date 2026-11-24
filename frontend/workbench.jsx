@@ -6,6 +6,11 @@ import { installMotion, reveal, selectionMarker } from "./ui/motion";
 import { Onboarding } from "./onboarding";
 import { LicenseControl } from "./license";
 import { AgentAssistant } from "./agent";
+import { MatrixOverviewCommand } from "./matrix/overview-command";
+import { AccountMatrixCenter } from "./matrix/account-matrix";
+import { MediaHubGallery } from "./matrix/media-hub";
+import { HubMatrixDashboard } from "./matrix/hub-matrix";
+import { MatrixBatchPublisher } from "./matrix/matrix-publish";
 
 const $ = id => document.getElementById(id);
 const bridge = window.CreatorHubBridge;
@@ -34,8 +39,8 @@ const composerSpecs = {
   notifications: ["n-name", "添加通知渠道", "配置推送渠道，添加后可发送测试通知。"],
 };
 const composerTitle = (key, platform) => key === "collections"
-  ? platform === "shipinhao" ? "新建视频号本账号作品采集"
-    : `新建${({ douyin: "抖音", xhs: "小红书", kuaishou: "快手" })[platform] || "平台"}关键词采集`
+  ? platform === "shipinhao" ? "新建视频号作品采集"
+    : `新建${({ douyin: "抖音", xhs: "小红书", rednote: "海外小红书", kuaishou: "快手", tiktok: "TikTok", bilibili: "哔哩哔哩", instagram: "Instagram", twitter: "Twitter" })[platform] || "平台"}关键词采集`
   : composerSpecs[key]?.[1] || "新建任务";
 // Notifications previously mixed configuration and saved objects in one card.
 const notificationCard = $("n-name").closest(".card");
@@ -44,6 +49,7 @@ notificationForm.className = "card";
 while (notificationCard.firstElementChild && !notificationCard.firstElementChild.classList.contains("section-divider")) {
   notificationForm.append(notificationCard.firstElementChild);
 }
+notificationCard.querySelector(":scope > .section-divider")?.remove();
 notificationCard.prepend(notificationForm);
 const composers = Object.fromEntries(Object.entries(composerSpecs).map(([key, [field, title, description]]) => {
   const node = $(field).closest(".card");
@@ -67,13 +73,14 @@ for (const key of ["monitors", "comments", "danmaku"]) {
 
 // Configuration is progressively disclosed; the search/record tools stay first.
 const groupSpecs = {
-  accounts: [["accounts", "账号列表"], ["inbox", "聚合私信", ["douyin", "xhs", "kuaishou"]], ["runtime", "浏览器内核"], ["proxies", "代理池"]],
-  settings: [["appearance", "外观与体验"], ["downloads", "下载设置"], ["ai", "AI 文案"], ["engine", "采集与运行"]],
+  accounts: [["accounts", "账号矩阵"], ["runtime", "浏览器内核"], ["proxies", "代理池"]],
+  settings: [["appearance", "外观与体验"], ["downloads", "下载设置"], ["ai", "AI 文案"], ["engine", "采集与运行"], ["channels", "视频号微信通道"], ["diagnostics", "日志与诊断"]],
   monitors: [["targets", "监控目标"], ["records", "作品记录"]],
   comments: [["targets", "监控目标"], ["records", "评论记录"]],
   danmaku: [["targets", "监控目标"], ["records", "弹幕记录"]],
   autocomment: [["rules", "评论规则"], ["tasks", "任务与审核"]],
-  publish: [["editor", "撰写内容"], ["records", "发布记录"], ["published", "已发布作品", ["xhs"]]],
+  publish: [["matrix", "矩阵多号群发"], ["editor", "单号精细发布", null, true], ["records", "发布记录"], ["published", "已发布作品", ["xhs", "rednote"], true]],
+  notifications: [["channels", "通知渠道"], ["webhooks", "Webhook 订阅"]],
   "risk-control": [["status", "账号状态"], ["rules", "风控规则"]],
 };
 const groups = Object.entries(groupSpecs).map(([key, spec]) => {
@@ -84,8 +91,8 @@ const groups = Object.entries(groupSpecs).map(([key, spec]) => {
   panel.prepend(target);
   // Match stable section keys, not card positions: inserting a card must never
   // put its content under another tab's label.
-  const items = spec.map(([value, label, platforms]) => ({
-    value, label, platforms, node: nodes.find(node => node.dataset.section === value),
+  const items = spec.map(([value, label, platforms, singlePfOnly]) => ({
+    value, label, platforms, singlePfOnly: !!singlePfOnly, node: nodes.find(node => node.dataset.section === value),
   })).filter(x => x.node);
   items.forEach(item => parking.append(item.node));
   // Risk counts belong with status, not above every configuration view.
@@ -108,11 +115,15 @@ overviewTarget.id = "workbench-attention";
 panels.get("overview").prepend(overviewTarget);
 const previewTarget = document.createElement("aside");
 previewTarget.className = "wb-publish-preview";
-const publishNode = groups.find(g => g.key === "publish").items[0].node;
+const publishNode = groups.find(g => g.key === "publish").items.find(i => i.value === "editor").node;
 const editorLayout = document.createElement("div");
 editorLayout.className = "wb-publish-layout";
 editorLayout.append(publishNode.querySelector(".stack"), previewTarget);
 publishNode.append(editorLayout);
+const accountMatrixTarget = $("wb-account-matrix-root");
+const mediaHubTarget = $("wb-media-hub-root");
+const hubMatrixTarget = $("wb-hub-matrix-root");
+const matrixPublishTarget = $("wb-matrix-publish-root");
 
 // Existing account actions stay authoritative, including platform conditions.
 const accountToolbar = document.createElement("div");
@@ -141,6 +152,7 @@ for (const [id, key, label, selector] of [
   ["pub-table", "publish", "发布标题、状态", "tr:not(:has([colspan]))"],
   ["ac-rule-table", "rule", "评论规则、目标", "tr:not(:has([colspan]))"],
   ["n-table", "channel", "通知渠道、类型", "tbody tr:not(:has([colspan]))"],
+  ["proxy-table", "proxy", "代理备注、地址或归属地", "tbody tr:not(:has([colspan]))"],
 ]) {
   const container = $(id);
   const target = container.closest(".table-wrap") || container;
@@ -172,15 +184,15 @@ function NodeHost({ node, className = "" }) {
   return <div className={className} ref={ref} />;
 }
 const tabSetters = new Map();
-function SectionTabs({ group, platform }) {
+function SectionTabs({ group, platform, globalMode }) {
   const [value, setValue] = useState(group.items[0].value);
   const root = useRef(null), list = useRef(null), previous = useRef(value);
-  const visible = group.items.filter(item => !item.node.hidden && (!item.platforms || item.platforms.includes(platform)));
+  const visible = group.items.filter(item => (!item.singlePfOnly || !globalMode) && !item.node.hidden && (!item.platforms || item.platforms.includes(platform)));
   useLayoutEffect(() => {
     tabSetters.set(group.key, setValue);
     return () => tabSetters.delete(group.key);
   }, [group]);
-  useEffect(() => { if (!visible.some(item => item.value === value)) setValue(visible[0].value); }, [platform]);
+  useEffect(() => { if (visible.length && !visible.some(item => item.value === value)) setValue(visible[0].value); }, [platform, globalMode]);
   useLayoutEffect(() => selectionMarker(list.current, '[data-state="active"]', "line"), []);
   useLayoutEffect(() => {
     if (previous.current !== value) {
@@ -257,8 +269,9 @@ function PublishPreview({ revision, contextVersion }) {
       const title = $("pub-title").value;
       const desc = $("pub-desc").value;
       if (titleBadge) {
-        titleBadge.textContent = `${title.length} / 20`;
-        titleBadge.dataset.nearLimit = title.length >= 18 ? "true" : "false";
+        const titleLimit = Number($("pub-title")?.maxLength) || 20;
+        titleBadge.textContent = `${title.length} / ${titleLimit}`;
+        titleBadge.dataset.nearLimit = title.length >= Math.max(1, titleLimit - 2) ? "true" : "false";
       }
       if (descBadge) descBadge.textContent = `${desc.length} 字`;
       setCopy({ title, desc, topics: $("pub-topics").value,
@@ -291,10 +304,10 @@ function PublishPreview({ revision, contextVersion }) {
 const readFailures = new Map();
 const latestReads = new Map();
 let readSerial = 0;
-const prefixes = { overview: ["/api/overview", "/api/stats", "/api/task-queue"], accounts: ["/api/accounts", "/api/browser-runtimes", "/api/proxies"],
+const prefixes = { overview: ["/api/overview", "/api/stats", "/api/task-queue", "/api/matrix/overview"], "media-hub": ["/api/matrix/media-hub"], accounts: ["/api/accounts", "/api/matrix/accounts", "/api/browser-runtimes", "/api/proxies"],
   monitors: ["/api/monitors", "/api/contents"], comments: ["/api/comment-watches", "/api/comments"], danmaku: ["/api/danmaku"],
-  collections: ["/api/collections"], queue: ["/api/task-queue"], publish: ["/api/publish"], autocomment: ["/api/comment-rules", "/api/comment-tasks"],
-  settings: ["/api/settings"], notifications: ["/api/notifications"], "risk-control": ["/api/risk"], hub: ["/api/accounts", "/api/hub"] };
+  collections: ["/api/collections"], queue: ["/api/task-queue"], publish: ["/api/publish", "/api/matrix/publish-batch"], autocomment: ["/api/comment-rules", "/api/comment-tasks"],
+  settings: ["/api/settings", "/api/channels/protocol"], notifications: ["/api/notifications"], "risk-control": ["/api/risk"], hub: ["/api/accounts", "/api/hub", "/api/matrix/hub-analytics"] };
 let menuOpen = false, sheetOpen = false;
 let lastContext = context();
 const drafts = new Map();
@@ -315,7 +328,7 @@ window.CreatorHubWorkbench = {
   isDirty(id) { return $(id)?.dataset.wbEdited === "true"; },
   navigate() {
     const next = context();
-    if (lastContext.platform !== next.platform) { readFailures.clear(); $("wb-account-search").value = ""; }
+    if (lastContext.platform !== next.platform || lastContext.globalMode !== next.globalMode) { readFailures.clear(); $("wb-account-search").value = ""; }
     lastContext = next; emit("context", next);
   },
   beforeNavigate() { scrollPositions.set(`${lastContext.platform}/${lastContext.tab}`, window.scrollY); },
@@ -455,7 +468,7 @@ function App() {
     else document.querySelector('#workbench-actions button')?.focus({ preventScroll: true });
   });
   return <>
-    {groups.map(group => createPortal(<SectionTabs group={group} platform={ctx.platform} />, group.target, group.key))}
+    {groups.map(group => createPortal(<SectionTabs group={group} platform={ctx.platform} globalMode={ctx.globalMode} />, group.target, group.key))}
     {createPortal(<div className="wb-page-actions">
       <LicenseControl />
       <Onboarding platform={ctx.platform} />
@@ -463,14 +476,18 @@ function App() {
         <button type="button" className="ghost wb-icon-button" aria-label="刷新当前页面" title="刷新当前页面" aria-busy={retrying} data-feedback={refreshFeedback === "已刷新" ? "success" : undefined} onClick={retry} disabled={retrying || !online}><Icon name={refreshFeedback === "已刷新" ? "check" : "refresh"} /></button>
         <span className="wb-refresh-feedback" role="status">{retrying ? "正在刷新…" : refreshFeedback}</span>
       </span>
-      {ctx.tab === "accounts" && <ActionMenu label="添加平台账号" triggerLabel="添加账号" heading="选择登录方式" icon="plus"
+      {ctx.tab === "accounts" && !ctx.globalMode && <ActionMenu label="添加平台账号" triggerLabel="添加账号" heading="选择登录方式" icon="plus"
         buttons={[...loginChoices.querySelectorAll("button")].filter(button => !button.classList.contains("hidden"))} onOpenChange={open => { menuOpen = open; }} />}
-      {composers[ctx.tab] && <button type="button" id="wb-create" onClick={() => openComposer(ctx.tab)}><Icon name="plus" />{composerTitle(ctx.tab, ctx.platform)}</button>}
-      {ctx.tab === "overview" && <button type="button" onClick={() => bridge.navigate("publish", true)}><Icon name="plus" />创作内容</button>}
+      {composers[ctx.tab] && !ctx.globalMode && <button type="button" id="wb-create" onClick={() => openComposer(ctx.tab)}><Icon name="plus" />{composerTitle(ctx.tab, ctx.platform)}</button>}
+      {ctx.tab === "overview" && <button type="button" onClick={() => bridge.navigate("publish", true)}><Icon name="plus" />{ctx.globalMode ? "矩阵群发" : "创作内容"}</button>}
     </div>, actionTarget)}
     {createPortal(showConnection && <div className="wb-connection" role="status"><Icon name={!online ? "offline" : "alert"} /><span><b>{!online ? "当前离线" : "部分数据刷新失败"}</b> · 已保留输入与已加载的记录；提交前请确认连接恢复。</span>
       <button className="ghost sm" onClick={retry} disabled={!online || retrying}>{retrying ? "正在重试…" : "重新加载"}</button></div>, connectionTarget)}
-    {createPortal(<Attention summary={summary} platform={ctx.platform} />, overviewTarget)}
+    {createPortal(<MatrixOverviewCommand ctx={ctx} />, overviewTarget)}
+    {accountMatrixTarget && createPortal(<AccountMatrixCenter ctx={ctx} />, accountMatrixTarget)}
+    {mediaHubTarget && createPortal(<MediaHubGallery ctx={ctx} />, mediaHubTarget)}
+    {hubMatrixTarget && createPortal(<HubMatrixDashboard ctx={ctx} />, hubMatrixTarget)}
+    {matrixPublishTarget && createPortal(<MatrixBatchPublisher ctx={ctx} />, matrixPublishTarget)}
     {createPortal(<AgentAssistant page={ctx} />, $("agent-root"))}
     {createPortal(<PublishPreview revision={previewVersion} contextVersion={`${ctx.platform}/${accountsVersion}`} />, previewTarget)}
     {rows.map(row => { const slot = row.querySelector("[data-account-menu]");
@@ -498,6 +515,11 @@ function App() {
 
 // Mobile filters collapse independently and always report non-default criteria.
 document.querySelectorAll(".manage-toolbar").forEach((toolbar, i) => {
+  const selbar = toolbar.querySelector('[id$="-selbar"]');
+  if (selbar) {
+    const bulkBar = document.createElement("div"); bulkBar.className = "wb-bulk-bar"; bulkBar.hidden = true;
+    bulkBar.append(selbar); toolbar.after(bulkBar);
+  }
   const controls = [...toolbar.children].filter(el => !el.matches('input[type="search"],.filter-count'));
   if (!controls.length) return;
   const details = document.createElement("details"); details.className = "wb-filter-details";
@@ -506,13 +528,22 @@ document.querySelectorAll(".manage-toolbar").forEach((toolbar, i) => {
   const clear = document.createElement("button"); clear.type = "button"; clear.className = "ghost sm"; clear.textContent = "重置筛选";
   const defaults = [...toolbar.querySelectorAll("select,input:not([type=search])")].map(el => [el, el.value]);
   const update = () => { const count = defaults.filter(([el, value]) => el.value !== value).length; summary.querySelector(".wb-filter-total").textContent = count ? `${count} 项` : ""; };
-  clear.onclick = () => { defaults.forEach(([el, value]) => { if (el.value === value) return; el.value = value; el._csSync?.(); el.dispatchEvent(new Event("change", { bubbles: true })); }); update(); };
+  clear.onclick = () => {
+    defaults.forEach(([el, value]) => {
+      if (el.value === value) return;
+      el.value = value; el._csSync?.();
+      if (el.tagName !== "SELECT" && el.type !== "date" && el.type !== "number") el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    update();
+  };
   body.append(...controls, clear); details.append(summary, body); toolbar.append(details);
   toolbar.addEventListener("change", update);
+  toolbar.addEventListener("input", e => { if (e.target.type !== "search") update(); });
 });
 
 // Search affordances use the same SVG as navigation, not a hard-coded bitmap.
-document.querySelectorAll('.manage-toolbar > input[type="search"],#command-search').forEach(input => {
+document.querySelectorAll('.manage-toolbar > input[type="search"],#command-search,#risk-account-search,.follow-toolbar > input[type="search"]').forEach(input => {
   const label = document.createElement("label"); label.className = "wb-search-field";
   label.innerHTML = '<svg aria-hidden="true"><use href="#i-logo"/></svg>';
   input.before(label); label.append(input);
@@ -525,7 +556,7 @@ const badgeObserver = new MutationObserver(records => records.forEach(record => 
 }));
 document.querySelectorAll(".nav-badge").forEach(badge => { badge.classList.toggle("wb-zero", badge.textContent.trim() === "0"); badgeObserver.observe(badge, { childList: true, characterData: true, subtree: true }); });
 // Stacked record rows on narrow screens keep column context and every action.
-for (const id of ["mon-table", "watch-table", "danmaku-watch-table", "queue-table", "pub-table", "ac-rule-table", "ac-task-table", "n-table", "risk-account-table"]) {
+for (const id of ["mon-table", "watch-table", "danmaku-watch-table", "queue-table", "pub-table", "ac-rule-table", "ac-task-table", "n-table", "risk-account-table", "runtime-table", "proxy-table", "wh-table", "wh-event-table", "tk-user-results", "following-table", "fans-table"]) {
   const node = $(id), table = node.tagName === "TABLE" ? node : node.closest("table");
   table.dataset.objectTable = "";
   const labelRows = () => {

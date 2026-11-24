@@ -1,20 +1,28 @@
-"""用真实浏览器打开用户主页,拦截抖音自己发的 post 接口响应,
-直接拿到 aweme_list —— 绕过自算 a_bogus。
-对应原项目 engine.ContentChecker + NativeClient 的抓取角色。
+"""用真实浏览器打开用户主页，拦截页面同域作品列表接口响应并提取 `aweme_list`。
 
 优化:屏蔽图片/视频/字体资源(只取数据,省带宽提速)、无新增即提前停止下滑。
 """
 from __future__ import annotations
 
 import json
+import logging
 import os
+
+_log = logging.getLogger("creatorhub.browser.douyin")
 import time
 from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 
+from .douyin_auth import douyin_login_prompt_visible
+from .human_interaction import (
+    DEFAULT_HUMAN_ENGINE,
+    human_click_first,
+    human_fill_first,
+    human_scroll,
+    human_wait,
+)
 from .identity import Identity
 from .manager import BrowserManager
-from .douyin_auth import douyin_login_prompt_visible
 from ..platforms.douyin.auth import parse_self_profile_response
 from ..platforms.douyin.extract import danmaku_key
 
@@ -35,21 +43,25 @@ _LOGIN_COOKIES = {"sessionid", "sessionid_ss", "sid_tt"}
 # 重发时必须去掉的一次性签名/风控参数,让抖音的 fetch 拦截器重新签
 _SIGN_PARAMS = ("a_bogus", "X-Bogus", "x-bogus", "msToken", "_signature", "verifyFp")
 
-# 抖音主页不一定由 window 承担滚动。选出页面里滚动范围最大的容器并拉到底，
-# 再配合 mouse.wheel 触发 React 的滚动/分页监听。
-_SCROLL_PROFILE_JS = """() => {
-  const roots = [document.scrollingElement, document.documentElement, document.body];
+# 抖音主页不一定由 window 承担滚动。只读定位最大可滚动容器包围盒，
+# 随后将鼠标平滑移入容器并触发多帧阻尼惯性滚轮滚动（严禁 scrollTo/scrollTop 瞬移）。
+_FIND_PROFILE_SCROLL_BOX_JS = """() => {
   const nodes = [...document.querySelectorAll('main,section,div')];
   let best = null;
   let bestRange = 0;
-  for (const el of [...roots, ...nodes]) {
+  for (const el of nodes) {
     if (!el) continue;
+    const s = getComputedStyle(el);
+    if (s.overflowY !== 'auto' && s.overflowY !== 'scroll' && s.overflowY !== 'overlay') continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 160 || r.height < 160) continue;
     const range = (el.scrollHeight || 0) - (el.clientHeight || 0);
-    if (range > bestRange) { best = el; bestRange = range; }
+    if (range > 40 && range > bestRange) { best = r; bestRange = range; }
   }
-  window.scrollTo(0, Math.max(document.body.scrollHeight, document.documentElement.scrollHeight));
-  if (best) best.scrollTop = best.scrollHeight;
-  return { range: bestRange, top: best ? best.scrollTop : window.scrollY };
+  if (best) {
+    return { x: best.x, y: best.y, width: best.width, height: best.height };
+  }
+  return null;
 }"""
 
 _DOUYIN_SEARCH_INPUTS = (
@@ -60,6 +72,18 @@ _DOUYIN_SEARCH_INPUTS = (
 )
 
 
+async def _douyin_scroll_box(page, finder_js: str = "") -> None:
+    if finder_js:
+        try:
+            box = await page.evaluate(finder_js)
+            if isinstance(box, dict) and box.get("width") and box.get("height"):
+                tx, ty = DEFAULT_HUMAN_ENGINE.sample_box_point(box)
+                await DEFAULT_HUMAN_ENGINE.move_mouse(page, tx, ty)
+        except Exception:
+            pass
+    await human_scroll(page, settle=False)
+
+
 async def _submit_douyin_search(page, keyword: str) -> bool:
     """只操作站内搜索框；不拼装、重放或主动调用抖音搜索接口。"""
     for selector in _DOUYIN_SEARCH_INPUTS:
@@ -67,8 +91,8 @@ async def _submit_douyin_search(page, keyword: str) -> bool:
             field = page.locator(selector).first
             if not await field.count() or not await field.is_visible(timeout=600):
                 continue
-            await field.click(timeout=2000)
-            await field.fill(keyword, timeout=3000)
+            await DEFAULT_HUMAN_ENGINE.type_text(field, keyword, page=page, timeout=3000)
+            await human_wait(page, 180)
             await field.press("Enter", timeout=3000)
             return True
         except Exception:
@@ -184,8 +208,8 @@ def douyin_search_empty_error(page_title: str, page_text: str,
     if any(token in diagnostic for token in (
             "验证码", "安全验证", "访问频繁", "环境异常",
             "captcha", "verify")):
-        return ("抖音触发验证码/安全验证；请在账号页点击“打开浏览器”，"
-                "完成验证并关窗保存登录态后再续跑")
+        return ("抖音触发验证码/安全验证；请在账号页点击“打开浏览器”完成验证并关窗保存登录态，"
+                "再到「风控中心」点击“解除”后即可恢复续跑")
     if api_seen:
         return "抖音搜索接口有响应，但没有可解析的作品（关键词可能无结果或接口结构已变化）"
     return "抖音搜索页没有发出作品搜索接口（页面可能未完整加载或平台页面已变化）"
@@ -326,18 +350,14 @@ async def fetch_videos(mgr: BrowserManager, identity: Identity, sec_uid: str,
             await page.wait_for_load_state("networkidle", timeout=15000)
         except Exception:
             pass
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         stagnant = 0
         min_scrolls = max(1, min(min_scrolls, max_scrolls))
         for scroll_index in range(max_scrolls):
             before = len(collected)
             pages_before = len(post_pages)
-            try:
-                await page.evaluate(_SCROLL_PROFILE_JS)
-            except Exception:
-                pass
-            await page.mouse.wheel(0, 4000)
-            await page.wait_for_timeout(settle_ms)
+            await _douyin_scroll_box(page, _FIND_PROFILE_SCROLL_BOX_JS)
+            await human_wait(page, settle_ms)
             fresh_pages = post_pages[pages_before:]
             boundary = any(_page_reaches_boundary(p, known_ids, stop_before)
                            for p in fresh_pages)
@@ -372,13 +392,16 @@ async def fetch_videos(mgr: BrowserManager, identity: Identity, sec_uid: str,
             pass
 
     if not collected:
-        # 「aweme/post 没发出来」和「发了但 aweme_list 空/读不到」是两回事,原来一律报同一句话
-        print(f"[works] 未拿到作品; sec_uid={sec_uid[:24]}… final_url={final_url}; "
-              f"post_hits({len(post_hits)})={post_hits[:5]}; dom={dom}")
-        print(f"[works] api_seen({len(api_seen)})={api_seen[:30]}")
+        _log.warning(
+            "抖音主页未拦截到作品: sec_uid=%s… final_url=%s post_hits=%d",
+            sec_uid[:20], final_url, len(post_hits),
+        )
+        _log.debug("抖音主页作品诊断: dom=%s api_seen(%d)=%s", dom, len(api_seen), api_seen[:30])
     elif pagination_stalled:
-        print(f"[works] 主页分页未触发; sec_uid={sec_uid[:24]}… "
-              f"collected={len(collected)} post_hits={post_hits[:3]}")
+        _log.debug(
+            "抖音主页分页未继续触发: sec_uid=%s… collected=%d post_hits=%s",
+            sec_uid[:20], len(collected), post_hits[:3],
+        )
     new_items = [it for aid, it in collected.items() if aid not in known_ids]
     return new_items, author, error
 
@@ -464,7 +487,7 @@ async def fetch_douyin_search(mgr: BrowserManager, identity: Identity, keyword: 
             pass
         rounds = max(1, min(600, int(captcha_wait_seconds)))
         for _ in range(rounds):
-            await page.wait_for_timeout(1000)
+            await human_wait(page, 1000)
             if collected or not verification_active:
                 return True
         return False
@@ -486,7 +509,7 @@ async def fetch_douyin_search(mgr: BrowserManager, identity: Identity, keyword: 
             await page.wait_for_load_state("networkidle", timeout=12000)
         except Exception:
             pass
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
 
         challenge_error = ""
         if verification_active and not await wait_for_verification():
@@ -503,7 +526,7 @@ async def fetch_douyin_search(mgr: BrowserManager, identity: Identity, keyword: 
                     await page.wait_for_load_state("domcontentloaded", timeout=8000)
                 except Exception:
                     pass
-                await page.wait_for_timeout(max(settle_ms, 2200))
+                await human_wait(page, max(settle_ms, 2200))
                 if verification_active and not await wait_for_verification():
                     challenge_error = (
                         "抖音要求完成滑块验证；本次任务已停止后续请求，"
@@ -514,12 +537,8 @@ async def fetch_douyin_search(mgr: BrowserManager, identity: Identity, keyword: 
             if len(collected) >= max_results:
                 break
             before = len(collected)
-            try:
-                await page.evaluate(_SCROLL_PROFILE_JS)
-            except Exception:
-                pass
-            await page.mouse.wheel(0, 4200)
-            await page.wait_for_timeout(settle_ms)
+            await _douyin_scroll_box(page, _FIND_PROFILE_SCROLL_BOX_JS)
+            await human_wait(page, settle_ms)
             if verification_active and not await wait_for_verification():
                 challenge_error = (
                     "抖音要求完成滑块验证；本次任务已停止后续请求，"
@@ -559,28 +578,32 @@ async def fetch_douyin_search(mgr: BrowserManager, identity: Identity, keyword: 
             pass
 
     if not collected:
-        print(f"[dy_search] keyword={keyword!r} final_url={final_url!r} "
-              f"title={page_title!r} api_seen({len(api_seen)})={api_seen[:10]}")
+        _log.warning(
+            "抖音页面搜索无结果: final_url=%r title=%r api_seen=%d",
+            final_url, page_title, len(api_seen),
+        )
+        _log.debug("抖音页面搜索 api_seen=%s", api_seen[:10])
     return _sort_douyin_search_items(list(collected.values()), search_sort)[:max_results], error
 
 
-# 滚动评论区的可滚动容器(而不是整页),驱动抖音自己的分页请求
-_SCROLL_COMMENTS = """
+# 只读定位评论区的可滚动容器包围盒，配合拟人惯性滚轮滚动驱动分页请求
+_FIND_COMMENT_SCROLL_BOX_JS = """
 () => {
   const item = document.querySelector('[data-e2e="comment-item"]')
             || document.querySelector('[data-e2e="comment-list"]');
-  if (!item) { window.scrollBy(0, 3000); return false; }
+  if (!item) return null;
   let el = item;
   while (el && el !== document.body) {
     const oy = getComputedStyle(el).overflowY;
-    if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 20) {
-      el.scrollTop = el.scrollHeight;
-      return true;
+    if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && el.scrollHeight > el.clientHeight + 20) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 80 && r.height > 80) {
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      }
     }
     el = el.parentElement;
   }
-  window.scrollBy(0, 3000);
-  return false;
+  return null;
 }
 """
 
@@ -614,15 +637,12 @@ async def fetch_comments(mgr: BrowserManager, identity: Identity, aweme_id: str,
     try:
         await page.goto(f"https://www.douyin.com/video/{aweme_id}",
                         wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         stagnant = 0
         for _ in range(max_scrolls):
             before = len(collected)
-            try:
-                await page.evaluate(_SCROLL_COMMENTS)
-            except Exception:
-                pass
-            await page.wait_for_timeout(settle_ms)
+            await _douyin_scroll_box(page, _FIND_COMMENT_SCROLL_BOX_JS)
+            await human_wait(page, settle_ms)
             if len(collected) == before:        # 本次没翻出新评论
                 stagnant += 1
                 if stagnant >= 2:               # 连续两次到底,停
@@ -678,7 +698,6 @@ def _dig_danmaku_list(data, depth: int = 0) -> list:
 _PROBE_DANMAKU_JS = """async (options) => {
   const video = document.querySelector('video');
   if (!video) {
-    window.scrollBy(0, 800);
     return { ok: false, duration: 0 };
   }
   const cfg = (options && typeof options === 'object') ? options : {};
@@ -771,21 +790,23 @@ async def fetch_danmaku(mgr: BrowserManager, identity: Identity, aweme_id: str,
     try:
         await page.goto(f"https://www.douyin.com/video/{aweme_id}",
                         wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         stagnant = 0
         attempts = max(1, min(max_rounds, 2 if step_seconds > 0 else 8))
         for _ in range(attempts):
             before = len(collected)
             try:
-                await page.evaluate(_PROBE_DANMAKU_JS, {
+                probe_res = await page.evaluate(_PROBE_DANMAKU_JS, {
                     "duration": duration, "start_ms": max(0, start_ms),
                     "end_ms": max(0, end_ms),
                     "step_seconds": max(0.25, float(step_seconds or 1)),
                     "max_points": max(1, int(max_points or 120)),
                 })
+                if isinstance(probe_res, dict) and not probe_res.get("ok"):
+                    await human_scroll(page, distance=560, settle=False)
             except Exception:
                 pass
-            await page.wait_for_timeout(settle_ms)
+            await human_wait(page, settle_ms)
             if len(collected) == before:
                 stagnant += 1
                 if stagnant >= 2:
@@ -858,18 +879,15 @@ async def fetch_creator_danmaku(mgr: BrowserManager, identity: Identity,
     page.on("response", on_response)
     try:
         await page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         if "/login" in page.url or "passport" in page.url:
             error = "创作者登录态已失效,请重新创作者登录"
         else:
             stagnant = 0
             for _ in range(max(1, min(max_scrolls, 20))):
                 before = len(collected)
-                try:
-                    await page.evaluate("() => window.scrollBy(0, document.body.scrollHeight)")
-                except Exception:
-                    pass
-                await page.wait_for_timeout(settle_ms)
+                await _douyin_scroll_box(page, _FIND_PROFILE_SCROLL_BOX_JS)
+                await human_wait(page, settle_ms)
                 if len(collected) == before:
                     stagnant += 1
                     if stagnant >= 2:
@@ -886,7 +904,7 @@ async def fetch_creator_danmaku(mgr: BrowserManager, identity: Identity,
                 with open(capture_path, "w", encoding="utf-8") as f:
                     json.dump(captured_requests, f, ensure_ascii=False, indent=2)
             except Exception as exc:
-                print(f"[creator-danmaku] capture dump failed: {exc!r}")
+                _log.debug("创作中心弹幕抓包落盘失败: %r", exc)
         try:
             await page.close()
         except Exception:
@@ -977,13 +995,13 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
     try:
         await page.goto(f"https://www.douyin.com/video/{aweme_id}",
                         wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         if "passport" in page.url or "/login" in page.url:
             return False, "logged_out:账号未登录,无法发评论"
 
         # 评论区懒加载:显式等输入框出现(全是 CSS 选择器,可合并等待),并轻滚一下触发渲染
         try:
-            await page.evaluate("() => window.scrollBy(0, 600)")
+            await human_scroll(page, distance=520, settle=False)
             await page.wait_for_selector(",".join(_COMMENT_INPUT), timeout=8000,
                                          state="attached")
         except Exception:
@@ -993,13 +1011,13 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
         # 回复模式:先在评论区找到目标评论,点它的「回复」打开内联框
         if reply_to_text:
             try:
-                await page.evaluate(_SCROLL_COMMENTS)
-                await page.wait_for_timeout(1200)
+                await _douyin_scroll_box(page, _FIND_COMMENT_SCROLL_BOX_JS)
+                await human_wait(page, 1200)
                 item = page.locator('[data-e2e="comment-item"]', has_text=reply_to_text[:20]).first
                 if await item.count():
                     rbtn = item.get_by_text("回复", exact=False).first
-                    await rbtn.click(timeout=4000)
-                    await page.wait_for_timeout(800)
+                    await DEFAULT_HUMAN_ENGINE.click_locator(rbtn, page=page, timeout=4000)
+                    await human_wait(page, 800)
                     editor = page.locator('[contenteditable="true"]').last
             except Exception:
                 editor = None  # 回退到顶层评论框
@@ -1021,14 +1039,12 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
                 diag = await page.evaluate(_DIAG_INPUTS)
             except Exception:
                 pass
-            print(f"[comment_post] 未找到输入框 aweme={aweme_id} diag={diag}")
+            _log.warning("抖音发评论未找到输入框: aweme=%s diag=%s", aweme_id, diag[:240])
             return False, ("未找到评论输入框(评论区可能未加载/被关闭/页面改版)。"
                            f"页面诊断: {diag[:300]}")
 
-        await editor.click(timeout=timeout_ms)
-        await page.wait_for_timeout(300)
-        await page.keyboard.type(content, delay=40)   # 逐字输入,更像真人
-        await page.wait_for_timeout(600)
+        await DEFAULT_HUMAN_ENGINE.type_text(editor, content, page=page, timeout=timeout_ms)
+        await human_wait(page, 500)
 
         # 优先点发送按钮;找不到则回车提交
         sent = False
@@ -1037,7 +1053,7 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
                 btn = page.locator(sel).first
                 if await btn.count() and await btn.is_enabled():
                     require_active()
-                    await btn.click(timeout=3000)
+                    await DEFAULT_HUMAN_ENGINE.click_locator(btn, page=page, timeout=3000)
                     sent = True
                     break
             except LicenseRequired:
@@ -1060,7 +1076,7 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
         for _ in range(27):
             if pub["seen"]:
                 break
-            await page.wait_for_timeout(300)
+            await human_wait(page, 300)
 
         if pub["seen"]:
             if pub["ok"]:
@@ -1083,9 +1099,7 @@ async def post_comment_browser(mgr: BrowserManager, identity: Identity, aweme_id
         return False, f"发评论异常: {e!r}"
     finally:
         try:
-            if ctx is not None:
-                await ctx.close()   # 有头:关 context 即落盘 Cookie
-            else:
+            if page is not None and not page.is_closed():
                 await page.close()
         except Exception:
             pass
@@ -1213,7 +1227,7 @@ async def _refetch_in_page(page, full_url: str) -> Optional[dict]:
               } catch (e) { return null; }
             }""", path)
     except Exception as e:
-        print(f"[self_profile] refetch failed: {e!r}")
+        _log.debug("抖音本人资料页内重拉失败: %r", e)
         return None
 
 
@@ -1314,7 +1328,7 @@ async def fetch_self_profile(mgr: BrowserManager, identity: Identity,
             await page.goto(url, wait_until="domcontentloaded", timeout=30000)
             # 等 hydrate/XHR；wait_for_response 若在 goto 后调用会漏掉已经返回的响应，
             # 因此统一由上面的 response handler 收集。
-            await page.wait_for_timeout(min(max(timeout_ms // 4, 1800), 4000))
+            await human_wait(page, min(max(timeout_ms // 4, 1800), 4000))
             final_url = page.url
             has_login_btn = await douyin_login_prompt_visible(page)
             if has_login_btn is True or self_profile_error == "logged_out":
@@ -1341,7 +1355,7 @@ async def fetch_self_profile(mgr: BrowserManager, identity: Identity,
         if not logged_out and storage_uid and not profile_user_seen:
             await page.goto(f"https://www.douyin.com/user/{storage_uid}",
                             wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(min(max(timeout_ms // 3, 2200), 5000))
+            await human_wait(page, min(max(timeout_ms // 3, 2200), 5000))
             final_url = page.url
             post_user = next(
                 (u for u in reversed(post_users)
@@ -1399,10 +1413,11 @@ async def fetch_self_profile(mgr: BrowserManager, identity: Identity,
         elif not error:
             # 区分「接口没发出来」和「发了但取不到 user」——之前一律报后者,误导排查
             error = ("profile/self 命中但取不到 user" if hit_apis else "no_profile_xhr")
-        print(f"[self_profile] 未拿到资料; err={error}; final_url={final_url}; "
-              f"login_btn_visible={has_login_btn}; login_cookie={has_login_cookie}; "
-              f"storage_uid={bool(storage_uid)}; hit={hit_apis}; shapes={shapes}; "
-              f"api_seen({len(api_seen)})={api_seen[:25]}")
+        _log.warning(
+            "抖音本人资料未获取: err=%s final_url=%s login_btn=%s login_cookie=%s hit=%s",
+            error, final_url, has_login_btn, has_login_cookie, hit_apis,
+        )
+        _log.debug("抖音本人资料诊断: shapes=%s api_seen(%d)=%s", shapes, len(api_seen), api_seen[:25])
     return result, error
 
 
@@ -1450,7 +1465,7 @@ async def fetch_creator_comments(mgr: BrowserManager, identity: Identity,
     page.on("response", on_response)
     try:
         await page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         # 若被重定向到登录页,说明创作者登录态失效
         if "/login" in page.url or "passport" in page.url:
             error = "创作者登录态已失效,请重新创作者登录"
@@ -1458,11 +1473,8 @@ async def fetch_creator_comments(mgr: BrowserManager, identity: Identity,
             stagnant = 0
             for _ in range(max_scrolls):
                 before = len(collected)
-                try:
-                    await page.evaluate("() => window.scrollBy(0, document.body.scrollHeight)")
-                except Exception:
-                    pass
-                await page.wait_for_timeout(settle_ms)
+                await _douyin_scroll_box(page, _FIND_PROFILE_SCROLL_BOX_JS)
+                await human_wait(page, settle_ms)
                 if len(collected) == before:
                     stagnant += 1
                     if stagnant >= 2:

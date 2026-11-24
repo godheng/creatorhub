@@ -980,8 +980,27 @@ def build_keyword_collection_report(job: Any, contents: Sequence[Any],
     for row in contents:
         platform = _text(_value(row, "platform"))
         aweme_id = _text(_value(row, "aweme_id"))
-        url = (f"https://www.xiaohongshu.com/explore/{aweme_id}"
-               if platform == "xhs" else f"https://www.douyin.com/video/{aweme_id}")
+        explicit_url = _text(_value(row, "source_url")).strip()
+        if explicit_url.startswith(("http://", "https://")):
+            url = explicit_url
+        elif platform == "xhs":
+            url = f"https://www.xiaohongshu.com/explore/{aweme_id}"
+        elif platform == "rednote":
+            url = f"https://www.rednote.com/zh/discovery/item/{aweme_id}"
+        elif platform == "kuaishou":
+            url = f"https://www.kuaishou.com/short-video/{aweme_id}"
+        elif platform == "bilibili":
+            url = (
+                f"https://www.bilibili.com/video/{aweme_id}"
+                if aweme_id.upper().startswith("BV1")
+                else f"https://www.bilibili.com/opus/{aweme_id}"
+            )
+        elif platform == "instagram":
+            url = f"https://www.instagram.com/p/{aweme_id}/"
+        elif platform == "twitter":
+            url = f"https://x.com/i/web/status/{aweme_id}"
+        else:
+            url = f"https://www.douyin.com/video/{aweme_id}"
         content_rows.append((
             _value(row, "id"), _text(_value(row, "keyword")), platform,
             aweme_id, _text(_value(row, "desc")),
@@ -991,15 +1010,15 @@ def build_keyword_collection_report(job: Any, contents: Sequence[Any],
             _value(row, "collected_comment_count", 0),
             _text(_value(row, "download_status")),
             _local_path_text(_value(row, "local_path")), url,
-            _text(_value(row, "error")),
+            _text(_value(row, "error")), _text(_value(row, "author_id")),
         ))
     _write_table(
         workbook, "作品",
         ("ID", "来源", "平台", "作品ID", "描述", "作者", "媒体类型",
          "发布时间", "点赞数", "平台评论数", "已采评论数", "下载状态",
-         "本地文件", "作品链接", "错误"),
+         "本地文件", "作品链接", "错误", "作者ID"),
         content_rows,
-        widths=(10, 20, 12, 24, 54, 22, 12, 20, 12, 14, 14, 14, 42, 42, 38),
+        widths=(10, 20, 12, 24, 54, 22, 12, 20, 12, 14, 14, 14, 42, 42, 38, 34),
         date_columns={8}, number_columns={1, 9, 10, 11},
         link_columns={13, 14}, tab_color="E11D48", freeze_panes="E2",
         row_height=36,

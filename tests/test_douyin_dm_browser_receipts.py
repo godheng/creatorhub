@@ -3,7 +3,7 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 import pytest
-from app.browser import account_hub as hub
+from app.browser import hub_actions as hub
 
 class Capture:
     def __init__(self, response): self.response=response
@@ -22,7 +22,7 @@ class Capture:
     (b'<html>gateway</html>',502,False,'uncertain'),
     (b'{"cmd":100,"status_code":0}',200,True,'uncertain'),
 ])
-def test_browser_send_has_platform_receipt_and_no_second_submit(raw,status,click_error,expected):
+def test_browser_send_has_platform_receipt_and_no_second_submit(raw,status,click_error,expected,monkeypatch):
     def locator():
         obj=SimpleNamespace(count=AsyncMock(return_value=1),is_visible=AsyncMock(return_value=True),
                             is_enabled=AsyncMock(return_value=True),click=AsyncMock())
@@ -31,7 +31,12 @@ def test_browser_send_has_platform_receipt_and_no_second_submit(raw,status,click
     entry,editor,button=locator(),locator(),locator()
     if click_error: button.click.side_effect=TimeoutError('connection lost after click')
     response=SimpleNamespace(url=hub._SEND_URL,request=SimpleNamespace(method='POST'),status=status,body=AsyncMock(return_value=raw))
-    page=SimpleNamespace(url='https://www.douyin.com/user/test',goto=AsyncMock(),wait_for_timeout=AsyncMock(),
+    async def click_locator(locator, **_kwargs):
+        await locator.click()
+    monkeypatch.setattr(hub, 'DEFAULT_HUMAN_ENGINE',
+                        SimpleNamespace(type_text=AsyncMock(), click_locator=click_locator))
+    monkeypatch.setattr(hub, 'human_wait', AsyncMock())
+    page=SimpleNamespace(url='https://www.douyin.com/user/test',goto=AsyncMock(),wait_for_timeout=AsyncMock(),is_closed=lambda:False,
         get_by_text=lambda *a,**k:entry,locator=lambda sel:editor if sel in hub._DM_INPUT else button,
         keyboard=SimpleNamespace(type=AsyncMock(),press=AsyncMock()),close=AsyncMock())
     def expect(predicate,**kwargs):
@@ -47,7 +52,7 @@ def test_browser_send_has_platform_receipt_and_no_second_submit(raw,status,click
     assert button.click.await_count==1
     page.keyboard.press.assert_not_awaited()
     page.close.assert_awaited_once()
-    ctx.close.assert_awaited_once()
+    ctx.close.assert_not_awaited()
 
 
 # These platform contract tests exercise an authorized running client.

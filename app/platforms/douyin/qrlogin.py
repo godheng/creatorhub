@@ -1,4 +1,4 @@
-"""抖音扫码登录(API 方式)。对应逆向 internal/douyin.APIQRLoginManager。
+"""抖音 SSO 二维码扫码登录客户端（API 轮询方式）。
 
 流程:
   1. get_qrcode  -> 拿到二维码图片 + token
@@ -19,6 +19,7 @@ from typing import Dict, Optional
 
 from curl_cffi.requests import AsyncSession
 
+from ...browser.manager import normalize_proxy
 from ...netfp import impersonate_for_ua
 
 SSO = "https://sso.douyin.com"
@@ -48,15 +49,19 @@ def gen_verify_fp() -> str:
 class QRLoginSession:
     """一次扫码会话,持有独立 cookie jar。"""
 
-    def __init__(self, user_agent: str):
+    def __init__(self, user_agent: str, proxy: str = ""):
+        from ...netfp import curl_proxy_url
         self.ua = user_agent
+        self.proxy = curl_proxy_url(proxy) or None
         self.verify_fp = gen_verify_fp()
-        # curl_cffi 持久会话:复刻 Chrome TLS 指纹,沿用 cookie jar 收集登录态
+        # curl_cffi 持久会话:对齐浏览器 TLS 握手指纹,沿用 cookie jar 收集登录态
         self.client = AsyncSession(
             timeout=20,
             impersonate=impersonate_for_ua(user_agent),
             headers={"User-Agent": user_agent},
             cookies={"s_v_web_id": self.verify_fp},
+            proxy=self.proxy,
+            trust_env=False,
         )
         self.token: Optional[str] = None
         self.status: str = "new"           # new | scanned | confirmed | expired | error

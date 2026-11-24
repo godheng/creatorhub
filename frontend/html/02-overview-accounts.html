@@ -1,0 +1,269 @@
+  <section data-panel="overview">
+  <section class="stats" aria-label="概览统计">
+    <div class="stat"><span class="stat-ic a"><svg><use href="#i-user"/></svg></span><div><div class="stat-v" id="stat-acc">—</div><div class="stat-l">已登录账号</div></div></div>
+    <div class="stat"><span class="stat-ic b"><svg><use href="#i-target"/></svg></span><div><div class="stat-v" id="stat-mon">—</div><div class="stat-l">监控中目标</div></div></div>
+    <div class="stat"><span class="stat-ic c"><svg><use href="#i-download"/></svg></span><div><div class="stat-v" id="stat-dl">—</div><div class="stat-l">已下载作品</div></div></div>
+    <div class="stat"><span class="stat-ic d"><svg><use href="#i-msg"/></svg></span><div><div class="stat-v" id="stat-cmt">—</div><div class="stat-l">抓取评论</div></div></div>
+  </section>
+  <div class="overview-grid">
+    <div class="card chart-card">
+      <div class="card-head">
+        <span class="card-ic"><svg><use href="#i-bolt"/></svg></span>
+        <h2>近 7 天采集 <span class="sub">每日新增作品 / 评论</span></h2>
+        <div class="chart-legend">
+          <span><i class="lg-a"></i>作品</span>
+          <span><i class="lg-b"></i>评论</span>
+        </div>
+      </div>
+      <div class="chart-wrap" id="overview-chart" role="group" aria-label="近七天每日新增作品与评论数量"><div class="chart-empty">加载中…</div></div>
+    </div>
+    <aside class="card quick-card" aria-labelledby="quick-title">
+      <div class="card-head">
+        <span class="card-ic"><svg><use href="#i-bolt"/></svg></span>
+        <h2 id="quick-title">快捷操作 <span class="sub">常用入口</span></h2>
+      </div>
+      <div class="quick-actions">
+        <button class="quick-action" type="button" onclick="switchTab('accounts', true)">
+          <span class="qa-ic"><svg><use href="#i-user"/></svg></span>
+          <span class="qa-copy"><b>管理平台账号</b><span>登录、检查状态与配置代理</span></span>
+          <svg><use href="#i-next"/></svg>
+        </button>
+        <button class="quick-action notsh-only" type="button" onclick="switchTab('monitors', true)">
+          <span class="qa-ic"><svg><use href="#i-target"/></svg></span>
+          <span class="qa-copy"><b>添加作品监控</b><span>设置目标与自动下载策略</span></span>
+          <svg><use href="#i-next"/></svg>
+        </button>
+        <button class="quick-action" type="button" onclick="switchTab('share-download', true)">
+          <span class="qa-ic"><svg><use href="#i-download"/></svg></span>
+          <span class="qa-copy"><b>解析分享链接</b><span>识别作品并保存到本地</span></span>
+          <svg><use href="#i-next"/></svg>
+        </button>
+        <button class="quick-action" type="button" onclick="exportMonitorReport(this)">
+          <span class="qa-ic"><svg><use href="#i-download"/></svg></span>
+          <span class="qa-copy"><b>&#x5BFC;&#x51FA;&#x76D1;&#x63A7;&#x62A5;&#x544A;</b><span>&#x5C06;&#x5F53;&#x524D;&#x5E73;&#x53F0;&#x7684;&#x4F5C;&#x54C1;&#x3001;&#x8BC4;&#x8BBA;&#x4E0E;&#x5F39;&#x5E55;&#x6574;&#x7406;&#x4E3A; Excel</span></span>
+          <svg><use href="#i-next"/></svg>
+        </button>
+      </div>
+    </aside>
+  </div>
+  <div class="platform-callout" role="note">
+    <svg aria-hidden="true"><use href="#i-info"/></svg>
+    <div><b>平台数据彼此独立</b><p>切换平台后，账号、采集与任务数据会独立展示；通知和下载设置全局共用。TikTok、哔哩哔哩、Instagram 与 Twitter 均已提供登录、采集、本账号作品与数据、发布及受控写操作，暂不含直播。</p></div>
+  </div>
+  </section>
+
+  <section data-panel="media-hub">
+    <div id="wb-media-hub-root" class="wb-react-island"></div>
+  </section>
+
+  <section data-panel="accounts">
+    <!-- 登录 / 账号 -->
+    <div class="card" data-section="accounts">
+      <div class="card-head">
+        <span class="card-ic"><svg><use href="#i-user"/></svg></span>
+        <h2>账号矩阵 <span class="sub">多平台分组 / 批量运维 / 登录管理</span></h2>
+      </div>
+      <div id="wb-account-matrix-root" class="wb-react-island"></div>
+      <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
+        <button class="dy-only" onclick="startLogin()"><svg><use href="#i-qr"/></svg>扫码登录</button>
+        <button class="ghost dy-only" onclick="startCreatorLogin()"><svg><use href="#i-login"/></svg>创作者登录</button>
+        <button class="ghost dy-only" onclick="toggleCookie()">Cookie 粘贴</button>
+        <button class="xhs-only" onclick="startXhsLogin()"><svg><use href="#i-qr"/></svg>小红书扫码登录</button>
+        <button class="ghost xhs-only" onclick="startXhsCreatorLogin()"><svg><use href="#i-send"/></svg>小红书创作者登录</button>
+        <button class="ghost xhs-only" onclick="toggleCookie()">Cookie 粘贴</button>
+        <button class="rn-only" onclick="startRednoteLogin()"><svg><use href="#i-qr"/></svg>海外小红书扫码登录</button>
+        <button class="ghost rn-only" onclick="startRednoteCreatorLogin()"><svg><use href="#i-send"/></svg>海外小红书创作者登录</button>
+        <button class="ghost rn-only" onclick="toggleCookie()">Cookie 粘贴</button>
+        <button class="ks-only" onclick="startKsLogin()"><svg><use href="#i-qr"/></svg>快手扫码登录</button>
+        <button class="ghost ks-only" onclick="startKsCreatorLogin()" title="普通快手扫码登录已可用于发布；仅在创作平台仍提示登录时使用"><svg><use href="#i-send"/></svg>创作平台登录（备用）</button>
+        <button class="ghost ks-only" onclick="toggleCookie()">Cookie 粘贴</button>
+        <button class="sh-only" onclick="startChannelsLogin()"><svg><use href="#i-login"/></svg>视频号登录</button>
+        <button class="tk-only" onclick="startTikTokLogin()"><svg><use href="#i-login"/></svg>TikTok 登录</button>
+        <button class="bili-only" onclick="startBilibiliLogin()"><svg><use href="#i-qr"/></svg>哔哩哔哩扫码登录</button>
+        <button class="ghost bili-only" onclick="toggleCookie()">Cookie 粘贴</button>
+        <button class="ig-only" onclick="startInstagramLogin()"><svg><use href="#i-login"/></svg>Instagram 登录</button>
+        <button class="tw-only" onclick="startTwitterLogin()"><svg><use href="#i-login"/></svg>Twitter 登录</button>
+        <button class="ghost tw-only" onclick="toggleCookie()">Token / Cookie 登录</button>
+        <button class="ghost ig-only" onclick="toggleCookie()">Cookie 粘贴</button>
+      </div>
+      <div id="qrbox" style="display:none;margin-bottom:14px">
+        <div class="mut" id="qrstatus">准备中…</div>
+      </div>
+      <div id="cookiebox" style="display:none" class="stack">
+        <div>
+          <label class="field" for="ck-nick">账号备注(可选)</label>
+          <input id="ck-nick" placeholder="例如:主号">
+        </div>
+        <div>
+          <label class="field" for="ck-val" id="ck-label">完整 Cookie(含 sessionid)</label>
+          <textarea id="ck-val" placeholder="从浏览器开发者工具复制完整 Cookie"></textarea>
+        </div>
+        <button onclick="saveCookie()"><svg><use href="#i-check"/></svg>保存</button>
+      </div>
+      <div class="table-wrap mini-table"><table id="acc-table" aria-label="平台账号列表"><thead><tr><th>账号与环境</th><th>状态与负载</th><th style="text-align:right">操作</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- 指纹 Chromium 多版本内核 -->
+    <div class="card" data-section="runtime">
+      <div class="card-head">
+        <span class="card-ic"><svg><use href="#i-film"/></svg></span>
+        <h2>浏览器内核 <span class="sub">多版本管理 · 账号固定绑定</span></h2>
+      </div>
+      <p class="mut" style="font-size:12px;margin:-4px 0 12px">
+        扫描当前机器的 Chromium 安装目录，或手动添加 <code>chrome.exe</code> / <code>chrome</code>。
+        每台机器可以使用不同路径；每个账号可在上方「环境」中固定选择一个版本，不同版本使用独立 Profile。
+        新指纹环境首次登录或手动打开时会附带环境体检标签；外部检测页会读取当前出口 IP 与浏览器特征。
+        <br>当前扫描目录：<code id="runtime-root">读取中…</code>
+      </p>
+      <div class="form-actions">
+        <button class="ghost" onclick="scanBrowserRuntimes()"><svg><use href="#i-eye"/></svg>扫描内核目录</button>
+        <button class="ghost" onclick="addBrowserRuntime()"><svg><use href="#i-plus"/></svg>手动添加 chrome.exe</button>
+      </div>
+      <div class="table-wrap mini-table"><table id="runtime-table" aria-label="浏览器内核列表"><thead><tr><th>内核与路径</th><th style="text-align:right">操作</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- 代理池(提前配置好,账号从池里关联) -->
+    <div class="card" data-section="proxies">
+      <div class="card-head px-card-head">
+        <div class="px-head-main">
+          <span class="card-ic"><svg><use href="#i-shield"/></svg></span>
+          <div>
+            <h2>代理池 <span class="sub">提前配置 · 账号关联使用</span></h2>
+            <p class="mut proxy-pool-intro">推荐一号一独立代理防多号关联；支持 HTTP / SOCKS5 及多种服务商账密导出格式自动识别。</p>
+          </div>
+        </div>
+        <div class="px-head-actions">
+          <button type="button" class="ghost sm" onclick="importProxies()" title="多行粘贴批量导入代理"><svg><use href="#i-plus"/></svg>批量导入</button>
+          <button type="button" class="ghost sm" id="px-btn-test-all" onclick="testAllProxies()" title="并发检测全部节点连通性与出口归属地"><svg><use href="#i-bolt"/></svg>全部测试</button>
+          <button type="button" class="ghost sm" onclick="assignAllProxies()" title="给所有未配置代理的账号按空闲优先自动分配"><svg><use href="#i-network"/></svg>给无代理账号分配</button>
+        </div>
+      </div>
+
+      <div id="px-kpi-bar" class="px-kpi-bar" role="tablist" aria-label="代理池筛选与统计"></div>
+
+      <div class="px-quick-add">
+        <div class="px-quick-grid">
+          <div class="form-field px-url-col">
+            <label for="px-url">代理地址 <span class="mut" style="font-weight:400">（自动识别协议与 6 种账密格式）</span></label>
+            <input id="px-url" aria-describedby="px-input-hint" autocomplete="off" spellcheck="false"
+                   placeholder="粘贴地址，例：socks5://user:pass@host:port 或 主机:端口:用户名:密码"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addProxy();}">
+          </div>
+          <div class="form-field px-lbl-col">
+            <label for="px-label">节点备注 <span class="mut" style="font-weight:400">（留空按地区自动命名）</span></label>
+            <input id="px-label" placeholder="例如：美区静态-01 / 广东住宅"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addProxy();}">
+          </div>
+          <div class="px-quick-btns">
+            <button type="button" class="ghost" id="px-btn-detect" onclick="detectProxy()" title="自动探测 HTTP/SOCKS5 协议并查询出口 IP 归属地"><svg><use href="#i-eye"/></svg>检测并识别</button>
+            <button type="button" onclick="addProxy()"><svg><use href="#i-plus"/></svg>加入代理池</button>
+          </div>
+        </div>
+
+        <div id="px-detect-banner" class="px-detect-banner" hidden></div>
+
+        <details class="px-adv-details" id="px-format-help" ontoggle="syncProxyFormatHelp(this)">
+          <summary id="px-format-toggle">解析选项、补充说明与支持格式示例</summary>
+          <div class="px-adv-body">
+            <div class="form-grid px-adv-grid">
+              <div class="form-field"><label for="px-proto">未带协议时默认按</label><select id="px-proto" title="未带协议的地址按此协议解析；已带协议时保留原值">
+                  <option value="http">HTTP</option><option value="socks5">SOCKS5</option>
+              </select></div>
+              <div class="form-field"><label for="px-format">账密分隔格式</label><select id="px-format" aria-describedby="px-input-hint">
+                  <option value="auto">自动识别（推荐）</option>
+                  <option value="host_colon">主机:端口:用户名:密码</option>
+                  <option value="host_csv">主机,端口,用户名,密码</option>
+                  <option value="host_at">主机:端口@用户名:密码</option>
+                  <option value="auth_colon">用户名:密码:主机:端口</option>
+                  <option value="auth_at">用户名:密码@主机:端口</option>
+                  <option value="host_hash">主机:端口##用户名##密码</option>
+              </select></div>
+              <div class="form-field"><label for="px-note">补充说明（可选）</label><input id="px-note" placeholder="如：独享住宅 / 2026-12 到期 / TikTok 专用"></div>
+            </div>
+            <div class="px-fmt-hint" id="px-input-hint">
+              <span>支持粘贴格式：</span>
+              <code>主机:端口:账:密</code>
+              <code>主机,端口,账,密</code>
+              <code>主机:端口@账:密</code>
+              <code>账:密:主机:端口</code>
+              <code>账:密@主机:端口</code>
+              <code>主机:端口##账##密</code>
+              <code>http/socks5://...</code>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div id="px-batch-bar" class="px-batch-bar" hidden>
+        <span class="px-batch-count">已选 <b id="px-sel-count">0</b> 个节点</span>
+        <div class="px-batch-actions">
+          <button type="button" class="ghost sm" onclick="batchTestPoolProxies()"><svg><use href="#i-bolt"/></svg>批量测试</button>
+          <button type="button" class="ghost sm" onclick="batchAutoNameProxies()" title="将已选且未命名的节点按出口归属地自动生成备注名"><svg><use href="#i-sparkles"/></svg>按地区自动命名</button>
+          <button type="button" class="ghost sm" onclick="batchTogglePoolProxies(true)">批量启用</button>
+          <button type="button" class="ghost sm" onclick="batchTogglePoolProxies(false)">批量停用</button>
+          <button type="button" class="ghost sm danger" onclick="batchDeletePoolProxies()"><svg><use href="#i-trash"/></svg>批量删除</button>
+          <button type="button" class="ghost sm" onclick="clearProxySelection()">取消选择</button>
+        </div>
+      </div>
+
+      <div class="table-wrap mini-table">
+        <table id="proxy-table" aria-label="代理池列表">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="px-check-all" onchange="toggleSelectAllProxies(this.checked)" aria-label="全选当前显示代理"></th>
+              <th>代理节点</th>
+              <th>归属地 / 出口网络</th>
+              <th>关联账号</th>
+              <th style="text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section data-panel="tiktok-tools" class="tk-only">
+    <div class="platform-callout" role="note">
+      <svg aria-hidden="true"><use href="#i-info"/></svg>
+      <div><b>TikTok 用户互动工具</b><p>这里处理站外用户搜索和主动互动；本账号自己的作品、数据和账号维护请到左侧「本账号管理」。所有写操作仍进入统一任务队列和风控审计。</p></div>
+    </div>
+    <div class="card" data-section="tiktok-actions">
+      <div class="card-head">
+        <span class="card-ic"><svg><use href="#i-user"/></svg></span>
+        <h2>TikTok 用户搜索与互动 <span class="sub">搜索用户后关注 / 取关 / 私信</span></h2>
+      </div>
+      <div class="stack">
+        <div class="form-grid tk-search-grid">
+          <div class="form-field"><label for="tk-account">执行账号</label><select id="tk-account"></select></div>
+          <div class="form-field"><label for="tk-user-query">用户关键词</label><input id="tk-user-query" type="search" placeholder="昵称或 @unique_id" onkeydown="if(event.key==='Enter'){event.preventDefault();searchTikTokUsers()}"></div>
+          <div class="form-field"><label for="tk-user-limit">结果上限</label><input id="tk-user-limit" type="number" min="1" max="100" value="30"></div>
+          <div class="form-field"><label>执行方式</label><label class="check-row"><input id="tk-action-run-now" type="checkbox"><span>立即打开浏览器执行</span></label></div>
+        </div>
+        <div class="form-actions"><span class="status-text" id="tk-user-status" role="status" aria-live="polite"></span><button type="button" onclick="searchTikTokUsers()"><svg><use href="#i-search"/></svg>搜索用户</button></div>
+        <div class="table-wrap"><table aria-label="TikTok 用户搜索结果"><thead><tr><th>用户</th><th>账号标识</th><th>数据</th><th>简介</th><th style="text-align:right">操作</th></tr></thead><tbody id="tk-user-results"></tbody></table></div>
+        <div class="form-note"><svg aria-hidden="true"><use href="#i-info"/></svg><span>用于查找其他 TikTok 用户并创建关注、取关或私信任务，不是本账号资料页。</span></div>
+      </div>
+    </div>
+
+    <div class="card" data-section="tiktok-comment">
+      <div class="card-head">
+        <span class="card-ic"><svg><use href="#i-msg"/></svg></span>
+        <h2>TikTok 手动评论任务 <span class="sub">指定作品创建评论或回复任务</span></h2>
+      </div>
+      <div class="stack">
+        <div class="form-grid cols-auto">
+          <div class="form-field"><label for="tk-comment-account">执行账号</label><select id="tk-comment-account"></select></div>
+          <div class="form-field"><label for="tk-aweme-id">作品链接 / ID</label><input id="tk-aweme-id" placeholder="https://www.tiktok.com/@user/video/... 或 video id"></div>
+          <div class="form-field"><label for="tk-author-id">作者 @username <span class="field-scope">仅填 ID 时必填</span></label><input id="tk-author-id" placeholder="例如 creator_name"></div>
+          <div class="form-field"><label for="tk-target-comment-id">目标评论 ID <span class="field-scope">回复时填写</span></label><input id="tk-target-comment-id" placeholder="顶层评论可留空"></div>
+          <div class="form-field"><label for="tk-target-nick">目标昵称 <span class="field-scope">可选</span></label><input id="tk-target-nick" placeholder="用于任务记录"></div>
+        </div>
+        <div class="form-field"><label for="tk-comment-content">评论内容</label><textarea id="tk-comment-content" rows="3" placeholder="输入要发布的评论或回复"></textarea></div>
+        <div class="form-field"><label for="tk-target-text">目标评论原文 <span class="field-scope">回复任务必填，用于在页面定位回复区</span></label><textarea id="tk-target-text" rows="2" placeholder="顶层评论可留空"></textarea></div>
+        <div class="form-actions"><label class="check-row"><input id="tk-comment-run-now" type="checkbox"><span>立即执行</span></label><span class="actions-spacer"></span><button type="button" onclick="createTikTokCommentTask()"><svg><use href="#i-send"/></svg>创建评论任务</button></div>
+        <div class="form-note"><svg aria-hidden="true"><use href="#i-info"/></svg><span>这是主动写入工具，因此与账号资料分开；任务结果在「任务队列」查看。</span></div>
+      </div>
+    </div>
+  </section>
+

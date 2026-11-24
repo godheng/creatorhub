@@ -1,5 +1,15 @@
 import pytest
 from app import licensing
+from commercial_fixtures import empty_schema
+
+
+@pytest.fixture(autouse=True)
+def no_live_license_transport(monkeypatch):
+    def unavailable(*_args, **_kwargs):
+        raise OSError("Live authorization service is disabled in tests")
+
+    monkeypatch.setattr(licensing._client, "request", unavailable)
+
 
 @pytest.fixture(autouse=True)
 def agent_test_license(request, monkeypatch):

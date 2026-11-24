@@ -1,4 +1,4 @@
-"""快手 Web 抓取(浏览器自动化 + 拦截 GraphQL 响应),对标 douyin/fetcher.py。
+"""快手 Web 抓取(浏览器自动化 + 拦截 GraphQL 响应),与 douyin/fetcher.py 保持统一返回契约。
 
 快手 PC 站把数据都打在 POST https://www.kuaishou.com/graphql 上,前端拦截响应即可:
   - 打开 /profile/{userId}      -> visionProfile(资料) + visionProfilePhotoList(作品)
@@ -12,10 +12,20 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
+
+_log = logging.getLogger("creatorhub.browser.kuaishou")
 from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import quote
 
+from .human_interaction import (
+    DEFAULT_HUMAN_ENGINE,
+    human_click_first,
+    human_fill_first,
+    human_scroll,
+    human_wait,
+)
 from .identity import Identity
 from .manager import BrowserManager
 
@@ -29,19 +39,35 @@ PROFILE_URL = "https://www.kuaishou.com/profile/{uid}"
 PHOTO_URL = "https://www.kuaishou.com/short-video/{pid}"
 SEARCH_URL = "https://www.kuaishou.com/search/video?searchKey={keyword}"
 
-# 快手新版页面把作品流/评论区放在可滚容器里,滚 window 不会触发翻页;
-# 统一滚动所有真正可滚的容器(window 兜底),否则 /rest/v/profile/feed
-# 只会发首页请求,单轮永远停在 ~20 条。
-_SCROLL_ALL_JS = """() => {
-  window.scrollTo(0, document.body.scrollHeight);
-  for (const el of document.querySelectorAll('*')) {
+# 快手新版页面把作品流/评论区放在可滚容器里；只读定位最大可滚容器包围盒，
+# 随后将鼠标移入容器并触发拟人惯性滚轮滚动，杜绝 scrollTo / scrollTop 机械跳变。
+_FIND_KS_SCROLL_BOX_JS = """() => {
+  let best = null;
+  let bestRange = 0;
+  for (const el of document.querySelectorAll('main,section,div,ul')) {
     const style = getComputedStyle(el);
-    if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
-        && el.scrollHeight > el.clientHeight + 20) {
-      el.scrollTop = el.scrollHeight;
+    if (style.overflowY !== 'auto' && style.overflowY !== 'scroll' && style.overflowY !== 'overlay') continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 140 || r.height < 140) continue;
+    const range = (el.scrollHeight || 0) - (el.clientHeight || 0);
+    if (range > 20 && range > bestRange) {
+      best = r;
+      bestRange = range;
     }
   }
+  return best ? { x: best.x, y: best.y, width: best.width, height: best.height } : null;
 }"""
+
+
+async def _ks_human_scroll(page) -> None:
+    try:
+        box = await page.evaluate(_FIND_KS_SCROLL_BOX_JS)
+        if isinstance(box, dict) and box.get("width") and box.get("height"):
+            tx, ty = DEFAULT_HUMAN_ENGINE.sample_box_point(box)
+            await DEFAULT_HUMAN_ENGINE.move_mouse(page, tx, ty)
+    except Exception:
+        pass
+    await human_scroll(page, settle=False)
 
 
 def _rf(d: dict, *keys, default=""):
@@ -105,7 +131,7 @@ def _feed_ts(feed: dict) -> int:
 def _ks_page_reaches_boundary(items: list, known_ids: set, stop_before: int = 0) -> bool:
     """一整批作品都已见过 / 早于监控起点时,才认为翻到了历史边界。
 
-    置顶作品会把旧 ID 混在首页,不能因为单个旧 ID 就停止(对标抖音
+    置顶作品会把旧 ID 混在首页,不能因为单个旧 ID 就停止(与抖音
     _page_reaches_boundary)。"""
     rows = [it for it in items if _feed_id(it)]
     if not rows:
@@ -263,16 +289,12 @@ async def fetch_ks_search(mgr: BrowserManager, identity: Identity, keyword: str,
         await page.goto(
             SEARCH_URL.format(keyword=quote(keyword, safe="")),
             wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         stagnant = 0
         for _ in range(max(1, min(40, int(max_scrolls or 1)))):
             before = len(collected)
-            try:
-                await page.evaluate(_SCROLL_ALL_JS)
-            except Exception:
-                pass
-            await page.mouse.wheel(0, 4200)
-            await page.wait_for_timeout(settle_ms)
+            await _ks_human_scroll(page)
+            await human_wait(page, settle_ms)
             if len(collected) == before:
                 stagnant += 1
                 if collected and stagnant >= max(
@@ -295,8 +317,8 @@ async def fetch_ks_search(mgr: BrowserManager, identity: Identity, keyword: str,
             pass
 
     if not collected:
-        print(f"[ks_search] keyword={keyword!r} final_url={final_url} "
-              f"api_seen({len(api_seen)})={api_seen[:40]}")
+        _log.warning("快手搜索未拦截到结果: final_url=%s api_seen=%d", final_url, len(api_seen))
+        _log.debug("快手搜索 api_seen=%s", api_seen[:40])
     return [feed for photo_id, feed in collected.items()
             if photo_id not in known_ids], error
 
@@ -313,7 +335,7 @@ async def fetch_ks_videos(mgr: BrowserManager, identity: Identity, user_id: str,
     stop_before>0 时,翻到整页都早于该时间戳(秒)即停止,用于历史回填边界;
     min_scrolls 保证至少真实滚动几次,避免首屏置顶旧作品直接截断扫描。"""
     collected: Dict[str, dict] = {}
-    pages: List[List[dict]] = []   # 每批响应新增的作品(边界判断用,对标抖音 post_pages)
+    pages: List[List[dict]] = []   # 每批响应新增的作品(边界判断用,同抖音 post_pages)
     author: Optional[dict] = None
     error = ""
     api_seen: list = []          # 诊断:看到的 GraphQL operation + 其它响应路径
@@ -390,20 +412,14 @@ async def fetch_ks_videos(mgr: BrowserManager, identity: Identity, user_id: str,
     try:
         await page.goto(open_url or PROFILE_URL.format(uid=user_id),
                         wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         stagnant = 0
         min_scrolls = max(1, min(min_scrolls, max_scrolls))
         for scroll_index in range(max_scrolls):
             before = len(collected)
             pages_before = len(pages)
-            # 作品流在可滚容器里,仅 mouse.wheel 滚 window 无法触发下一页
-            # /rest/v/profile/feed;先滚容器再兜底滚 window。
-            try:
-                await page.evaluate(_SCROLL_ALL_JS)
-            except Exception:
-                pass
-            await page.mouse.wheel(0, 4000)
-            await page.wait_for_timeout(settle_ms)
+            await _ks_human_scroll(page)
+            await human_wait(page, settle_ms)
             fresh_pages = pages[pages_before:]
             boundary = any(_ks_page_reaches_boundary(p, known_ids, stop_before)
                            for p in fresh_pages)
@@ -431,11 +447,10 @@ async def fetch_ks_videos(mgr: BrowserManager, identity: Identity, user_id: str,
             pass
 
     if not collected:
-        print(f"[ks_videos] user_id={user_id!r} open_url={open_url!r} "
-              f"final_url={final_url} api_seen({len(api_seen)})={api_seen[:40]}")
-    # REST feed 命中但可能字段没对齐:打样本便于核对 _rest_item_to_feed
+        _log.warning("快手主页未拦截到作品: final_url=%s api_seen=%d", final_url, len(api_seen))
+        _log.debug("快手主页 api_seen=%s", api_seen[:40])
     if feed_sample:
-        print(f"[ks_videos] feed_sample={feed_sample[0]}")
+        _log.debug("快手 REST feed 样本长度=%d", len(feed_sample[0]))
 
     new_items = [feed for pid, feed in collected.items() if pid not in known_ids]
     return new_items, author, error
@@ -502,20 +517,13 @@ async def fetch_ks_comments(mgr: BrowserManager, identity: Identity, photo_id: s
     try:
         await page.goto(PHOTO_URL.format(pid=photo_id),
                         wait_until="domcontentloaded", timeout=30000)
-        # 详情页比主页重(视频播放器 + 评论区异步渲染),多等一拍让首屏评论请求
-        # 发出;有视频流时 networkidle 不可靠,用固定延时兜底。
-        await page.wait_for_timeout(settle_ms)
-        await page.wait_for_timeout(1200)
+        # 详情页比主页重(视频播放器 + 评论区异步渲染),多等一拍让首屏评论请求发出
+        await human_wait(page, settle_ms + 1200)
         stagnant = 0
         for _ in range(max_scrolls):
             before = len(collected)
-            try:
-                # 新版详情页评论区是固定面板，滚 window 不会翻页；同时滚动所有
-                # 真正可滚容器，旧版页面则继续由 window.scrollTo 兜底。
-                await page.evaluate(_SCROLL_ALL_JS)
-            except Exception:
-                pass
-            await page.wait_for_timeout(settle_ms)
+            await _ks_human_scroll(page)
+            await human_wait(page, settle_ms)
             if len(collected) == before:
                 stagnant += 1
                 if stagnant >= 2:
@@ -535,9 +543,8 @@ async def fetch_ks_comments(mgr: BrowserManager, identity: Identity, photo_id: s
         if "passport" in final_url or "/login" in final_url:
             error = "logged_out:登录态失效,请重新登录"
         else:
-            print(f"[ks_comments] photo_id={photo_id!r} final_url={final_url} "
-                  f"api_seen={api_seen} gql_shape={gql_shape}")
-            print(f"[ks_comments] gql_sample={gql_sample}")
+            _log.warning("快手详情页未拦截到评论: photo_id=%r final_url=%s", photo_id, final_url)
+            _log.debug("快手评论诊断: api_seen=%s gql_shape=%s", api_seen, gql_shape)
             sample = gql_sample[0][:600] if gql_sample else "无"
             error = f"未拦截到评论; 评论响应样本={sample}"
     new = [c for cid, c in collected.items() if cid not in known_cids]
@@ -776,7 +783,7 @@ async def fetch_ks_self_profile(mgr: BrowserManager, identity: Identity,
         try:
             await asyncio.wait_for(profile_seen.wait(), timeout=4.0)
         except asyncio.TimeoutError:
-            await page.wait_for_timeout(500)
+            await human_wait(page, 500)
         try:
             has_login_btn = await page.locator(
                 '[role="button"].sidebar-login-button').first.is_visible(
@@ -848,8 +855,10 @@ async def fetch_ks_self_profile(mgr: BrowserManager, identity: Identity,
             error = "logged_out"
         elif not error:
             error = "no_profile_data"
-        print(f"[ks_self_profile] 未拿到资料; err={error}; login_btn={has_login_btn}; uid_cookie={uid_cookie!r}; "
-              f"hit_urls={hit_urls[:6]}; attempts={attempts}")
+        _log.warning(
+            "快手本人资料未获取: err=%s login_btn=%s hit_urls=%s",
+            error, has_login_btn, hit_urls[:6],
+        )
     return result, error
 
 
@@ -922,12 +931,12 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
     try:
         await page.goto(PHOTO_URL.format(pid=photo_id),
                         wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(settle_ms)
+        await human_wait(page, settle_ms)
         if "passport" in page.url or "/login" in page.url:
             return False, "logged_out:账号未登录,无法发评论"
 
         try:
-            await page.evaluate("() => window.scrollBy(0, 600)")
+            await human_scroll(page, distance=520, settle=False)
             await page.wait_for_selector(",".join(_COMMENT_INPUT), timeout=8000,
                                          state="attached")
         except Exception:
@@ -945,10 +954,8 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
         if editor is None:
             return False, "未找到评论输入框(评论区可能未加载/被关闭/页面改版)"
 
-        await editor.click(timeout=timeout_ms)
-        await page.wait_for_timeout(300)
-        await page.keyboard.type(content, delay=40)
-        await page.wait_for_timeout(600)
+        await DEFAULT_HUMAN_ENGINE.type_text(editor, content, page=page, timeout=timeout_ms)
+        await human_wait(page, 500)
 
         sent = False
         for sel in _COMMENT_SUBMIT:
@@ -956,7 +963,7 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
                 btn = page.locator(sel).first
                 if await btn.count() and await btn.is_enabled():
                     require_active()
-                    await btn.click(timeout=3000)
+                    await DEFAULT_HUMAN_ENGINE.click_locator(btn, page=page, timeout=3000)
                     sent = True
                     break
             except LicenseRequired:
@@ -978,7 +985,7 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
         for _ in range(27):       # 等提交接口回包,最多 ~8s
             if pub["seen"]:
                 break
-            await page.wait_for_timeout(300)
+            await human_wait(page, 300)
 
         if pub["seen"]:
             if pub["ok"]:
@@ -992,9 +999,7 @@ async def post_ks_comment(mgr: BrowserManager, identity: Identity, photo_id: str
         return False, f"发评论异常: {e!r}"
     finally:
         try:
-            if ctx is not None:
-                await ctx.close()
-            else:
+            if page is not None and not page.is_closed():
                 await page.close()
         except Exception:
             pass

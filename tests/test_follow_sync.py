@@ -11,7 +11,8 @@ from sqlalchemy import inspect as sa_inspect
 from sqlmodel import select
 
 import app.db as db
-import app.main as main
+from app import runtime
+from app.api import follows
 from app.config import Config
 from app.engine.monitor import MonitorEngine
 from app.models import DouyinAccount, FollowEdge
@@ -58,18 +59,18 @@ class _Engine:
 class FollowSyncTests(unittest.TestCase):
     def setUp(self):
         self.previous_db_engine = db._engine
-        self.previous_main_engine = main.engine
-        self.previous_browser = main.browser
-        self.previous_read_mode = main.cfg.engine.douyin_read_mode
-        self.previous_followers_mode = main.cfg.engine.douyin_followers_mode
-        main.cfg.engine.douyin_read_mode = "hybrid"
-        main.cfg.engine.douyin_followers_mode = "hybrid"
-        main._follow_sync_jobs.clear()
-        main._follow_sync_tasks.clear()
+        self.previous_main_engine = runtime.engine
+        self.previous_browser = runtime.browser
+        self.previous_read_mode = runtime.cfg.engine.douyin_read_mode
+        self.previous_followers_mode = runtime.cfg.engine.douyin_followers_mode
+        runtime.cfg.engine.douyin_read_mode = "hybrid"
+        runtime.cfg.engine.douyin_followers_mode = "hybrid"
+        runtime._follow_sync_jobs.clear()
+        runtime._follow_sync_tasks.clear()
         self.tmp = tempfile.TemporaryDirectory()
         self.db_path = Path(self.tmp.name) / "follow-sync.db"
         db.init_db(str(self.db_path))
-        main.browser = _Browser()
+        runtime.browser = _Browser()
         with db.get_session() as session:
             account = DouyinAccount(
                 platform="douyin",
@@ -85,10 +86,10 @@ class FollowSyncTests(unittest.TestCase):
             self.account_id = account.id
 
     def tearDown(self):
-        main.engine = self.previous_main_engine
-        main.browser = self.previous_browser
-        main.cfg.engine.douyin_read_mode = self.previous_read_mode
-        main.cfg.engine.douyin_followers_mode = self.previous_followers_mode
+        runtime.engine = self.previous_main_engine
+        runtime.browser = self.previous_browser
+        runtime.cfg.engine.douyin_read_mode = self.previous_read_mode
+        runtime.cfg.engine.douyin_followers_mode = self.previous_followers_mode
         if db._engine is not None:
             db._engine.dispose()
         db._engine = self.previous_db_engine
@@ -96,11 +97,11 @@ class FollowSyncTests(unittest.TestCase):
 
     def test_fan_skips_known_empty_direct_endpoint_and_uses_one_guard(self):
         engine = _Engine()
-        main.engine = engine
+        runtime.engine = engine
         browser_fetch = AsyncMock(return_value=([_user()], ""))
 
-        with patch("app.main.fetch_follows", browser_fetch):
-            result = asyncio.run(main.sync_follows(self.account_id, "fan"))
+        with patch("app.api.follows.fetch_follows", browser_fetch):
+            result = asyncio.run(follows.sync_follows(self.account_id, "fan"))
 
         self.assertEqual(result["fetched"], 1)
         self.assertEqual(result["source"], "browser_fallback")
@@ -110,44 +111,44 @@ class FollowSyncTests(unittest.TestCase):
         browser_fetch.assert_awaited_once()
 
     def test_browser_mode_following_never_attempts_direct_api(self):
-        main.cfg.engine.douyin_read_mode = "browser"
+        runtime.cfg.engine.douyin_read_mode = "browser"
         engine = _Engine()
-        main.engine = engine
+        runtime.engine = engine
         browser_fetch = AsyncMock(return_value=([_user()], ""))
 
-        with patch("app.main.fetch_follows", browser_fetch):
-            result = asyncio.run(main.sync_follows(self.account_id, "following"))
+        with patch("app.api.follows.fetch_follows", browser_fetch):
+            result = asyncio.run(follows.sync_follows(self.account_id, "following"))
 
         self.assertEqual(result["source"], "browser")
         engine.locked_direct.assert_not_awaited()
         browser_fetch.assert_awaited_once()
 
     def test_api_mode_following_failure_never_falls_back_to_browser(self):
-        main.cfg.engine.douyin_read_mode = "api"
+        runtime.cfg.engine.douyin_read_mode = "api"
         engine = _Engine()
-        main.engine = engine
+        runtime.engine = engine
         browser_fetch = AsyncMock(side_effect=AssertionError(
             "API mode must not open a browser"))
 
-        with patch("app.main.fetch_follows", browser_fetch):
+        with patch("app.api.follows.fetch_follows", browser_fetch):
             with self.assertRaises(HTTPException) as caught:
-                asyncio.run(main.sync_follows(self.account_id, "following"))
+                asyncio.run(follows.sync_follows(self.account_id, "following"))
 
         self.assertEqual(caught.exception.status_code, 502)
         engine.locked_direct.assert_awaited_once()
         browser_fetch.assert_not_awaited()
-        self.assertEqual(main.browser.identity_calls, 0)
+        self.assertEqual(runtime.browser.identity_calls, 0)
 
     def test_api_mode_fan_reports_matrix_incompatibility_without_browser(self):
-        main.cfg.engine.douyin_followers_mode = "api"
+        runtime.cfg.engine.douyin_followers_mode = "api"
         engine = _Engine()
-        main.engine = engine
+        runtime.engine = engine
         browser_fetch = AsyncMock(side_effect=AssertionError(
             "unsupported API-only operation must not open a browser"))
 
-        with patch("app.main.fetch_follows", browser_fetch):
+        with patch("app.api.follows.fetch_follows", browser_fetch):
             with self.assertRaises(HTTPException) as caught:
-                asyncio.run(main.sync_follows(self.account_id, "fan"))
+                asyncio.run(follows.sync_follows(self.account_id, "fan"))
 
         self.assertEqual(caught.exception.status_code, 502)
         self.assertIn("已保留原数据", str(caught.exception.detail))
@@ -156,11 +157,11 @@ class FollowSyncTests(unittest.TestCase):
 
     def test_following_direct_and_browser_fallback_share_one_guard(self):
         engine = _Engine()
-        main.engine = engine
+        runtime.engine = engine
         browser_fetch = AsyncMock(return_value=([_user("follow-1", "关注一")], ""))
 
-        with patch("app.main.fetch_follows", browser_fetch):
-            result = asyncio.run(main.sync_follows(self.account_id, "following"))
+        with patch("app.api.follows.fetch_follows", browser_fetch):
+            result = asyncio.run(follows.sync_follows(self.account_id, "following"))
 
         self.assertEqual(result["fetched"], 1)
         self.assertEqual(result["source"], "browser_fallback")
@@ -169,9 +170,53 @@ class FollowSyncTests(unittest.TestCase):
         engine.locked_direct.assert_awaited_once_with(self.account_id, "following")
         browser_fetch.assert_awaited_once()
 
+    def test_hybrid_following_stalled_partial_falls_back_to_browser(self):
+        engine = _Engine()
+        engine.locked_direct = AsyncMock(return_value=(
+            [_user(f"partial-{i}") for i in range(185)],
+            "pagination_stalled",
+        ))
+        engine._fetch_douyin_follows_direct_locked = engine.locked_direct
+        runtime.engine = engine
+        browser_users = [_user(f"full-{i}", f"关注 {i}") for i in range(220)]
+        browser_fetch = AsyncMock(return_value=(browser_users, ""))
+
+        with patch("app.api.follows.fetch_follows", browser_fetch):
+            result = asyncio.run(follows.sync_follows(self.account_id, "following"))
+
+        self.assertEqual(result["fetched"], 220)
+        self.assertEqual(result["stored"], 220)
+        self.assertEqual(result["source"], "browser_fallback")
+        browser_fetch.assert_awaited_once()
+
+    def test_hybrid_stalled_partial_preserves_existing_rows_when_browser_also_fails(self):
+        with db.get_session() as session:
+            session.add(FollowEdge(
+                platform="douyin", account_id=self.account_id,
+                direction="following", uid="old-follow", nickname="原关注"))
+            session.commit()
+        engine = _Engine()
+        engine.locked_direct = AsyncMock(return_value=(
+            [_user("partial-1")], "pagination_stalled"))
+        engine._fetch_douyin_follows_direct_locked = engine.locked_direct
+        runtime.engine = engine
+        browser_fetch = AsyncMock(return_value=([], ""))
+
+        with patch("app.api.follows.fetch_follows", browser_fetch):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(follows.sync_follows(self.account_id, "following"))
+
+        self.assertEqual(caught.exception.status_code, 502)
+        self.assertIn("pagination_stalled", str(caught.exception.detail))
+        with db.get_session() as session:
+            rows = session.exec(select(FollowEdge).where(
+                FollowEdge.account_id == self.account_id,
+                FollowEdge.direction == "following")).all()
+        self.assertEqual([row.uid for row in rows], ["old-follow"])
+
     def test_ambiguous_empty_preserves_existing_snapshot_and_reports_failure(self):
         engine = _Engine()
-        main.engine = engine
+        runtime.engine = engine
         with db.get_session() as session:
             session.add(FollowEdge(
                 platform="douyin", account_id=self.account_id,
@@ -180,9 +225,9 @@ class FollowSyncTests(unittest.TestCase):
 
         browser_fetch = AsyncMock(return_value=(
             [], "未拦截到粉丝列表(没等到该方向专属接口)"))
-        with patch("app.main.fetch_follows", browser_fetch):
+        with patch("app.api.follows.fetch_follows", browser_fetch):
             with self.assertRaises(HTTPException) as caught:
-                asyncio.run(main.sync_follows(self.account_id, "fan"))
+                asyncio.run(follows.sync_follows(self.account_id, "fan"))
 
         self.assertEqual(caught.exception.status_code, 502)
         with db.get_session() as session:
@@ -194,9 +239,9 @@ class FollowSyncTests(unittest.TestCase):
     def test_risk_deferred_is_not_reported_as_completed_sync(self):
         engine = _Engine(guarded_result=(
             [], "risk_deferred:尚未达到该操作最小间隔"))
-        main.engine = engine
+        runtime.engine = engine
 
-        result = asyncio.run(main.sync_follows(self.account_id, "fan"))
+        result = asyncio.run(follows.sync_follows(self.account_id, "fan"))
 
         self.assertTrue(result["skipped"])
         self.assertEqual(result["reason"], "尚未达到该操作最小间隔")
@@ -211,7 +256,7 @@ class FollowSyncTests(unittest.TestCase):
                     nickname=f"粉丝 {index}"))
             session.commit()
 
-        result = asyncio.run(main.list_follows(
+        result = asyncio.run(follows.list_follows(
             self.account_id, "fan", page=2, page_size=50))
 
         self.assertEqual(result["total"], 125)
@@ -255,15 +300,15 @@ class FollowSyncTests(unittest.TestCase):
         engine = _Engine()
         engine.locked_direct = AsyncMock(return_value=(users, ""))
         engine._fetch_douyin_follows_direct_locked = engine.locked_direct
-        main.engine = engine
+        runtime.engine = engine
 
-        result = asyncio.run(main.sync_follows(self.account_id, "following"))
+        result = asyncio.run(follows.sync_follows(self.account_id, "following"))
 
         self.assertEqual(result["fetched"], 2500)
         self.assertEqual(result["stored"], 2500)
         self.assertTrue(result["complete"])
         with db.get_session() as session:
-            count = session.exec(select(main.func.count(FollowEdge.id)).where(
+            count = session.exec(select(follows.func.count(FollowEdge.id)).where(
                 FollowEdge.account_id == self.account_id,
                 FollowEdge.direction == "following")).one()
         self.assertEqual(count, 2500)
@@ -274,21 +319,34 @@ class FollowSyncTests(unittest.TestCase):
                 platform="douyin", account_id=self.account_id,
                 direction="fan", uid="old-fan", nickname="旧粉丝"))
             session.commit()
-        engine = _Engine()
-        engine.locked_direct = AsyncMock(return_value=(
-            [_user(f"fan-{index}") for index in range(600)],
-            "page_limit:10000"))
-        engine._fetch_douyin_follows_direct_locked = engine.locked_direct
-        main.engine = engine
-
-        with self.assertRaises(HTTPException):
-            asyncio.run(main.sync_follows(self.account_id, "fan"))
-
+        for error in ("page_limit:10000", "pagination_stalled",
+                      "network:TimeoutError", "platform_cap:api_status_2096"):
+            with self.subTest(error=error):
+                engine = _Engine()
+                engine.locked_direct.return_value = (
+                    [_user(f"fan-{index}") for index in range(600)], error)
+                runtime.engine = engine
+                browser_fetch = AsyncMock(return_value=([_user("first-screen")], ""))
+                with patch("app.api.follows.fetch_follows", browser_fetch):
+                    with self.assertRaises(HTTPException) as caught:
+                        asyncio.run(follows.sync_follows(self.account_id, "fan"))
+                self.assertIn(error, str(caught.exception.detail))
         with db.get_session() as session:
             rows = session.exec(select(FollowEdge).where(
                 FollowEdge.account_id == self.account_id,
                 FollowEdge.direction == "fan")).all()
         self.assertEqual([row.uid for row in rows], ["old-fan"])
+
+    def test_browser_terminal_cannot_override_a_known_shortfall(self):
+        engine = _Engine()
+        engine.locked_direct.return_value = (
+            [_user("fan-1")], "platform_cap:got=1,total=10")
+        runtime.engine = engine
+        browser_fetch = AsyncMock(return_value=([_user("fan-1"), _user("fan-2")], ""))
+        with patch("app.api.follows.fetch_follows", browser_fetch):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(follows.sync_follows(self.account_id, "fan"))
+        self.assertIn("platform_cap:got=1,total=10", caught.exception.detail)
 
     def test_background_follow_job_reports_completion(self):
         users = [_user(f"fan-{index}", f"粉丝 {index}")
@@ -296,13 +354,13 @@ class FollowSyncTests(unittest.TestCase):
         engine = _Engine()
         engine.locked_direct = AsyncMock(return_value=(users, ""))
         engine._fetch_douyin_follows_direct_locked = engine.locked_direct
-        main.engine = engine
+        runtime.engine = engine
 
         async def scenario():
-            started = await main.start_follow_sync_job(self.account_id, "fan")
-            task = main._follow_sync_tasks[started["id"]]
+            started = await follows.start_follow_sync_job(self.account_id, "fan")
+            task = runtime._follow_sync_tasks[started["id"]]
             await task
-            return await main.get_follow_sync_job(started["id"])
+            return await follows.get_follow_sync_job(started["id"])
 
         result = asyncio.run(scenario())
 
@@ -311,27 +369,50 @@ class FollowSyncTests(unittest.TestCase):
         self.assertEqual(result["percent"], 100)
 
     def test_background_follow_job_can_be_canceled_while_fetching(self):
+        with db.get_session() as session:
+            session.add(FollowEdge(platform="douyin", account_id=self.account_id,
+                                   direction="fan", uid="old-fan"))
+            session.commit()
         engine = _Engine()
 
         async def wait_forever(*_args, **_kwargs):
+            _kwargs["progress"]({"pages": 1, "fetched": 1})
             await asyncio.Event().wait()
 
         engine.locked_direct = AsyncMock(side_effect=wait_forever)
         engine._fetch_douyin_follows_direct_locked = engine.locked_direct
-        main.engine = engine
+        runtime.engine = engine
 
         async def scenario():
-            started = await main.start_follow_sync_job(self.account_id, "fan")
-            task = main._follow_sync_tasks[started["id"]]
+            started = await follows.start_follow_sync_job(self.account_id, "fan")
+            task = runtime._follow_sync_tasks[started["id"]]
             await asyncio.sleep(0)
-            await main.cancel_follow_sync_job(started["id"])
+            await follows.cancel_follow_sync_job(started["id"])
             await task
-            return await main.get_follow_sync_job(started["id"])
+            return await follows.get_follow_sync_job(started["id"])
 
         result = asyncio.run(scenario())
 
         self.assertEqual(result["status"], "canceled")
         self.assertFalse(result["cancelable"])
+        self.assertEqual(result["fetched"], 1)
+        with db.get_session() as session:
+            rows = session.exec(select(FollowEdge).where(
+                FollowEdge.account_id == self.account_id, FollowEdge.direction == "fan")).all()
+        self.assertEqual([row.uid for row in rows], ["old-fan"])
+
+    def test_queued_follow_job_cancels_before_fetch_starts(self):
+        runtime.engine = _Engine()
+
+        async def scenario():
+            started = await follows.start_follow_sync_job(self.account_id, "fan")
+            result = await follows.cancel_follow_sync_job(started["id"])
+            await asyncio.sleep(0)
+            return result
+
+        self.assertEqual(asyncio.run(scenario())["status"], "canceled")
+        runtime.engine.locked_direct.assert_not_awaited()
+
 
 
 class FollowDirectErrorTests(unittest.TestCase):
@@ -364,7 +445,7 @@ class FollowDirectErrorTests(unittest.TestCase):
                                  fetch_all_follows=AsyncMock(return_value=[]))
         client.session_scope = session_scope
         engine = MonitorEngine(Config(), _Browser())
-        with patch("app.engine.monitor.DouyinClient", return_value=client):
+        with patch("app.engine.work_sync.DouyinClient", return_value=client):
             users, error = asyncio.run(
                 engine._fetch_douyin_follows_direct_locked(
                     self.account_id, "following"))
@@ -372,11 +453,26 @@ class FollowDirectErrorTests(unittest.TestCase):
         self.assertEqual(users, [])
         self.assertEqual(error, "empty_body")
 
+    def test_norm_follow_user_preserves_reset_account_with_sec_uid(self):
+        from app.browser.account_hub import _norm_follow_user
+
+        user = _norm_follow_user(
+            {"uid": "0", "sec_uid": "MS4wLjABreset", "nickname": "",
+             "unique_id": "dy_reset_01"},
+            "following",
+        )
+        self.assertIsNotNone(user)
+        self.assertEqual(user["uid"], "MS4wLjABreset")
+        self.assertEqual(user["nickname"], "dy_reset_01")
+        self.assertTrue(user["is_following"])
+        # Non-user module entries without sec_uid and without nickname stay rejected.
+        self.assertIsNone(_norm_follow_user({"id": "42"}, "following"))
+
 
 class FollowSyncUiTests(unittest.TestCase):
     def test_follow_diagnostic_markers_are_gbk_encodable(self):
         source = (Path(__file__).parents[1] / "app" / "browser" /
-                  "account_hub.py").read_text(encoding="utf-8")
+                  "hub_follows.py").read_text(encoding="utf-8")
         self.assertIn('("exact:" if precise else "candidate:") + path', source)
         for marker in ("exact:", "candidate:"):
             self.assertEqual(marker.encode("gbk").decode("gbk"), marker)
@@ -397,6 +493,88 @@ class FollowSyncUiTests(unittest.TestCase):
         self.assertIn("const list = payload.items || []", source)
         self.assertIn("renderFollowSyncStatus", source)
         self.assertIn("cancelFollowSync", source)
+        self.assertIn("pager.hidden = state.total <= 0;", source)
+
+    def test_douyin_browser_modal_requires_a_complete_snapshot(self):
+        from app.browser import hub_follows
+
+        listeners = {}
+        first = [{"uid": f"fan-{i}", "nickname": f"粉丝{i}"} for i in range(17)]
+        next_page = [{"uid": "fan-17", "nickname": "粉丝17"}]
+
+        async def emit(rows, more):
+            resp = SimpleNamespace(
+                url="https://www.douyin.com/aweme/v1/web/user/follower/list/?count=20",
+                status=200,
+                request=SimpleNamespace(resource_type="xhr", post_data=""),
+                json=AsyncMock(return_value={
+                    "status_code": 0, "followers": rows, "has_more": more, "total": 18,
+                }),
+            )
+            await listeners["response"](resp)
+
+        class FakePage:
+            url = "https://www.douyin.com/user/self"
+
+            def on(self, event, callback):
+                listeners[event] = callback
+
+            async def goto(self, *_args, **_kwargs):
+                return None
+
+            async def wait_for_load_state(self, *_args, **_kwargs):
+                return None
+
+            async def wait_for_timeout(self, _ms):
+                return None
+
+            async def evaluate(self, script, arg=None):
+                if arg == "粉丝":
+                    return {"width": 30, "height": 20, "x": 100, "y": 100}
+                return {"inModal": True, "width": 300, "height": 400, "x": 500, "y": 400}
+
+            async def close(self):
+                return None
+
+        async def click_point(*_args, **_kwargs):
+            await emit(first, 1)
+
+        async def scroll_wheel(*_args, **_kwargs):
+            if terminal is not None:
+                await emit(terminal, "0")
+
+        async def _fast_wait(aw, timeout=None):
+            if hasattr(aw, "close"):
+                aw.close()
+            return None
+
+        for terminal, count, expected_error in (
+            (None, 17, "browser_pagination_incomplete"),
+            (first, 17, "pagination_stalled"),
+            ([], 17, "platform_cap"),
+            (next_page, 18, ""),
+        ):
+            with self.subTest(expected_error=expected_error):
+                fake_mgr = SimpleNamespace(new_page=AsyncMock(return_value=FakePage()))
+                progress = []
+                with (
+                    patch.object(hub_follows.asyncio, "wait_for", side_effect=_fast_wait),
+                    patch.object(hub_follows, "human_wait", new_callable=AsyncMock),
+                    patch.object(hub_follows, "DEFAULT_HUMAN_ENGINE", SimpleNamespace(
+                        sample_box_point=lambda box: (box["x"], box["y"]),
+                        click_point=click_point, move_mouse=AsyncMock(),
+                        scroll_wheel=scroll_wheel,
+                    )),
+                ):
+                    users, err = asyncio.run(hub_follows.fetch_follows(
+                        fake_mgr, SimpleNamespace(), "douyin", "sec-self",
+                        "fan", set(), settle_ms=10, max_scrolls=8, progress=progress.append))
+                self.assertEqual(len(users), count)
+                self.assertEqual(err.partition(":")[0], expected_error)
+                self.assertEqual(progress[-1], {
+                    "pages": 1 if terminal is None else 2, "fetched": count,
+                    "expected_total": 18,
+                })
 
 
 if __name__ == "__main__":
