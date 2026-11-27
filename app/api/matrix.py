@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field as PydanticField
 from sqlalchemy import func
 from sqlmodel import select
 
-from app import runtime as app_runtime
+from app import licensing, runtime as app_runtime
 from app.api.accounts import _clean_account_tags, _parse_account_tags
 from app.api.publishing import (
     _norm_publish_action,
@@ -1116,6 +1116,7 @@ def _sync_matrix_batch_to_hub(job: dict[str, Any], *, immediate: bool = False) -
             "action": job.get("action"),
             "deleted_ids": list(job.get("deleted_ids") or []),
             "failed_ids": list(job.get("failed_ids") or []),
+            "license_skipped_ids": list(job["license_skipped_ids"]),
             "failed_samples": list(job.get("failed_samples") or [])[:8],
         },
     )
@@ -1151,7 +1152,10 @@ async def _run_matrix_batch_job(job_id: str, action: str, ids: list[int], concur
             ok = False
             err_msg = ""
             try:
-                if action == "test_proxy":
+                if not licensing.is_active():
+                    err_msg = "授权失效，未执行"
+                    job["license_skipped_ids"].append(aid)
+                elif action == "test_proxy":
                     res = await proxies_api.test_account_proxy(aid)
                     ok = bool(res.get("ok"))
                     if not ok:
@@ -1271,6 +1275,7 @@ async def start_matrix_batch_job(body: MatrixBatchJobIn):
         "concurrency": concurrency,
         "deleted_ids": [],
         "failed_ids": [],
+        "license_skipped_ids": [],
         "failed_samples": [],
         "error": "",
         "created_at": datetime.utcnow().isoformat() + "Z",
