@@ -831,7 +831,7 @@ async function exportFilteredCollectionComments(button) {
   await withBusy(button, "导出中", async () => {
     try {
       const params = collectionCommentParams({ exportMode: true });
-      await _downloadExcelReport(`/api/collections/${COLLECTION_JOB_ID}/export.xlsx?${params.toString()}`, `keyword-collection-${COLLECTION_JOB_ID}-filtered.xlsx`);
+      await _downloadExcelReport(`/api/collections/${COLLECTION_JOB_ID}/export.xlsx?${params.toString()}`, `获客助手_keyword-collection-${COLLECTION_JOB_ID}-filtered.xlsx`);
       toast("当前筛选结果已导出", "ok");
     } catch (e) { toast("导出失败：" + e.message, "err"); }
   });
@@ -868,6 +868,6 @@ async function deleteCollection(jobId) {
 function exportCollection(jobId) {
   const link = document.createElement("a");
   link.href = `/api/collections/${jobId}/export.xlsx`;
-  link.download = `keyword-collection-${jobId}.xlsx`;
+  link.download = `获客助手_keyword-collection-${jobId}.xlsx`;
   document.body.appendChild(link); link.click(); link.remove();
 }

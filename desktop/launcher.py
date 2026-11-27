@@ -493,7 +493,7 @@ class Launcher:
                 import pystray
                 from desktop.ui import brand_image
                 icon = brand_image()
-                self.tray = pystray.Icon("CreatorHub", icon, "CreatorHub 正在本地运行", menu=pystray.Menu(
+                self.tray = pystray.Icon("CreatorHub", icon, "获客助手 正在本地运行", menu=pystray.Menu(
                     pystray.MenuItem("打开管理器", lambda: self.events.put(("show", None)), default=True),
                     pystray.MenuItem("停止并退出", lambda: self.events.put(("exit", None)))))
                 self.tray.run_detached()
@@ -591,7 +591,7 @@ def main() -> int:
                         install_browser=not args.skip_browser_install)
     except Exception as exc:
         from tkinter import messagebox
-        messagebox.showerror("CreatorHub 启动提示", str(exc))
+        messagebox.showerror("获客助手 启动提示", str(exc))
         return 1
     return 0
 

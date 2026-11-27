@@ -55,6 +55,7 @@ def main():
     for source, destination in ((ROOT / "config.example.yaml", "."),
                                 (ROOT / "LICENSE", "."),
                                 (ROOT / "COMMERCIAL-NOTICE.txt", "."),
+                                (ROOT / "app/brand.json", "app"),
                                 (ROOT / "app/license_public.pem", "app"),
                                 node_module_data(ROOT),
                                 (helper, "desktop"),

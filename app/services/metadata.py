@@ -231,14 +231,16 @@ def _report_window(stmt, model, start: datetime | None, end: datetime | None):
 
 
 def _report_download(payload: bytes, prefix: str):
+    from urllib.parse import quote
+    from app.brand import PRODUCT_NAME
     from app.reporting import REPORT_MIME
 
-    filename = f"creatorhub_{prefix}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    filename = f"{PRODUCT_NAME}_{prefix}_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
     return StreamingResponse(
         iter([payload]),
         media_type=REPORT_MIME,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
             "Content-Length": str(len(payload)),
         },
     )

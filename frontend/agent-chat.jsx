@@ -100,7 +100,7 @@ export function ChatMessages({ turns, busy, statusText, platformText, onRetry, r
       <div className="agent-user-message"><span>你</span><p className="agent-result-question">{run.prompt}</p></div>
       <div className="agent-assistant-message">
         <div className="agent-message-top">
-          <div className="agent-message-heading"><span className="agent-message-avatar"><Icon name="sparkles" /></span><strong>AI 助手</strong><span className="agent-model-chip">{run.model_name}</span></div>
+          <div className="agent-message-heading"><span className="agent-message-avatar"><Icon name="sparkles" /></span><strong>获客助手 AI 助手</strong><span className="agent-model-chip">{run.model_name}</span></div>
           <h3 className="agent-message-status">{statusText[run.status] || run.status}</h3>
         </div>
         {pending(run) && <p className="agent-working"><span className="agent-working-dot" />{run.partial_answer ? "正在流式输出…" : "正在读取证据或接收模型事件…"}</p>}

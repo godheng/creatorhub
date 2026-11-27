@@ -424,7 +424,7 @@ async function exportShareHistoryReport(full = false, explicitBtn = null) {
     try {
       await _downloadExcelReport(
         "/api/reports/share-download-history.xlsx?" + _shareHistoryReportParams(full).toString(),
-        "creatorhub_share_download_history.xlsx",
+        "获客助手_share_download_history.xlsx",
       );
       const count = $("sd-history-filter-count")?.textContent?.trim();
       toast(`链接下载历史 ${full ? "全量" : "筛选结果"} Excel 已导出${!full && count ? `（${count}）` : ""}`, "ok");

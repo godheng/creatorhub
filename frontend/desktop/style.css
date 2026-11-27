@@ -256,7 +256,7 @@ h1:focus { outline: none; }
   background: var(--glass-pill-bg);
   border: 1px solid var(--glass-rim);
   box-shadow: var(--sh-pill), var(--glass-specular);
-  color: var(--accent);
+  color: #d9244e;
   display: grid;
   place-items: center;
 }

@@ -108,7 +108,7 @@ class LauncherView:
     def __init__(self, owner, version):
         self.owner = owner
         root = owner.root
-        root.title("CreatorHub · 启动管理器")
+        root.title("获客助手 · 启动管理器")
         root.geometry("840x670")
         root.minsize(780, 650)
         configure_styles(root)
@@ -129,7 +129,7 @@ class LauncherView:
         mark.create_oval(9, 5, 39, 35, outline=COLORS["accent"], width=3)
         mark.create_oval(18, 15, 29, 26, outline=COLORS["accent"], width=2)
         mark.create_line(34, 32, 44, 43, fill=COLORS["accent"], width=3)
-        ttk.Label(header, text="CreatorHub", style="Title.TLabel").grid(row=0, column=1, sticky="w")
+        ttk.Label(header, text="获客助手", style="Title.TLabel").grid(row=0, column=1, sticky="w")
         ttk.Label(header, text="启动管理器  /  你的本地内容工作台", style="Subtitle.TLabel").grid(row=1, column=1, sticky="w")
         ttk.Label(header, text=f"桌面版 {version}", style="Idle.TLabel").grid(row=0, column=2, rowspan=2)
 

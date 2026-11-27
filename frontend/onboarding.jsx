@@ -1,3 +1,4 @@
+import brand from "../app/brand.json";
 import React, { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -49,8 +50,8 @@ export function Onboarding({ platform }) {
     <Dialog.Portal>
       <Dialog.Overlay className="wb-sheet-overlay" />
       <Dialog.Content className="wb-onboarding">
-        <div className="wb-onboarding-head"><span>CREATORHUB / GET STARTED</span><Dialog.Close asChild><button className="ghost sm" aria-label="关闭新手向导">关闭</button></Dialog.Close></div>
-        <Dialog.Title>跟着三步，完成第一次使用</Dialog.Title>
+        <div className="wb-onboarding-head"><span>{brand.name} / 入门指南</span><Dialog.Close asChild><button className="ghost sm" aria-label="关闭新手向导">关闭</button></Dialog.Close></div>
+        <Dialog.Title>欢迎使用{brand.name}</Dialog.Title>
         <Dialog.Description>{demo ? "当前是示例演示：操作不会登录真实账号或产生真实任务。" : "先选平台、再登录、最后完成一个小任务。不会自动发布或发送任何内容。"}</Dialog.Description>
         <ol className="wb-onboarding-steps" aria-label="上手步骤">{["选择平台", "登录账号", "第一个任务"].map((label, i) => <li key={label}><button className="ghost" aria-current={step === i ? "step" : undefined} onClick={() => setStep(i)}>{i + 1}. {label}</button></li>)}</ol>
         {step === 0 && <div><h3>你想先使用哪个平台？</h3><div className="wb-onboarding-platforms">{Object.entries(platforms).map(([key, value]) => <button key={key} className="ghost" aria-pressed={selected === key} onClick={() => setSelected(key)}><b>{value.name}</b><span>{value.task}</span></button>)}</div><p>不同平台的能力独立。视频号支持创作者助手与微信原生协议双通道，小红书主站与创作者登录分开。</p></div>}

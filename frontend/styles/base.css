@@ -50,9 +50,9 @@
     display:flex; align-items:center; gap:14px;
   }
   .brand { display:flex; align-items:center; gap:11px; flex:0 0 calc(var(--sidebar-w) - 20px); min-width:0; }
-  .brand-mark {
+  .brand .brand-mark {
     display:grid; place-items:center; width:34px; height:34px; border-radius:10px;
-    background:linear-gradient(135deg,var(--acc),#ff6a85); color:#fff;
+    background:#d9244e; color:#fff;
     box-shadow:0 4px 14px -4px var(--acc-ring);
   }
   .brand-mark svg { width:19px; height:19px; }
