@@ -49,6 +49,8 @@ from app.platforms.facebook.urls import FACEBOOK_BASE, dm_thread_url, group_url,
 
 
 async def _notify_submit(on_submit: Optional[Callable[[], Any]]) -> None:
+    from app.licensing import require_active
+    require_active()
     if on_submit is None:
         return
     res = on_submit()

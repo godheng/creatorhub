@@ -74,13 +74,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & $compiler "/DAppVersion=$env:APP_VERSION" desktop/installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $file = Get-Item "dist/installer/CreatorHub-Setup-$env:APP_VERSION-windows-x64.exe"
+          $file = Get-Item "dist/installer/aispace-Setup-$env:APP_VERSION-windows-x64.exe"
           "$((Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower())  $($file.Name)" | Set-Content dist/installer/SHA256.txt -Encoding ascii
       - name: Fetch verified previous release inventory
         # Size limits use compressed bytes and expanded bytes separately.
         run: python desktop/fetch_update_base.py --version $env:APP_VERSION
       - name: Enforce installer size budget
-        run: python desktop/package_report.py dist/windows/CreatorHub --installer "dist/installer/CreatorHub-Setup-$env:APP_VERSION-windows-x64.exe" --output dist/installer/package-size.json --max-installer-mib 110 --max-bundle-mib 330
+        run: python desktop/package_report.py dist/windows/aispace --installer "dist/installer/aispace-Setup-$env:APP_VERSION-windows-x64.exe" --output dist/installer/package-size.json --max-installer-mib 110 --max-bundle-mib 330
       - name: Build file delta and release inventory
         run: python desktop/build_update.py --version $env:APP_VERSION --base-manifest build/windows/update-base.json
       - uses: actions/upload-artifact@v4
@@ -120,8 +120,8 @@ jobs:
           else
             gh release create "$TAG" --verify-tag --draft --title "CreatorHub $TAG" --notes-file RELEASE_NOTES.md
           fi
-          assets=("CreatorHub-Setup-$APP_VERSION-windows-x64.exe" "CreatorHub-Update-$APP_VERSION-windows-x64.json" SHA256.txt)
-          for delta in CreatorHub-Delta-*-to-"$APP_VERSION"-windows-x64.zip; do
+          assets=("aispace-Setup-$APP_VERSION-windows-x64.exe" "aispace-Update-$APP_VERSION-windows-x64.json" SHA256.txt)
+          for delta in aispace-Delta-*-to-"$APP_VERSION"-windows-x64.zip; do
             [ ! -f "$delta" ] || assets+=("$delta")
           done
           gh release upload "$TAG" "${assets[@]}" --clobber

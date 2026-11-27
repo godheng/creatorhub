@@ -435,6 +435,8 @@ class _SubmitLocator:
             result = self._on_submit()
             if inspect.isawaitable(result):
                 await result
+        from app.licensing import require_active
+        require_active()
         self._state["clicked"] = True
         return await self._locator.click(*args, **kwargs)
 

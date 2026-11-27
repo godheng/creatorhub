@@ -764,6 +764,8 @@ async def publish_douyin(mgr: BrowserManager, identity: Identity,
         await _notify_submit(on_submit)
         submitted["clicked"] = True
         try:
+            from app.licensing import require_active
+            require_active()
             await DEFAULT_HUMAN_ENGINE.click_locator(btn, page=page, timeout=5000)
             _log(f"已点击{action_label}按钮")
             await _notify_stage(on_stage, f"已点击「{action_label}」，等待抖音确认…")

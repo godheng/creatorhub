@@ -187,6 +187,9 @@ class MediaDownloadMixin:
         return aw
 
     async def retry_download(self, record_id: int) -> dict:
+        from app.licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         """重新下载某条作品(用入库时存下的媒体直链;直链可能过期则需重抓目标)。
         小红书:若当初连详情都没拿到(无媒体快照),这里会用 xsec_token 重新拉一次详情。"""
         with get_session() as s:

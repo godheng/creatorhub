@@ -1,6 +1,8 @@
 """待发评论队列执行、多平台直连/浏览器发送及回退。"""
 from __future__ import annotations
 
+from app.licensing import LicenseRequired
+
 from datetime import datetime, timedelta
 
 from app.account_lifecycle import AccountUnavailableError
@@ -34,6 +36,9 @@ class CommentTaskRunnerMixin:
                 s.commit()
 
     async def execute_comment_task(self, task_id: int, *, scheduled: bool = False) -> dict:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         if task_id in self._commenting:
             return {"ok": False, "error": "正在执行中"}
         self._commenting.add(task_id)
@@ -61,6 +66,8 @@ class CommentTaskRunnerMixin:
                 "blocked_by": "account_busy",
                 "error": "该账号当前正在执行其他浏览器操作，稍后将自动重试",
             }
+        except LicenseRequired:
+            return {"ok": False, "error": "license_required", "deferred": True}
         except AccountUnavailableError:
             return self._fail_missing_account_task(CommentTask, task_id)
         finally:

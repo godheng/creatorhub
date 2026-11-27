@@ -188,6 +188,8 @@ class XhsApiClient:
             self._session_owner = None
 
     async def _request(self, method: str, url: str, **kwargs):
+        from app.licensing import require_active
+        require_active()
         async def send(session):
             request = getattr(session, method)
             resp = await request(

@@ -119,7 +119,7 @@ def release_info(data, current):
     version = tag.removeprefix("v")
     target = platform_tag()
     windows = target == "windows-x64"
-    asset_name = f"CreatorHub-Setup-{version}-{target}.{'exe' if windows else 'dmg'}"
+    asset_name = f"aispace-Setup-{version}-{target}.{'exe' if windows else 'dmg'}"
     download_url = f"{RELEASES_URL}/download/{quote(tag, safe='')}/{asset_name}"
     asset = next((a for a in data.get("assets", []) if isinstance(a, dict)
                   and a.get("name") == asset_name and a.get("state") == "uploaded"
@@ -184,7 +184,7 @@ class UpdateChecker:
         self.monitor_stop = threading.Event()
         self.monitor = None
         self.manual_notice = False
-        self.result = {"status": "idle", "message": "只检查正式版更新，不会自动下载或安装。"}
+        self.result = {"status": "idle", "message": "请使用商用安装包覆盖升级。"}
 
     def state(self):
         with self.lock:
@@ -211,13 +211,7 @@ class UpdateChecker:
             self.manual_notice = False
 
     def start_monitor(self):
-        """Native packaged app only. Loading/reloading the UI never duplicates timers."""
-        with self.lock:
-            if (not self.install_dir or numeric_version(self.current) is None
-                    or self.monitor_stop.is_set() or (self.monitor and self.monitor.is_alive())):
-                return
-            self.monitor = threading.Thread(target=self._monitor, daemon=True)
-            self.monitor.start()
+        return
 
     def _monitor(self):
         if self.monitor_stop.wait(15):
@@ -233,30 +227,7 @@ class UpdateChecker:
             self.monitor.join(timeout=2)
 
     def check(self, *, automatic=False):
-        with self.lock:
-            if automatic and (self.monitor_stop.is_set() or not self.install_dir
-                    or numeric_version(self.current) is None or not self.policy.due(time.time())
-                    or self.artifact
-                    or self.result.get("status") not in {"idle", "current", "empty", "error", "available", "unavailable"}
-                    or (self.worker and self.worker.is_alive()) or time.monotonic() - self.last_attempt < 5):
-                return False
-            if self.result.get("status") in BUSY_STATES - {"checking"}:
-                raise ValueError("更新正在处理中，请等待完成或取消下载。")
-            if self.artifact:
-                raise ValueError("新版已经下载，请安装或稍后继续，无需重新检查。")
-            if self.worker and self.worker.is_alive():
-                return False
-            if time.monotonic() - self.last_attempt < 5:
-                raise ValueError("刚刚检查过，请稍等几秒再试。")
-            self.last_attempt = time.monotonic()
-            self.policy.save(last_check=time.time(), best_effort=True)
-            self.manual_notice = not automatic
-            self.artifact = None
-            self.manifest = None
-            self.result = {"status": "checking", "message": "正在连接 GitHub，检查正式版本…"}
-            self.worker = threading.Thread(target=self.run, daemon=True)
-            self.worker.start()
-            return True
+        raise ValueError("商用版请通过商用安装包覆盖升级。")
 
     def run(self):
         try:
@@ -295,26 +266,10 @@ class UpdateChecker:
             self.result = {**result, "checked_at": time.time()}
 
     def download_url(self, tag):
-        with self.lock:
-            if self.result.get("tag") != tag or self.result.get("status") not in {"available", "development", "download_error", "cancelled", "downloaded", "install_error"} or not self.result.get("download_url"):
-                raise ValueError("版本信息已变化或安装包尚未就绪，请重新检查更新。")
-            return self.result["download_url"]
+        raise ValueError("商用版请通过商用安装包覆盖升级。")
 
     def download(self, tag):
-        with self.lock:
-            self.download_url(tag)
-            if not self.cache_dir or not self.result.get("verified_download"):
-                raise ValueError("此版本缺少完整的 SHA-256 校验信息，请前往发布页查看。")
-            if self.worker and self.worker.is_alive():
-                raise ValueError("更新正在处理中，请稍候。")
-            info = dict(self.result)
-            self.manual_notice = True
-            self.artifact = None
-            self.cancel.clear()
-            self.result.update(status="downloading", message="正在下载新版，当前任务继续运行。",
-                               downloaded_bytes=0, progress=0)
-            self.worker = threading.Thread(target=self._download, args=(info,), daemon=True)
-            self.worker.start()
+        raise ValueError("商用版请通过商用安装包覆盖升级。")
 
     def cancel_download(self):
         with self.lock:
@@ -398,12 +353,7 @@ class UpdateChecker:
                                progress=min(99, int(downloaded * 100 / size)))
 
     def begin_install(self, tag):
-        with self.lock:
-            if (self.result.get("status") not in {"downloaded", "install_error"}
-                    or not self.artifact or self.artifact["tag"] != tag):
-                raise ValueError("请先下载并校验当前版本，再确认安装。")
-            self.result.update(status="preparing", message="正在准备安装并检查下载文件…")
-            return dict(self.artifact)
+        raise ValueError("商用版请通过商用安装包覆盖升级。")
 
     def install_status(self, status, message):
         with self.lock:

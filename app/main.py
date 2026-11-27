@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from . import runtime
+from . import licensing
+from .api import license
 from .api import register_routes
 from .local_access import LocalAccessMiddleware
 from .logging_setup import RequestLoggingMiddleware
@@ -53,6 +55,9 @@ def create_app() -> FastAPI:
     """装配本地 FastAPI 应用实例（导入阶段不启动浏览器或后台协程）。"""
     _ensure_standard_mime_types()
     application = FastAPI(title="CreatorHub", lifespan=lifespan)
+    application.include_router(license.router)
+    application.add_exception_handler(licensing.LicenseRequired, license.commercial_license_error)
+    application.middleware("http")(license.commercial_license_gate)
     application.add_middleware(LocalAccessMiddleware)
     application.add_middleware(RequestLoggingMiddleware, cfg_getter=lambda: runtime.cfg)
     register_routes(application)

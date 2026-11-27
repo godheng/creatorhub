@@ -1,6 +1,8 @@
 """Durable idempotency for local queue creation, not platform-write retries."""
 from __future__ import annotations
 
+from . import licensing
+
 import hashlib
 import json
 import re
@@ -61,6 +63,7 @@ def submit_once(session, *, request, scope: str, body, create):
     """
     identity = _identity(request, scope, body)
     if identity is None:
+        licensing.require_active()
         payload = create()
         session.commit()
         return payload, True
@@ -80,6 +83,7 @@ def submit_once(session, *, request, scope: str, body, create):
         if existing is None:
             raise
         return _replay(session, existing, payload_hash), False
+    licensing.require_active()
     payload = create()
     model = _MODELS.get(scope.split(":", 1)[0])
     if model is not None:

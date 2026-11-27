@@ -120,6 +120,8 @@ def _ensure_creator_monitor_available(session, *, platform: str, sec_uid: str,
 
 @router.post("/api/monitors")
 async def add_monitor(body: TargetIn, request: Request = None):
+    from app.licensing import require_active
+    require_active()
     with get_session() as session:
         replay = replay_if_exists(session, request=request, scope="monitor", body=body)
         if replay is not None:

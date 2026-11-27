@@ -1,6 +1,8 @@
 """多平台定时/立即发布任务调度、转发入队与浏览器/协议发布执行。"""
 from __future__ import annotations
 
+from app.licensing import LicenseRequired
+
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
@@ -306,6 +308,9 @@ class PublishJobMixin:
             loop.create_task(self._process_publish())
 
     async def _process_publish(self):
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         worker = getattr(self, "_publish_worker_task", None)
         if worker is not None and not worker.done():
             return
@@ -360,6 +365,9 @@ class PublishJobMixin:
         scheduled: bool = False,
         close_open_browser: bool = False,
     ) -> dict:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         if task_id in self._publishing:
             return {"ok": False, "error": "正在发布中"}
         self._publishing.add(task_id)
@@ -481,6 +489,8 @@ class PublishJobMixin:
                 "account_id": account_id,
                 "error": "该账号当前正在执行其他浏览器操作，稍后将自动重试",
             }
+        except LicenseRequired:
+            return {"ok": False, "error": "license_required", "deferred": True}
         except AccountUnavailableError:
             return self._fail_missing_account_task(PublishTask, task_id)
         finally:

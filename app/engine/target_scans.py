@@ -64,6 +64,9 @@ class TargetScanMixin:
                 await asyncio.gather(*(self.scan_target(tid) for tid in runnable))
 
     async def scan_target(self, target_id: int) -> dict:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         if target_id in self._inflight:
             return {"ok": True, "new": 0, "skipped": "正在抓取中"}
         self._inflight.add(target_id)

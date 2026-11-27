@@ -280,7 +280,7 @@ def update_health_check() -> int:
             assert (channels_js / "finder_proxy_bridge.js").is_file()
             assert (channels_js / "finder_native_protocol.js").is_file()
             assert (channels_js / "finder_protocol_browser_bootstrap.js").is_file()
-            for name in ("desktop/web/app.js", "desktop/web/index.html", "config.example.yaml", "LICENSE"):
+            for name in ("desktop/web/app.js", "desktop/web/index.html", "config.example.yaml", "LICENSE", "app/license_public.pem", "COMMERCIAL-NOTICE.txt"):
                 assert (resources() / name).is_file(), name
             assert all(Path(path).is_file() for path in compute_driver_executable())
             assert Path(get_ffmpeg_exe()).is_file()
@@ -327,7 +327,9 @@ def recover_interrupted_update(home):
     if not journal or journal.get("phase") in {"committed", "rolled_back"}:
         return False
     from desktop.update_helper import clean_environment
-    helper = home / "runtime/updates" / journal["attempt"] / "CreatorHubUpdater.exe"
+    helper = home / "runtime/updates" / journal["attempt"] / "aispaceUpdater.exe"
+    if not helper.is_file():
+        helper = helper.with_name("CreatorHubUpdater.exe")
     ready = home / "runtime/update-recovery-ready.json"
     ready.unlink(missing_ok=True)
     (home / "runtime/update-recovery-cancel").unlink(missing_ok=True)

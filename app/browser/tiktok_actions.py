@@ -24,6 +24,8 @@ from .human_interaction import (
 
 
 async def _mark_submit(on_submit: Any) -> None:
+    from app.licensing import require_active
+    require_active()
     if on_submit is None:
         return
     result = on_submit()
@@ -116,10 +118,14 @@ async def post_tiktok_comment(
         button = await _visible(page, COMMENT_SUBMITS)
         await _mark_submit(on_submit)
         if button is not None:
+            from app.licensing import require_active
+            require_active()
             await DEFAULT_HUMAN_ENGINE.click_locator(
                 button, page=page, timeout=4000
             )
         else:
+            from app.licensing import require_active
+            require_active()
             await page.keyboard.press("Enter")
         submitted = True
         for _ in range(30):
@@ -172,6 +178,8 @@ async def do_tiktok_follow(
         if following == (not unfollow):
             return True, ""
         await _mark_submit(on_submit)
+        from app.licensing import require_active
+        require_active()
         await DEFAULT_HUMAN_ENGINE.click_locator(button, page=page, timeout=4000)
         clicked = True
         if unfollow:
@@ -180,6 +188,8 @@ async def do_tiktok_follow(
                 page, ('button:has-text("Unfollow")', 'button:has-text("Confirm")')
             )
             if confirm is not None:
+                from app.licensing import require_active
+                require_active()
                 await DEFAULT_HUMAN_ENGINE.click_locator(
                     confirm, page=page, timeout=3000
                 )
@@ -247,6 +257,8 @@ async def send_tiktok_dm(
         )
         await human_wait(page, 350)
         await _mark_submit(on_submit)
+        from app.licensing import require_active
+        require_active()
         await page.keyboard.press("Enter")
         submitted = True
         await human_wait(page, 1000)

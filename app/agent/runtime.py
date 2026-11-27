@@ -1,6 +1,8 @@
 """Bounded native tool loop with durable, redacted evidence and audit records."""
 from __future__ import annotations
 
+from .. import licensing
+
 import asyncio
 import hashlib
 import json
@@ -172,6 +174,7 @@ async def execute_run(run_id: str, body: RunInput, cfg: AgentSettings, previous_
 
     async def loop():
         nonlocal partial_answer, progress_flush
+        licensing.require_active()
         update_run(run_id, status="running")
         await read("list_accounts", {"limit": 20})
         if body.mode == "diagnose":
@@ -189,6 +192,7 @@ async def execute_run(run_id: str, body: RunInput, cfg: AgentSettings, previous_
             tools.append(PLAN_TOOL)
         calls_total = 0
         for round_index in range(cfg.max_rounds):
+            licensing.require_active()
             partial_answer = ""
             steps.append({"tool": "model", "round": round_index + 1, "status": "running"})
             call = {"round": round_index + 1, "status": "running", "usage": {}, "cost": None, "usage_final": False}
@@ -266,6 +270,8 @@ async def execute_run(run_id: str, body: RunInput, cfg: AgentSettings, previous_
         raise
     except asyncio.TimeoutError:
         update_run(run_id, status="failed", error="分析达到 180 秒总时限；未自动重试")
+    except licensing.LicenseRequired as exc:
+        update_run(run_id, status="failed", error="授权不可用：" + str(exc))
     except ModelError as exc:
         update_run(run_id, status="failed", error=str(exc))
     except Exception:
@@ -288,6 +294,7 @@ def start_run(body: RunInput) -> dict:
             if previous.request_hash != digest:
                 raise HTTPException(409, "该请求编号已用于其他问题，请重新提交")
             return get_run(body.request_id)
+    licensing.require_active()
     channel_id = body.channel_id or list_channels()["active_channel_id"]
     try:
         cfg = get_settings(channel_id)

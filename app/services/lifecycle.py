@@ -9,6 +9,7 @@ import logging
 
 from fastapi import FastAPI
 
+from app import licensing
 from app import runtime as app_runtime
 from app.account_merge import (
     cleanup_merged_profiles,
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     try:
         progress_hub.bind_loop(asyncio.get_running_loop())
         init_db(app_runtime.cfg.db_path)
+        await asyncio.to_thread(licensing.start)
         from app.agent.runtime import recover_interrupted, shutdown as shutdown_agent
         recover_interrupted()
 
@@ -173,7 +175,8 @@ async def lifespan(app: FastAPI):
         async def webhook_delivery_loop():
             while True:
                 try:
-                    await dispatch_pending(20)
+                    if licensing.is_active():
+                        await dispatch_pending(20)
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -234,4 +237,5 @@ async def lifespan(app: FastAPI):
         await app_runtime.channels_proxy.stop()
         progress_hub.shutdown()
         log.info("服务已安全退出")
+        await asyncio.to_thread(licensing.stop)
         shutdown_logging()

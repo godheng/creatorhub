@@ -1,10 +1,10 @@
-; Compile after desktop/build_windows.py. The data directory is NEVER installed
+﻿; Compile after desktop/build_windows.py. The data directory is NEVER installed
 ; into, overwritten, or deleted by the installer/uninstaller.
 #ifndef AppVersion
   #define AppVersion "0.2.0"
 #endif
 #ifndef AppSourceDir
-  #define AppSourceDir "..\dist\windows\CreatorHub"
+  #define AppSourceDir "..\dist\windows\aispace"
 #endif
 #define StagingDir AddBackslash(SourcePath) + "..\build\windows"
 #define IconPath StagingDir + "\CreatorHub.ico"
@@ -17,15 +17,14 @@
 
 [Setup]
 AppId={{93FD4B37-6436-4CE0-8249-BC487CC5A062}
-AppName=CreatorHub
+AppName=获客助手
 AppVersion={#AppVersion}
-AppVerName=CreatorHub v{#AppVersion}
-AppPublisher=CreatorHub
+AppVerName=获客助手 v{#AppVersion}
+AppPublisher=aispace
 AppPublisherURL=https://github.com/3441293738/creatorhub
 AppSupportURL=https://github.com/3441293738/creatorhub/issues
-AppUpdatesURL=https://github.com/3441293738/creatorhub/releases/latest
-DefaultDirName={localappdata}\Programs\CreatorHub
-DefaultGroupName=CreatorHub
+DefaultDirName={localappdata}\Programs\aispace
+DefaultGroupName=获客助手
 DisableWelcomePage=no
 DisableDirPage=no
 DisableProgramGroupPage=yes
@@ -39,7 +38,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir=..\dist\installer
-OutputBaseFilename=CreatorHub-Setup-{#AppVersion}-windows-x64
+OutputBaseFilename=aispace-Setup-{#AppVersion}-windows-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -53,8 +52,8 @@ WizardSmallImageFile={#Small100},{#Small150},{#Small200}
 #if FileExists(Banner100) && FileExists(Banner150) && FileExists(Banner200)
 WizardImageFile={#Banner100},{#Banner150},{#Banner200}
 #endif
-UninstallDisplayIcon={app}\CreatorHub.exe
-UninstallDisplayName=CreatorHub
+UninstallDisplayIcon={app}\aispace.exe
+UninstallDisplayName=获客助手
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
@@ -70,16 +69,16 @@ DialogFontName=Microsoft YaHei UI
 WelcomeFontName=Microsoft YaHei UI
 
 [CustomMessages]
-LaunchCreatorHub=立即启动 CreatorHub
+LaunchCreatorHub=立即启动 获客助手
 InstallingWebView2=正在配置 Microsoft WebView2 运行环境，请保持网络连接…
 WebView2StartFailed=WebView2 安装程序启动失败，请重新运行安装包。
-WebView2Required=需要安装 Microsoft WebView2 运行环境才能继续。请检查网络连接后重试，原有 CreatorHub 数据保持不变。
-UninstallKeepData=卸载将保留账号资料、配置、下载内容和备份。%n%n用户数据目录：%1%n%n卸载前请先退出 CreatorHub。如不再需要这些数据，可在卸载完成后自行备份并清理该目录。
-WelcomeSubtitleFresh=即将在您的电脑上安装 CreatorHub v{#AppVersion} 本地多平台内容工作台。%n%n• 支持自由选择程序安装目录（如 D 盘或其他位置）%n• 账号登录态、配置、数据库与下载内容独立保存在用户数据目录%n• %1%n%n点击“下一步”选择安装位置。
-WelcomeSubtitleUpgrade=检测到本机已安装 CreatorHub，即将升级或重新配置为 v{#AppVersion}。%n%n• 当前已安装位置：%1%n• 可直接覆盖升级，也可在下一步更换到其他磁盘目录%n• 原有账号登录态、配置、下载素材与备份将完整保留%n• %2%n%n点击“下一步”确认或修改安装位置。
+WebView2Required=需要安装 Microsoft WebView2 运行环境才能继续。请检查网络连接后重试，原有 获客助手 数据保持不变。
+UninstallKeepData=卸载将保留账号资料、配置、下载内容和备份。%n%n用户数据目录：%1%n%n卸载前请先退出 获客助手。如不再需要这些数据，可在卸载完成后自行备份并清理该目录。
+WelcomeSubtitleFresh=即将在您的电脑上安装 获客助手 v{#AppVersion} 本地多平台内容工作台。%n%n• 支持自由选择程序安装目录（如 D 盘或其他位置）%n• 账号登录态、配置、数据库与下载内容独立保存在用户数据目录%n• %1%n%n点击“下一步”选择安装位置。
+WelcomeSubtitleUpgrade=检测到本机已安装 获客助手，即将升级或重新配置为 v{#AppVersion}。%n%n• 当前已安装位置：%1%n• 可直接覆盖升级，也可在下一步更换到其他磁盘目录%n• 原有账号登录态、配置、下载素材与备份将完整保留%n• %2%n%n点击“下一步”确认或修改安装位置。
 WebView2StatusReady=运行环境检测：Microsoft WebView2 已就绪
 WebView2StatusMissing=运行环境检测：缺少 Microsoft WebView2，安装时将自动联网补齐
-SelectDirSubtitle=可保持默认位置，或点击“浏览”选择其他磁盘目录（如 D:\CreatorHub）。
+SelectDirSubtitle=可保持默认位置，或点击“浏览”选择其他磁盘目录（如 D:\aispace）。
 ResetDefaultDir=恢复默认位置
 SwitchSecondaryDir=切换到 %1
 DiskSpaceSufficient=目标磁盘 (%1) 可用空间：%2  ·  空间充足
@@ -89,9 +88,9 @@ DataIsolationHint=说明：此处仅存放程序运行文件。账号资料、�
 CleanOldDirOption=安装完成后自动清理原安装目录中的旧程序文件（不影响账号与用户数据）
 DriveRootConfirm=不能直接将程序散落安装在磁盘根目录。%n%n是否自动使用子目录：%n%1 ？
 ForeignDirConfirm=所选文件夹“%1”已包含其他文件。%n%n为避免程序文件混放并保障后续在线增量更新正常，建议安装到独立子目录：%n%2%n%n是否使用该子目录继续？
-DataDirConflict=所选安装目录与 CreatorHub 用户数据目录存在重叠或包含关系：%n%1%n%n为保护账号数据在升级与卸载时不被影响，请选择独立的程序安装目录（例如 D:\CreatorHub 或点击“恢复默认位置”）。
-DirNotWritable=当前用户对所选位置没有写入权限：%n%1%n%nCreatorHub 采用免管理员安装以支持平滑在线更新，请避免选择受系统保护的目录（如 C:\Program Files 或 C:\Windows），改选其他磁盘目录（如 D:\CreatorHub）或点击“恢复默认位置”。
-AppRunningPrompt=检测到 CreatorHub（启动中心或后台服务）正在运行。%n%n请先在 CreatorHub 启动中心点击“停止并退出”（或从任务栏右下角托盘图标退出），然后点击“重试”继续。
+DataDirConflict=所选安装目录与 获客助手 用户数据目录存在重叠或包含关系：%n%1%n%n为保护账号数据在升级与卸载时不被影响，请选择独立的程序安装目录（例如 D:\aispace 或点击“恢复默认位置”）。
+DirNotWritable=当前用户对所选位置没有写入权限：%n%1%n%n获客助手按当前用户安装，请避免选择受系统保护的目录（如 C:\Program Files 或 C:\Windows），改选其他磁盘目录（如 D:\aispace）或点击“恢复默认位置”。
+AppRunningPrompt=检测到 获客助手（启动中心或后台服务）正在运行。%n%n请先在 获客助手 启动中心点击“停止并退出”（或从任务栏右下角托盘图标退出），然后点击“重试”继续。
 ReadySectionMode=安装方式：
 ReadyModeFresh=全新安装
 ReadyModeUpgrade=原位覆盖升级（保留账号与用户数据）
@@ -102,9 +101,9 @@ ReadySectionAppDir=程序安装位置：
 ReadySectionDataDir=用户数据位置（独立保留）：
 ReadySectionRuntime=运行环境状态：
 ReadySectionShortcuts=快捷方式：
-ReadyShortcutStartMenu=开始菜单快捷方式（CreatorHub）
+ReadyShortcutStartMenu=开始菜单快捷方式（获客助手）
 ReadyShortcutDesktop=桌面快捷方式
-FinishedSummary=CreatorHub v{#AppVersion} 已安装完成。%n%n程序安装目录：%1%n用户数据目录：%2%n%n后续可在启动中心内直接检查并一键更新版本。点击“完成”退出安装向导。
+FinishedSummary=获客助手 v{#AppVersion} 已安装完成。%n%n程序安装目录：%1%n用户数据目录：%2%n%n后续版本请通过商用安装包覆盖升级。点击“完成”退出安装向导。
 
 [Files]
 Source: "..\build\windows\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
@@ -113,6 +112,8 @@ Source: "{#AppSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdi
 ; Full-package upgrades also retire the old media stack. These three paths
 ; belong exclusively to the application, never to user-data or account profiles.
 [InstallDelete]
+Type: files; Name: "{app}\CreatorHub.exe"
+Type: files; Name: "{app}\_internal\desktop\CreatorHubUpdater.exe"
 Type: filesandordirs; Name: "{app}\_internal\cv2"
 Type: filesandordirs; Name: "{app}\_internal\numpy"
 Type: filesandordirs; Name: "{app}\_internal\numpy.libs"
@@ -121,17 +122,17 @@ Type: filesandordirs; Name: "{app}\_internal\numpy.libs"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Icons]
-Name: "{group}\CreatorHub"; Filename: "{app}\CreatorHub.exe"
-Name: "{autodesktop}\CreatorHub"; Filename: "{app}\CreatorHub.exe"; Tasks: desktopicon
+Name: "{group}\获客助手"; Filename: "{app}\aispace.exe"
+Name: "{autodesktop}\获客助手"; Filename: "{app}\aispace.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\CreatorHub.exe"; Description: "{cm:LaunchCreatorHub}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\aispace.exe"; Description: "{cm:LaunchCreatorHub}"; Flags: nowait postinstall skipifsilent
 
 ; Delta updates can add application-owned files not in the original install log.
 ; User data lives outside {app}; never delete the parent/user-data directories.
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\_internal"
-Type: files; Name: "{app}\CreatorHub.exe"
+Type: files; Name: "{app}\aispace.exe"
 
 [Code]
 const
@@ -193,7 +194,7 @@ end;
 
 function DefaultInstallDir(): String;
 begin
-  Result := ExpandConstant('{localappdata}\Programs\CreatorHub');
+  Result := ExpandConstant('{localappdata}\Programs\aispace');
 end;
 
 function DetectPreviousInstallDir(): String;
@@ -205,7 +206,7 @@ begin
      RegQueryStringValue(HKCU, UninstallRegKey, 'InstallLocation', Location) then
   begin
     Location := NormalizeDir(Location);
-    if (Location <> '') and FileExists(AddBackslash(Location) + 'CreatorHub.exe') then
+    if (Location <> '') and FileExists(AddBackslash(Location) + 'aispace.exe') then
       Result := Location;
   end;
 end;
@@ -273,7 +274,7 @@ begin
     CandidateRoot := Chr(DriveLetter) + ':\';
     if Uppercase(Chr(DriveLetter) + ':') = SystemDrive then
       Continue;
-    CandidateDir := CandidateRoot + 'CreatorHub';
+    CandidateDir := CandidateRoot + 'aispace';
     if (GetDriveTypeW(CandidateRoot) = DRIVE_FIXED) and DirExists(CandidateRoot) and
        CanWriteTargetDir(CandidateDir) then
     begin
@@ -361,7 +362,7 @@ end;
 
 function IsExistingCreatorHubDir(const DirPath: String): Boolean;
 begin
-  Result := FileExists(AddBackslash(DirPath) + 'CreatorHub.exe') or
+  Result := FileExists(AddBackslash(DirPath) + 'aispace.exe') or
             DirExists(AddBackslash(DirPath) + '_internal');
 end;
 
@@ -574,7 +575,7 @@ begin
 
     if IsDriveRoot(SelectedDir) then
     begin
-      SuggestedDir := AddBackslash(SelectedDir) + 'CreatorHub';
+      SuggestedDir := AddBackslash(SelectedDir) + 'aispace';
       if MsgBox(FmtMessage(CustomMessage('DriveRootConfirm'), [SuggestedDir]),
         mbConfirmation, MB_YESNO) = IDYES then
       begin
@@ -599,7 +600,7 @@ begin
 
     if HasForeignEntries(SelectedDir) then
     begin
-      SuggestedDir := AddBackslash(SelectedDir) + 'CreatorHub';
+      SuggestedDir := AddBackslash(SelectedDir) + 'aispace';
       if MsgBox(FmtMessage(CustomMessage('ForeignDirConfirm'), [SelectedDir, SuggestedDir]),
         mbConfirmation, MB_YESNO) = IDYES then
       begin
@@ -682,7 +683,7 @@ begin
 
   Log('Cleaning previous application files after relocation: ' + OldDir);
   DelTree(AddBackslash(OldDir) + '_internal', True, True, True);
-  DeleteFile(AddBackslash(OldDir) + 'CreatorHub.exe');
+  DeleteFile(AddBackslash(OldDir) + 'aispace.exe');
   if FindFirst(AddBackslash(OldDir) + 'unins*.*', FindRec) then
   begin
     try

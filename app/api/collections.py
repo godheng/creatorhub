@@ -57,6 +57,8 @@ def _resolve_collection_account_id(
 
 @router.post("/api/collections")
 async def create_keyword_collection(body: collections_service.KeywordCollectionIn, request: Request = None):
+    from app.licensing import require_active
+    require_active()
     with get_session() as session:
         def create():
             platform, keywords, quality, download_dir, options = collections_service._validated_collection_input(body)

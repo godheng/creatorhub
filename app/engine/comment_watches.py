@@ -39,6 +39,9 @@ class CommentWatchMixin:
             await self.scan_comment_watch(wid)
 
     async def scan_comment_watch(self, watch_id: int) -> dict:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         key = f"cw:{watch_id}"
         if key in self._inflight:
             return {"ok": True, "new_comments": 0, "skipped": "正在抓取中"}

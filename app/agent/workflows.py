@@ -1,6 +1,8 @@
 """Immutable, preview-first plans. Execution reuses the existing task APIs."""
 from __future__ import annotations
 
+from .. import licensing
+
 import asyncio
 import hashlib
 import json
@@ -129,6 +131,7 @@ def public_plan(row: AgentWorkflow) -> dict:
 
 
 async def apply_plan(plan_id: str, plan_hash: str, executors: dict) -> dict:
+    licensing.require_active()
     with get_session() as s:
         row = s.get(AgentWorkflow, plan_id)
         if row is None:
@@ -151,6 +154,7 @@ async def apply_plan(plan_id: str, plan_hash: str, executors: dict) -> dict:
                 continue
             # Existing handlers revalidate live state only for new submissions;
             # a persisted receipt is replayed even after an account is retired.
+            licensing.require_active()
             key = f"agent-{plan_id}-{index}"
             request = Request({"type": "http", "headers": [(b"idempotency-key", key.encode())]})
             payload = await asyncio.wait_for(executors[step.kind](step.payload(), request), timeout=60)
@@ -168,6 +172,8 @@ async def apply_plan(plan_id: str, plan_hash: str, executors: dict) -> dict:
             row.status = "interrupted" if isinstance(exc, asyncio.CancelledError) else "partial"
             if isinstance(exc, HTTPException) and isinstance(exc.detail, str):
                 row.error = redact(exc.detail)[:500]
+            elif isinstance(exc, licensing.LicenseRequired):
+                row.error = "授权不可用：" + str(exc)
             elif isinstance(exc, ValueError):
                 row.error = "账号或计划校验未通过，请检查账号状态和参数"
             else:

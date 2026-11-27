@@ -5,6 +5,8 @@ endpoints (including local OpenAI-compatible servers) may omit an API key.
 """
 from __future__ import annotations
 
+from .. import licensing
+
 import asyncio
 import copy
 import json
@@ -102,6 +104,7 @@ class ModelSession:
         return inference_url(cfg), headers, body
 
     async def complete(self, tools: list[dict]) -> Turn:
+        licensing.require_active()
         self._last_telemetry = None
         try:
             return await asyncio.wait_for(self._complete_stream(tools), timeout=self.settings.timeout_seconds)

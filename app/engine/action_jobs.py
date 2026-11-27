@@ -1,6 +1,8 @@
 """跨平台账号互动动作（关注、私信、点赞、收藏等）配额检查与执行。"""
 from __future__ import annotations
 
+from app.licensing import LicenseRequired
+
 from datetime import datetime
 import json
 
@@ -76,6 +78,9 @@ class ActionJobMixin:
         return ""
 
     async def _process_action_tasks(self):
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         now = datetime.utcnow()
         due = []
         with get_session() as s:
@@ -112,6 +117,9 @@ class ActionJobMixin:
                 s.commit()
 
     async def execute_action_task(self, task_id: int, *, scheduled: bool = False) -> dict:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         if task_id in self._actioning:
             return {"ok": False, "error": "正在执行中"}
         self._actioning.add(task_id)
@@ -140,6 +148,8 @@ class ActionJobMixin:
                 "blocked_by": "account_busy",
                 "error": "该账号当前正在执行其他浏览器操作，稍后将自动重试",
             }
+        except LicenseRequired:
+            return {"ok": False, "error": "license_required", "deferred": True}
         except AccountUnavailableError:
             return self._fail_missing_account_task(AccountActionTask, task_id)
         finally:

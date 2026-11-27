@@ -881,6 +881,8 @@ async def post_channels_comment(
                 try:
                     btn = frame.locator(sel).first
                     if await btn.count() and await btn.is_enabled():
+                        from app.licensing import require_active
+                        require_active()
                         await DEFAULT_HUMAN_ENGINE.click_locator(btn, page=page, timeout=3000)
                         sent = True
                         break

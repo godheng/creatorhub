@@ -27,7 +27,7 @@ def main():
     staging = ROOT / "build" / "windows"
     staging.mkdir(parents=True, exist_ok=True)
     dist_root = (ROOT / args.dist_dir).resolve()
-    output = (dist_root / "CreatorHub").resolve()
+    output = (dist_root / "aispace").resolve()
     if not output.is_relative_to(ROOT.resolve()):
         raise SystemExit("Build output must remain inside the repository")
     write_installer_assets(staging)
@@ -40,12 +40,12 @@ def main():
     # Independent updater survives replacement of the main onedir bundle.
     helper_dir = staging / "updater"
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--onefile", "--windowed",
-                    "--name", "CreatorHubUpdater", "--paths", str(ROOT), "--distpath", str(helper_dir),
+                    "--name", "aispaceUpdater", "--paths", str(ROOT), "--distpath", str(helper_dir),
                     "--workpath", str(staging / "updater-work"), "--specpath", str(staging),
                     str(ROOT / "desktop" / "update_helper.py")], cwd=ROOT, check=True)
-    helper = helper_dir / "CreatorHubUpdater.exe"
+    helper = helper_dir / "aispaceUpdater.exe"
     command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--onedir", "--windowed",
-               "--name", "CreatorHub", "--icon", str(staging / "CreatorHub.ico"),
+               "--name", "aispace", "--icon", str(staging / "CreatorHub.ico"),
                "--distpath", str(dist_root),
                "--workpath", str(staging / "work"), "--specpath", str(staging),
                "--paths", str(ROOT)]
@@ -54,6 +54,8 @@ def main():
         raise SystemExit("Build the desktop renderer first: npm run build:desktop")
     for source, destination in ((ROOT / "config.example.yaml", "."),
                                 (ROOT / "LICENSE", "."),
+                                (ROOT / "COMMERCIAL-NOTICE.txt", "."),
+                                (ROOT / "app/license_public.pem", "app"),
                                 node_module_data(ROOT),
                                 (helper, "desktop"),
                                 (ROOT / "desktop" / "languages" / "ChineseSimplified-LICENSE.txt", "desktop/licenses"),
@@ -64,7 +66,7 @@ def main():
         command += ["--add-data", f"{source};{destination}"]
     command.append(str(ROOT / "desktop" / "launcher.py"))
     subprocess.run(command, cwd=ROOT, check=True)
-    print("Built:", output / "CreatorHub.exe")
+    print("Built:", output / "aispace.exe")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """多平台监控、发布与社交互动调度引擎核心编排器（生命周期、风控闸门与主调度循环）。"""
 from __future__ import annotations
+from ..licensing import LicenseRequired
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -195,6 +196,8 @@ class MonitorEngine(
     @staticmethod
     def _mark_write_submit(model, task_id: int, *, channel: str = "browser") -> None:
         """Durably mark the no-retry boundary before one click or API POST."""
+        from ..licensing import require_active
+        require_active()
         if channel not in {"browser", "api"}:
             raise ValueError("未知的提交通道")
         with get_session() as s:
@@ -264,6 +267,8 @@ class MonitorEngine(
                 async with lock:
                     if account_id and self._load_account(account_id) is None:
                         raise AccountUnavailableError("绑定账号已删除，操作已停止")
+                    from ..licensing import require_active
+                    require_active()
                     yield account
 
     def _fail_missing_account_task(self, model, task_id: int) -> dict:
@@ -610,6 +615,10 @@ class MonitorEngine(
     async def _loop(self):
         next_maintenance_at = 0.0
         while self._running:
+            from ..licensing import is_active
+            if not is_active():
+                await asyncio.sleep(1)
+                continue
             poll_seconds = 15
             self._last_loop_tick_at = datetime.utcnow()
             self._loop_tick_count += 1
@@ -641,6 +650,9 @@ class MonitorEngine(
             await asyncio.sleep(poll_seconds)
 
     async def poll_xhs_dm_now(self, account_id: int, *, trigger: str = "manual") -> dict:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         with get_session() as session:
             account = session.get(DouyinAccount, account_id)
             if not account or account.platform != "xhs":
@@ -681,6 +693,9 @@ class MonitorEngine(
     async def _process_xhs_dm_automation(self) -> None:
         from app.services.login_sessions import has_active_open_browser
 
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         enabled = bool(self.cfg.engine.xhs_dm_monitor_enabled
                        or self.cfg.engine.xhs_dm_auto_reply_enabled)
         if not enabled:
@@ -892,6 +907,9 @@ class MonitorEngine(
         return canceled_now
 
     async def _process_collection_jobs(self) -> None:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         limit = self._collection_concurrency()
         active_job_ids = set(self._collection_tasks.keys())
         with get_session() as s:
@@ -957,6 +975,9 @@ class MonitorEngine(
 
     async def run_collection_job(self, job_id: int) -> dict:
         """执行一个持久化关键词任务，并维护可恢复的状态机。"""
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         started_clock = time.monotonic()
         with get_session() as s:
             job = s.get(KeywordCollectionJob, job_id)
@@ -1194,6 +1215,8 @@ class MonitorEngine(
                     self._sync_collection_hub(job, status=job.status, step=job.current_step, immediate=True)
             progress_hub.unregister_cancel(f"collection:{job_id}")
             raise
+        except LicenseRequired:
+            return {"ok": False, "error": "license_required", "deferred": True}
         except Exception as exc:
             self.risk.record_failure(account_id, OperationKind.READ_HEAVY, exc)
             with get_session() as s:

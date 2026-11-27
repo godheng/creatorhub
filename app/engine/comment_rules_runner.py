@@ -302,6 +302,9 @@ class CommentRuleRunnerMixin:
         return ""
 
     async def _process_comment_rules(self):
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         from app.services.login_sessions import has_active_open_browser
 
         due: list[tuple[int, int | None]] = []
@@ -356,6 +359,9 @@ class CommentRuleRunnerMixin:
 
     async def run_comment_rule(self, rule_id: int, *, force_draft: bool = False) -> dict:
         """跑一轮规则:发现目标 -> 去重/过滤 -> 生成 CommentTask(错峰排期)。"""
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         return await self._execute_comment_rule(rule_id, dry_run=False, force_draft=force_draft)
 
     async def regenerate_comment_task(self, task_id: int) -> dict:
@@ -1642,6 +1648,9 @@ class CommentRuleRunnerMixin:
         return cands, ""
 
     async def _process_comment_tasks(self):
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         now = datetime.utcnow()
         due = []
         with get_session() as s:

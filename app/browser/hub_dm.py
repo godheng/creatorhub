@@ -892,6 +892,8 @@ async def fetch_dm_history(mgr: BrowserManager, identity, platform: str,
         ctx = await mgr.context_for(identity)      # 常驻无头 context(带 cookie)
         req = build_history_request(conv_id, int(conv_type or 1),
                                     int(conv_short_id), int(cursor or 0), count)
+        from app.licensing import require_active
+        require_active()
         resp = await ctx.request.post(
             GET_BY_CONV_URL, data=req,
             headers={"content-type": "application/x-protobuf",

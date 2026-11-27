@@ -1,6 +1,8 @@
 """Bounded, on-demand upstream model discovery. No inference or settings writes."""
 from __future__ import annotations
 
+from .. import licensing
+
 import asyncio
 import json
 from urllib.parse import urlsplit
@@ -63,6 +65,7 @@ def parse_models(payload, api_key: str = "") -> dict:
 
 
 async def discover_models(settings: ConnectionSettings) -> dict:
+    licensing.require_active()
     if not settings.base_url:
         raise CatalogError("请先填写模型基础地址。")
     if settings.base_url.endswith("/models"):

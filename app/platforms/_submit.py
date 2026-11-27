@@ -7,6 +7,8 @@ from typing import Callable
 
 async def notify_submit(callback: Callable[[], object] | None) -> None:
     """Invoke a sync or coroutine submit-boundary marker before final click/POST."""
+    from app.licensing import require_active
+    require_active()
     if callback is None:
         return
     result = callback()

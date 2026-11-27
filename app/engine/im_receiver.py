@@ -47,7 +47,7 @@ class ImReceiverManager:
         if platform == "douyin" and (not st["task"] or st["task"].done()):
             st["task"] = asyncio.create_task(self._run(account_id))
         elif platform == "bilibili" and (not st["task"] or st["task"].done()):
-            st["task"] = asyncio.create_task(self._run_bilibili(account_id))
+            st["task"] = asyncio.create_task(self._run(account_id, platform="bilibili"))
         return q
 
     def unsubscribe(self, account_id: int, q: asyncio.Queue):
@@ -81,9 +81,28 @@ class ImReceiverManager:
             except Exception:
                 pass
 
-    async def _run(self, account_id: int):
+    async def _run(self, account_id: int, platform: str = "douyin"):
+        from ..licensing import is_active
+        while True:
+            state = self._accts.get(account_id)
+            if not state or not state["queues"]:
+                return
+            if not is_active():
+                await asyncio.sleep(1)
+                continue
+            if platform == "bilibili":
+                await self._run_bilibili(account_id)
+            else:
+                await self._receive_once(account_id)
+            if is_active():
+                return
+
+    async def _receive_once(self, account_id: int):
         from .. import runtime as app_runtime
         from ..risk import OperationKind
+        from ..licensing import is_active
+        if not is_active():
+            return
         # 等 uid(允许"先开面板后同步"):最多轮询 ~30s 读 DB,同步存下 uid 即自愈
         uid, identity, proxy, ua = "", None, "", ""
         for _ in range(15):
@@ -128,7 +147,7 @@ class ImReceiverManager:
 
         def should_stop():
             st = self._accts.get(account_id)
-            return not st or not st["queues"]
+            return not st or not st["queues"] or not is_active()
 
         try:
             await receive_messages(
@@ -141,6 +160,9 @@ class ImReceiverManager:
                                    should_stop=should_stop)
 
     async def _run_bilibili(self, account_id: int):
+        from ..licensing import is_active
+        if not is_active():
+            return
         from .. import runtime as app_runtime
         from ..risk import OperationKind
         with get_session() as s:
@@ -177,7 +199,7 @@ class ImReceiverManager:
 
         def should_stop():
             st = self._accts.get(account_id)
-            return not st or not st["queues"]
+            return not st or not st["queues"] or not is_active()
 
         async def on_watch_notify():
             nonlocal begin_ts, self_uid

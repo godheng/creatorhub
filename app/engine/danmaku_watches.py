@@ -190,6 +190,9 @@ class DanmakuWatchMixin:
             self._inflight.discard(key)
 
     async def scan_danmaku_watch(self, watch_id: int) -> dict:
+        from ..licensing import is_active
+        if not is_active():
+            return {"ok": False, "error": "license_required", "deferred": True}
         key = f"dw:{watch_id}"
         if key in self._inflight:
             return {"ok": True, "new_danmaku": 0, "skipped": "正在抓取中"}

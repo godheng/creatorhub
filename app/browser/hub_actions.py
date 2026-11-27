@@ -20,6 +20,8 @@ from app.browser.xhs_dm import send_xhs_dm_page
 
 
 async def _notify_submit_hook(on_submit: Any) -> None:
+    from app.licensing import require_active
+    require_active()
     if on_submit is None:
         return
     res = on_submit()
@@ -253,6 +255,8 @@ async def do_follow(mgr: BrowserManager, identity, platform: str, target_uid: st
         after = text
         if platform == "xhs":
             try:
+                from app.licensing import require_active
+                require_active()
                 await interaction.click_visible(btn)
             except Exception as e:
                 return False, f"{want}点击失败: {e!r}"
@@ -267,6 +271,8 @@ async def do_follow(mgr: BrowserManager, identity, platform: str, target_uid: st
                            "为避免重复操作，本次不再点击")
         for attempt in range(3):
             try:
+                from app.licensing import require_active
+                require_active()
                 await DEFAULT_HUMAN_ENGINE.click_locator(btn, page=page, timeout=4000)
             except Exception as e:
                 if attempt == 2:
@@ -338,6 +344,8 @@ async def send_dm_api(mgr: BrowserManager, identity, conv_id: str,
         stime = int(time.time() * 1000)
         req = build_send_request(conv_id, int(conv_type or 1), int(conv_short_id),
                                  ticket, text, cmid, stime)
+        from app.licensing import require_active
+        require_active()
         resp = await ctx.request.post(
             _SEND_URL, data=req,
             headers={"accept": "application/x-protobuf",

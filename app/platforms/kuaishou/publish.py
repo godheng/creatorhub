@@ -572,6 +572,8 @@ async def publish_kuaishou(mgr: BrowserManager, identity: Identity,
             await _dump(page, "no-draft-button" if save_as_draft else "no-publish-button")
             return False, "", f"未找到可用的“{action_label}”按钮(已保存 data/debug 诊断快照)"
         await button.scroll_into_view_if_needed(timeout=3000)
+        from app.licensing import require_active
+        require_active()
         await _notify_submit(on_submit)
         submitted["clicked"] = True
         await DEFAULT_HUMAN_ENGINE.click_locator(button, page=page, timeout=5000)
