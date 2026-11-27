@@ -5,7 +5,6 @@ from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlmodel import select
 
@@ -153,7 +152,7 @@ async def export_monitor_report(
             statement = in_window(statement, DanmakuRecord)
             danmaku = s.exec(statement).all()
 
-    from app.reporting import REPORT_MIME, build_monitor_report
+    from app.reporting import build_monitor_report
 
     payload = build_monitor_report(
         platform=platform or "",
@@ -167,15 +166,8 @@ async def export_monitor_report(
         danmaku=danmaku,
         generated_at=datetime.now(),
     )
-    filename = f"creatorhub_monitor_report_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
-    return StreamingResponse(
-        iter([payload]),
-        media_type=REPORT_MIME,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Content-Length": str(len(payload)),
-        },
-    )
+    return metadata_service._report_download(payload, "monitor_report")
+
 
 
 def _report_bounds(

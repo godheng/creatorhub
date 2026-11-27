@@ -1,3 +1,4 @@
+import brand from "../app/brand.json";
 import React, { useEffect, useRef, useState } from "react";
 import { Icon, Tabs, SelectBox } from "./ui/primitives";
 import { selectionMarker } from "./ui/motion";
@@ -19,9 +20,9 @@ async function request(path, options = {}) {
     headers: { "Content-Type": "application/json", ...options.headers } });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (path === "/channels" && response.status === 404) throw new Error("本地后端尚未加载多渠道接口，请重启 CreatorHub 后刷新页面。");
+    if (path === "/channels" && response.status === 404) throw new Error(`本地后端尚未加载多渠道接口，请重启 ${brand.name} 后刷新页面。`);
     if (path === "/models" && response.status === 404) {
-      throw new Error("本地工作台的模型目录接口不存在（404）。请重启 CreatorHub 后刷新页面；若仍出现，请检查后端地址或反向代理路由。这不是上游密钥校验结果。");
+      throw new Error(`本地工作台的模型目录接口不存在（404）。请重启 ${brand.name} 后刷新页面；若仍出现，请检查后端地址或反向代理路由。这不是上游密钥校验结果。`);
     }
     const detail = result.detail;
     throw new Error(Array.isArray(detail) ? detail.map(item => `${(item.loc || []).join(".")}: ${item.msg}`).join("；")
@@ -327,7 +328,7 @@ export function AgentAssistant({ page }) {
       onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); minimize(); } }}>
       <header className="agent-window-header">
         <span className="agent-avatar"><Icon name="automation" /></span>
-        <div className="agent-window-heading"><h2 id="agent-title" tabIndex={-1} ref={title}>AI 助手</h2><p id="agent-description">全局助手 · 分析问题，协助行动</p></div>
+        <div className="agent-window-heading"><h2 id="agent-title" tabIndex={-1} ref={title}>{brand.name} AI 助手</h2><p id="agent-description">全局助手 · 分析问题，协助行动</p></div>
         <button type="button" className="ghost agent-icon-button" data-spinning={busy || undefined} disabled={busy} aria-label="刷新助手数据与记录" title="刷新数据与记录"
           onClick={() => { setError(""); setReload(value => value + 1); }}><Icon name="refresh" /></button>
         <button type="button" className="ghost agent-icon-button agent-expand" aria-label={expanded ? "恢复浮窗大小" : "展开助手"} title={expanded ? "恢复浮窗大小" : "展开助手"}
@@ -399,7 +400,7 @@ export function AgentAssistant({ page }) {
             <p className="agent-page-context">当前页面：{pageContext?.title || "工作台"}{scope === "follow" ? " · 跟随页面范围" : " · 使用指定范围"}</p>
             {currentTask && <button type="button" className="ghost agent-context-action" onClick={useCurrentTask} disabled={busy}>带入当前任务进行诊断 <Icon name="next" /></button>}
             {activeSettings && !activeSettings.enabled && <div className="agent-setup-notice"><span>先配置并启用模型，即可开始对话。</span><button type="button" className="ghost" onClick={() => setView("settings")}>配置模型 <Icon name="next" /></button></div>}
-            {!turns.length && <div className="agent-welcome"><span className="agent-welcome-mark"><Icon name="sparkles" /></span><h3>有什么可以帮你？</h3><p>聊数据、查原因，把需求变成待确认的行动。</p>
+            {!turns.length && <div className="agent-welcome"><span className="agent-welcome-mark"><Icon name="sparkles" /></span><h3>你好，我是{brand.name}的 AI 助手。</h3><p>聊数据、查原因，把需求变成待确认的行动。</p>
               <div className="agent-suggestions">{[
                 ["分析最近异常", "chat", "分析最近的失败任务，列出证据、可能原因和修复验证步骤。"],
                 ["汇总运行情况", "chat", "总结最近七天的任务与账号指标，说明异常和数据缺口。"],
@@ -546,15 +547,15 @@ export function AgentAssistant({ page }) {
         <button type="button" className="ghost" disabled={busy} onClick={cancelSettings}>取消</button>
         <button type="submit" form="agent-settings-form" disabled={busy || addingModel} aria-label="保存配置" title={addingModel ? "请先添加或取消当前模型" : undefined}>{busy ? "处理中…" : "保存配置"}</button>
       </div>
-      <footer className="agent-window-footer"><Icon name="shield" /><span>基于证据分析 · 操作前确认</span><span>{running(run) ? "分析中" : "CreatorHub"}</span></footer>
+      <footer className="agent-window-footer"><Icon name="shield" /><span>基于证据分析 · 操作前确认</span><span>{running(run) ? "分析中" : brand.name}</span></footer>
     </section>
     {settings && <ModelPicker open={pickerOpen && open && view === "settings"} available={catalog?.models || []} configured={settings.models}
       returnFocus={fetchModelsButton} onOpenChange={setPickerOpen} onApply={models => {
         setSettings(previous => ({ ...previous, models, model: previous.model || models[0]?.id || "" })); setDirty(true); setNotice("");
       }} />}
-    <button id="agent-launcher" type="button" ref={launcher} className="agent-launcher" aria-label={open ? "收起全局 AI 助手" : "打开全局 AI 助手"}
+    <button id="agent-launcher" type="button" ref={launcher} className="agent-launcher" aria-label={open ? "收起获客助手 AI 助手" : "打开获客助手 AI 助手"}
       aria-expanded={open} aria-haspopup="dialog" aria-controls="agent-dialog" onClick={() => open ? minimize() : show()}>
-      <Icon name="automation" /><span>{open ? "收起助手" : running(run) ? "正在分析…" : "AI 助手"}</span>
+      <Icon name="automation" /><span>{open ? "收起助手" : running(run) ? "正在分析…" : `${brand.name} AI 助手`}</span>
       {running(run) && <span className="agent-running-dot" aria-hidden="true" />}
     </button>
   </div>;

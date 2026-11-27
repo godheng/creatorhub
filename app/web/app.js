@@ -1565,9 +1565,9 @@ async function exportMonitorReport(explicitBtn = null) {
       }
       const blob = await response.blob();
       const disposition = response.headers.get("content-disposition") || "";
-      const matched = disposition.match(/filename="?([^";]+)"?/i);
-      const filename = matched ? matched[1] :
-        `creatorhub_monitor_report_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.xlsx`;
+      const matched = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      const filename = matched ? decodeURIComponent(matched[1]) :
+        `获客助手_monitor_report_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.xlsx`;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -1596,8 +1596,8 @@ async function _downloadExcelReport(path, fallbackName) {
   }
   const blob = await response.blob();
   const disposition = response.headers.get("content-disposition") || "";
-  const matched = disposition.match(/filename="?([^";]+)"?/i);
-  const filename = matched ? matched[1] : fallbackName;
+  const matched = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  const filename = matched ? decodeURIComponent(matched[1]) : fallbackName;
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -1715,7 +1715,7 @@ async function exportModuleReport(module, full = false, explicitBtn = null) {
     try {
       await _downloadExcelReport(
         path + "?" + params.toString(),
-        "creatorhub_" + module + "_report.xlsx",
+        "获客助手_" + module + "_report.xlsx",
       );
       const count = $( _reportCountIds[module] )?.textContent?.trim();
       const scope = full ? "全量" : "筛选结果";
@@ -1815,7 +1815,7 @@ function updatePageContext(name = CURRENT_TAB) {
   if ($("page-desc")) $("page-desc").textContent = effectiveDesc;
   if ($("page-platform")) $("page-platform").textContent = showGlobalLabel ? "全平台矩阵" : pfName;
   if ($("page-kicker")) $("page-kicker").textContent = showGlobalLabel ? "跨 11 大平台全局视角" : (pfIsChannels(PLATFORM) ? "本账号工作台" : "单平台精细工作台");
-  document.title = `${effectiveTitle} · ${showGlobalLabel ? "全平台" : (PF_NAME[PLATFORM] || "")} | CreatorHub`;
+  document.title = `${effectiveTitle} · ${showGlobalLabel ? "全平台" : (PF_NAME[PLATFORM] || "")} | 获客助手`;
   globalThis.CreatorHubWorkbench?.navigate?.();
 }
 // 是否支持「发布」面板
@@ -10612,7 +10612,7 @@ async function exportShareHistoryReport(full = false, explicitBtn = null) {
     try {
       await _downloadExcelReport(
         "/api/reports/share-download-history.xlsx?" + _shareHistoryReportParams(full).toString(),
-        "creatorhub_share_download_history.xlsx",
+        "获客助手_share_download_history.xlsx",
       );
       const count = $("sd-history-filter-count")?.textContent?.trim();
       toast(`链接下载历史 ${full ? "全量" : "筛选结果"} Excel 已导出${!full && count ? `（${count}）` : ""}`, "ok");
@@ -11870,7 +11870,7 @@ async function exportFilteredCollectionComments(button) {
   await withBusy(button, "导出中", async () => {
     try {
       const params = collectionCommentParams({ exportMode: true });
-      await _downloadExcelReport(`/api/collections/${COLLECTION_JOB_ID}/export.xlsx?${params.toString()}`, `keyword-collection-${COLLECTION_JOB_ID}-filtered.xlsx`);
+      await _downloadExcelReport(`/api/collections/${COLLECTION_JOB_ID}/export.xlsx?${params.toString()}`, `获客助手_keyword-collection-${COLLECTION_JOB_ID}-filtered.xlsx`);
       toast("当前筛选结果已导出", "ok");
     } catch (e) { toast("导出失败：" + e.message, "err"); }
   });
@@ -11907,7 +11907,7 @@ async function deleteCollection(jobId) {
 function exportCollection(jobId) {
   const link = document.createElement("a");
   link.href = `/api/collections/${jobId}/export.xlsx`;
-  link.download = `keyword-collection-${jobId}.xlsx`;
+  link.download = `获客助手_keyword-collection-${jobId}.xlsx`;
   document.body.appendChild(link); link.click(); link.remove();
 }
 

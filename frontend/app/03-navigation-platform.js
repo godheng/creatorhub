@@ -17,9 +17,9 @@ async function exportMonitorReport(explicitBtn = null) {
       }
       const blob = await response.blob();
       const disposition = response.headers.get("content-disposition") || "";
-      const matched = disposition.match(/filename="?([^";]+)"?/i);
-      const filename = matched ? matched[1] :
-        `creatorhub_monitor_report_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.xlsx`;
+      const matched = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      const filename = matched ? decodeURIComponent(matched[1]) :
+        `获客助手_monitor_report_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.xlsx`;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -48,8 +48,8 @@ async function _downloadExcelReport(path, fallbackName) {
   }
   const blob = await response.blob();
   const disposition = response.headers.get("content-disposition") || "";
-  const matched = disposition.match(/filename="?([^";]+)"?/i);
-  const filename = matched ? matched[1] : fallbackName;
+  const matched = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  const filename = matched ? decodeURIComponent(matched[1]) : fallbackName;
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -167,7 +167,7 @@ async function exportModuleReport(module, full = false, explicitBtn = null) {
     try {
       await _downloadExcelReport(
         path + "?" + params.toString(),
-        "creatorhub_" + module + "_report.xlsx",
+        "获客助手_" + module + "_report.xlsx",
       );
       const count = $( _reportCountIds[module] )?.textContent?.trim();
       const scope = full ? "全量" : "筛选结果";
@@ -267,7 +267,7 @@ function updatePageContext(name = CURRENT_TAB) {
   if ($("page-desc")) $("page-desc").textContent = effectiveDesc;
   if ($("page-platform")) $("page-platform").textContent = showGlobalLabel ? "全平台矩阵" : pfName;
   if ($("page-kicker")) $("page-kicker").textContent = showGlobalLabel ? "跨 11 大平台全局视角" : (pfIsChannels(PLATFORM) ? "本账号工作台" : "单平台精细工作台");
-  document.title = `${effectiveTitle} · ${showGlobalLabel ? "全平台" : (PF_NAME[PLATFORM] || "")} | CreatorHub`;
+  document.title = `${effectiveTitle} · ${showGlobalLabel ? "全平台" : (PF_NAME[PLATFORM] || "")} | 获客助手`;
   globalThis.CreatorHubWorkbench?.navigate?.();
 }
 // 是否支持「发布」面板
