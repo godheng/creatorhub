@@ -317,7 +317,7 @@ class ActionJobMixin:
                             AccountActionTask, task_id))
                 elif platform == "youtube":
                     ok, err = False, "unavailable:YouTube 平台暂不提供站内私信功能"
-                elif platform == "xhs":
+                elif platform in {"xhs", "douyin"}:
                     ok, err = await send_dm(
                         self.browser, identity, platform,
                         target_uid, target_sec_uid, content,

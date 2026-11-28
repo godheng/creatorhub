@@ -1,13 +1,17 @@
 """本账号关注/取关与私信发送（API 优先 + 浏览器回退）执行器。"""
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 from typing import Any, Tuple
 
+from patchright.async_api import Error as BrowserError, TimeoutError as BrowserTimeoutError
+
 _log = logging.getLogger("creatorhub.browser.hub")
 
 from app.browser.hub_common import _bili_cookie_str, _ig_cookie_str
+from app.browser.douyin_im_pb import parse_send_response
 from app.browser.human_interaction import (
     DEFAULT_HUMAN_ENGINE,
     human_click_first,
@@ -301,6 +305,15 @@ async def do_follow(mgr: BrowserManager, identity, platform: str, target_uid: st
             pass
 
 
+_DOUYIN_DM_EDITOR = (
+    '.messageEditorinputArea[data-slate-editor="true"]'
+    '[contenteditable="true"][data-placeholder="发送消息"]:visible'
+)
+_DOUYIN_DM_SEND = (
+    ".messageMsgInputinputRow .messageMsgInputpopupInputAction "
+    "svg.e2e-send-msg-btn.messageMsgInputpublishRedBtn:visible"
+)
+
 _DM_INPUT = [
     'textarea[placeholder*="发送"]', 'div[contenteditable="true"][placeholder*="发送"]',
     'textarea[placeholder*="私信"]', 'div[contenteditable="true"]',
@@ -325,6 +338,18 @@ _DM_ENTRY_URL = {
 _SEND_URL = "https://imapi.douyin.com/v1/message/send"
 
 
+def _is_douyin_dm_send_request(request: Any) -> bool:
+    return request.method == "POST" and request.url.partition("?")[0] == _SEND_URL
+
+
+async def _douyin_dm_accepted(request: Any) -> bool:
+    response = await request.response()
+    if response is None or response.status != 200:
+        return False
+    result = parse_send_response(await response.body())
+    return result["ok"] and result["cmd"] == 100
+
+
 async def send_dm_api(mgr: BrowserManager, identity, conv_id: str,
                       conv_short_id: str, ticket: str, text: str,
                       conv_type: int = 1) -> Tuple[bool, str]:
@@ -332,7 +357,7 @@ async def send_dm_api(mgr: BrowserManager, identity, conv_id: str,
     与读/ mark_read 一致)。需已有会话的 conv_id + short_id + ticket(同步会话列表时已存库)。"""
     import time
     import uuid as _uuid
-    from app.browser.douyin_im_pb import build_send_request, parse_send_response
+    from app.browser.douyin_im_pb import build_send_request
     text = (text or "").strip()
     if not text:
         return False, "空内容"
@@ -467,6 +492,7 @@ async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str 
                         pass
     ctx = None
     page = None
+    keep_page_open = False
     try:
         ctx = (await mgr.context_for(identity) if platform == "xhs"
                else await mgr.open_headed(identity))
@@ -495,24 +521,32 @@ async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str 
                     if platform == "xhs":
                         await mgr.xhs_interaction.click_visible(el)
                     else:
-                        await DEFAULT_HUMAN_ENGINE.click_locator(el, page=page, timeout=4000)
+                        timeout = 20000 if platform == "douyin" else 4000
+                        await DEFAULT_HUMAN_ENGINE.click_locator(el, page=page, timeout=timeout)
                     opened = True
                     if platform == "xhs":
                         await mgr.xhs_interaction.pause(0.25, 0.55)
-                    else:
+                    elif platform != "douyin":
                         await human_wait(page, 1500)
                     break
             except Exception:
                 continue
-        editor = None
-        for sel in _DM_INPUT:
+        if platform == "douyin":
+            editor = page.locator(_DOUYIN_DM_EDITOR)
             try:
-                loc = page.locator(sel).first
-                if await loc.count() and await loc.is_visible():
-                    editor = loc
-                    break
-            except Exception:
-                continue
+                await editor.wait_for(state="visible", timeout=15000)
+            except BrowserTimeoutError:
+                return False, f"等待抖音私信输入框超时，未发送。opened_entry={opened}"
+        else:
+            editor = None
+            for sel in _DM_INPUT:
+                try:
+                    loc = page.locator(sel).first
+                    if await loc.count() and await loc.is_visible():
+                        editor = loc
+                        break
+                except Exception:
+                    continue
         if editor is None:
             return False, ("未找到私信输入框(私信入口可能需手动打开/页面改版)。"
                            f"opened_entry={opened}")
@@ -522,6 +556,31 @@ async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str 
             else:
                 await mgr.xhs_interaction.insert_long(
                     editor, text, page=page)
+        elif platform == "douyin":
+            await editor.fill(text, timeout=8000)
+            submit = page.locator(_DOUYIN_DM_SEND)
+            try:
+                await submit.click(trial=True, timeout=10000)
+            except BrowserError:
+                keep_page_open = True
+                return False, "未找到唯一可点击的抖音私信发送按钮，未点击发送"
+
+            try:
+                async with page.expect_request(
+                        lambda request: keep_page_open and _is_douyin_dm_send_request(request),
+                        timeout=12000) as request_info:
+                    await _notify_submit_hook(on_submit)
+                    keep_page_open = True
+                    await submit.click(timeout=3000)
+                request = await request_info.value
+                if await asyncio.wait_for(_douyin_dm_accepted(request), timeout=8000):
+                    keep_page_open = False
+                    return True, ""
+                return False, "write_uncertain:已观察到私信发送请求，未收到成功回执，请在抖音会话核对"
+            except Exception:
+                if keep_page_open:
+                    return False, "write_uncertain:已尝试触发私信发送，未确认平台结果，请在抖音会话核对"
+                raise
         else:
             await DEFAULT_HUMAN_ENGINE.type_text(editor, text, page=page, timeout=8000)
             await human_wait(page, 450)
@@ -555,7 +614,7 @@ async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str 
         return False, f"发私信异常: {e!r}"
     finally:
         try:
-            if page is not None and not page.is_closed():
+            if page is not None and not keep_page_open and not page.is_closed():
                 await page.close()
         except Exception:
             pass
