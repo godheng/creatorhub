@@ -97,7 +97,7 @@
         xhs_request_jitter: 0.35,
         xhs_read_mode: "api",
         rednote_read_mode: "hybrid",
-        douyin_read_mode: "hybrid",
+        douyin_read_mode: "browser",
         tiktok_read_mode: "native",
         channels_read_mode: "auto",
         bilibili_read_mode: "hybrid",

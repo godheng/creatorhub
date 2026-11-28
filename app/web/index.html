@@ -329,6 +329,16 @@
   .dm-auto-row { display:flex; gap:8px; align-items:center; padding:8px 10px; border:1px solid var(--line-soft); border-radius:8px; background:var(--surface); font-size:12px; }
   .dm-auto-row .grow { flex:1; min-width:0; }
   .dm-auto-row .sub { color:var(--mut); font-size:11px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dm-batch-body, .dm-batch-form { display:grid; gap:8px; margin-top:10px; }
+  .dm-batch-body p { margin:0; }
+  .dm-batch-body p:empty { display:none; }
+  .dm-batch-body fieldset { min-width:0; border:1px solid var(--line-soft); border-radius:8px; }
+  .dm-batch-recipient-list, .dm-batch-task-list { max-height:260px; overflow:auto; }
+  .dm-batch-recipient { display:flex; gap:8px; align-items:center; padding:4px; overflow-wrap:anywhere; }
+  .dm-batch-recipient input { flex:none; }
+  .dm-batch-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .dm-batch-task { display:grid; gap:4px; padding:8px 0; border-top:1px solid var(--line-soft); overflow-wrap:anywhere; }
+  .dm-batch-body small { color:var(--mut); }
   @media(max-width:900px){ .dm-auto-grid{grid-template-columns:1fr 1fr} }
   @media(max-width:700px){ .dm-wrap{grid-template-columns:1fr} .dm-list{max-height:200px} }
 
@@ -1200,6 +1210,7 @@
     flex:0 0 auto; margin-top:0; padding-top:14px;
     border-top:1px solid var(--line-soft); background:var(--surface);
   }
+  .ui-confirm-detail { white-space:pre-wrap; overflow-wrap:anywhere; }
   #uimodal .fp-edit-tabs {
     position:sticky; top:-2px; z-index:2; display:grid;
     grid-template-columns:1fr 1fr; gap:6px; margin:0 0 14px; padding:2px 0 8px;
@@ -5875,10 +5886,10 @@
                 <div class="stack">
                   <div class="form-field">
                     <label for="engine-douyin_read_mode">作品、关键词与评论读取</label>
-                    <select id="engine-douyin_read_mode" name="douyin_read_mode" disabled title="优先走 search/single API；普通兼容失败才回退浏览器，触发验证/风控直接冷却且不打开浏览器">
-                      <option value="hybrid">API 优先，失败回退浏览器（推荐）</option>
+                    <select id="engine-douyin_read_mode" name="douyin_read_mode" disabled title="默认使用浏览器读取作品、关键词与评论">
+                      <option value="browser">仅浏览器模拟操作（推荐）</option>
+                      <option value="hybrid">API 优先，失败回退浏览器</option>
                       <option value="api">仅 API 直连（不打开浏览器）</option>
-                      <option value="browser">仅浏览器</option>
                     </select>
                   </div>
                   <div class="form-field">
@@ -7608,6 +7619,41 @@
           <button class="ghost sm dy-only" style="flex:0 0 auto" onclick="startNewDm()"><svg><use href="#i-plus"/></svg>新私信</button>
           <button style="flex:0 0 auto" onclick="openHubAccountBrowser()"><svg><use href="#i-send"/></svg>打开浏览器收发</button>
         </div>
+        <details class="dm-auto dm-batch dy-only" id="dm-batch-panel" hidden ontoggle="refreshDouyinDmBatchPanel()">
+          <summary>Excel 批量私信</summary>
+          <div class="dm-batch-body">
+            <p id="dm-batch-account" class="hint"></p>
+            <label for="dm-batch-file">关键词采集导出的 Excel 文件</label>
+            <input id="dm-batch-file" type="file" accept=".xlsx" onchange="importDouyinDmBatch(this)">
+            <p id="dm-batch-import-status" role="status"></p>
+            <fieldset id="dm-batch-recipients" hidden>
+              <legend>选择已同意接受私信的收件人</legend>
+              <div class="dm-batch-actions">
+                <button type="button" class="ghost sm" id="dm-batch-select-reviewed"
+                        onclick="selectAllReviewedDouyinDmRecipients()" disabled>全选已核对名单</button>
+              </div>
+              <small>整份名单都已核对，并确认可由当前账号联系时，可一键全选。</small>
+              <div id="dm-batch-recipient-list" class="dm-batch-recipient-list"
+                   onchange="updateDouyinDmBatchSelection()"></div>
+            </fieldset>
+            <form class="dm-batch-form" onsubmit="submitDouyinDmBatch(event)">
+              <label for="dm-batch-content">私信文案</label>
+              <textarea id="dm-batch-content" rows="3" maxlength="500" required
+                        oninput="updateDouyinDmBatchSelection()"></textarea>
+              <div class="dm-batch-actions">
+                <button class="sm" id="dm-batch-submit" type="submit" disabled>确认发送</button>
+                <span id="dm-batch-selection-status" role="status"></span>
+              </div>
+            </form>
+            <div class="dm-batch-actions">
+              <label for="dm-batch-history">发送批次</label>
+              <select id="dm-batch-history" onchange="showDouyinDmBatchHistory(this.value)" aria-describedby="dm-batch-history-status"></select>
+              <button type="button" class="ghost sm" onclick="refreshDouyinDmBatchHistory()">刷新</button>
+            </div>
+            <p id="dm-batch-history-status" role="status"></p>
+            <div id="dm-batch-progress"></div>
+          </div>
+        </details>
         <details class="dm-auto" id="dm-auto-panel">
           <summary>自动回复规则与待审核回复</summary>
           <div class="hint" style="margin-top:8px">仅处理建立监控基线后收到的新消息。默认先生成草稿；自动发送仍受活跃时段、15 分钟私信间隔、小时/每日配额和风险冷却控制。</div>

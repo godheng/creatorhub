@@ -352,6 +352,7 @@ class BrowserManager:
         self._xhs_visible_gate = XhsVisibleActionGate()
         self._xhs_page_locks: Dict[Any, asyncio.Lock] = {}
         self._task_pages: Dict[Any, Any] = {}
+        self._douyin_dm_batch_pages: Dict[int, tuple[Identity, Any]] = {}
         self._last_used: Dict[Any, float] = {}
         self._locks: Dict[Any, asyncio.Lock] = {}
         self._cv_lock = asyncio.Lock()                   # 保护 context 字典的创建/驱逐
@@ -1372,6 +1373,8 @@ class BrowserManager:
 
     async def _close_key_unlocked(self, key: Any) -> None:
         ctx = self._contexts.pop(key, None)
+        if ctx is not None:
+            self._forget_douyin_dm_batch_pages(ctx)
         self._startup_pages.pop(key, None)
         session = self._cdp_sessions.pop(key, None)
         self._task_pages.pop(key, None)
@@ -1455,6 +1458,7 @@ class BrowserManager:
 
     def _forget_closed_context(self, ctx: BrowserContext) -> None:
         """Drop cache entries when callers close a managed context directly."""
+        self._forget_douyin_dm_batch_pages(ctx)
         keys = [key for key, value in self._contexts.items() if value is ctx]
         for key in keys:
             self._contexts.pop(key, None)
@@ -2099,6 +2103,48 @@ class BrowserManager:
         await asyncio.to_thread(bring_window_to_front, snapshot,
                                 CHROMIUM_WINDOW_CLASSES, "", 1.5)
         return ctx
+
+    def _forget_douyin_dm_batch_pages(self, context: BrowserContext) -> None:
+        for batch_id, (_, page) in list(self._douyin_dm_batch_pages.items()):
+            if page.context is context:
+                self._douyin_dm_batch_pages.pop(batch_id)
+
+    async def douyin_dm_batch_page(self, identity: Identity, batch_id: int):
+        """Return the batch's dedicated headed tab under the account operation lock."""
+        if identity.platform != "douyin":
+            raise ValueError("批量私信页签仅支持抖音")
+        key = identity.key
+        entry = self._douyin_dm_batch_pages.get(batch_id)
+        if entry is not None and entry[0].key != key:
+            raise ValueError("批量私信的发送账号已变更")
+
+        context = self._contexts.get(key)
+        if entry is not None and entry[1].context is context:
+            backend = self.effective_browser_backend(identity)
+            runtime_id = (
+                self.effective_fingerprint_runtime_id(identity)
+                if backend == FINGERPRINT_CHROMIUM_BACKEND else "")
+            plan = self._strict_proxy_plan(identity)
+            signature = self._context_signature(
+                identity, backend, runtime_id, plan.signature if plan else "direct")
+            if self._proxy_signature_by_key.get(key) == signature:
+                self._last_used[key] = time.time()
+                if not entry[1].is_closed():
+                    return entry[1]
+                page = await context.new_page()
+                self._douyin_dm_batch_pages[batch_id] = (identity, page)
+                return page
+
+        context = await self.open_headed(identity)
+        page = await context.new_page()
+        self._douyin_dm_batch_pages[batch_id] = (identity, page)
+        return page
+
+    async def finish_douyin_dm_batch(self, batch_id: int) -> None:
+        """Release the owned tab without closing unrelated browser pages."""
+        entry = self._douyin_dm_batch_pages.pop(batch_id, None)
+        if entry is not None:
+            await self.release_task_page(*entry)
 
     @asynccontextmanager
     async def temporary_headed_context(self, identity: Identity):

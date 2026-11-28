@@ -18,6 +18,7 @@ from . import account_works
 from . import follows
 from . import messages
 from . import account_actions
+from . import douyin_dm_batches
 from . import account_browser
 from . import proxies
 from . import settings
@@ -65,6 +66,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(follows.router)
     app.include_router(messages.router)
     app.include_router(account_actions.router)
+    app.include_router(douyin_dm_batches.router)
     app.include_router(account_browser.router)
     app.include_router(proxies.router)
     app.include_router(settings.router)

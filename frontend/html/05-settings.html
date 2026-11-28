@@ -654,10 +654,10 @@
                 <div class="stack">
                   <div class="form-field">
                     <label for="engine-douyin_read_mode">作品、关键词与评论读取</label>
-                    <select id="engine-douyin_read_mode" name="douyin_read_mode" disabled title="优先走 search/single API；普通兼容失败才回退浏览器，触发验证/风控直接冷却且不打开浏览器">
-                      <option value="hybrid">API 优先，失败回退浏览器（推荐）</option>
+                    <select id="engine-douyin_read_mode" name="douyin_read_mode" disabled title="默认使用浏览器读取作品、关键词与评论">
+                      <option value="browser">仅浏览器模拟操作（推荐）</option>
+                      <option value="hybrid">API 优先，失败回退浏览器</option>
                       <option value="api">仅 API 直连（不打开浏览器）</option>
-                      <option value="browser">仅浏览器</option>
                     </select>
                   </div>
                   <div class="form-field">

@@ -67,7 +67,7 @@ class EngineConfig:
     xhs_read_mode: str = "api"               # api | browser
     # 海外小红书(Rednote)读取通道: hybrid=XYS/XYW+b1 直连优先、普通兼容失败回退页面(默认推荐); api=仅直连; browser=仅页面
     rednote_read_mode: str = "hybrid"        # hybrid | api | browser
-    douyin_read_mode: str = "hybrid"         # 默认 API 优先/浏览器回退；api=仅 API；browser=仅浏览器
+    douyin_read_mode: str = "browser"        # 默认仅浏览器；hybrid=API 优先/浏览器回退；api=仅 API
     # native=纯 Python 离线签名直连；browser=已授权页面；auto=直连优先/页面回退。
     tiktok_read_mode: str = "native"          # native | auto | browser
     # B站读写通道: hybrid=WBI/Cookie直连优先、明确风控兼容失败时回退页面; api=仅直连; browser=仅页面
@@ -282,7 +282,7 @@ def load_config(path: str | None = None) -> Config:
                 ("rednote_read_mode", "hybrid"),
                 ("bilibili_read_mode", "hybrid"),
                 ("bilibili_write_mode", "hybrid"),
-                ("douyin_read_mode", "hybrid"),
+                ("douyin_read_mode", "browser"),
                 ("douyin_profile_mode", "hybrid"),
                 ("douyin_followers_mode", "hybrid"),
                 ("douyin_dm_sync_mode", "hybrid"),

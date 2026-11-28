@@ -922,6 +922,14 @@ class DmMonitorState(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class DouyinDmBatch(SQLModel, table=True):
+    """One confirmed list of recipients for a single sending account."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    account_id: int = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class AccountActionTask(SQLModel, table=True):
     """本账号写操作队列(取关/回关/发私信)。状态机同 CommentTask,带节流。"""
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -933,6 +941,7 @@ class AccountActionTask(SQLModel, table=True):
     target_nick: str = ""             # 展示用
     conv_id: str = ""                 # send_dm:会话 id(可空,用 target_uid 新开)
     content: str = ""                 # send_dm 的文案
+    dm_batch_id: Optional[int] = Field(default=None, index=True)
     source_msg_id: str = Field(default="", index=True)  # 自动回复去重键
     source_rule_id: Optional[int] = Field(default=None, index=True)
     scheduled_at: Optional[datetime] = None

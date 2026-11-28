@@ -10,12 +10,13 @@ import re
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from .models import (TaskSubmission, PublishTask, AccountActionTask, CommentRule, MonitorTarget,
+from .models import (TaskSubmission, PublishTask, AccountActionTask, CommentRule, MonitorTarget, DouyinDmBatch,
                      DmAutoReplyRule, KeywordCollectionJob)
 
 _MODELS = {"publish": PublishTask, "repost": PublishTask,
            "account-action": AccountActionTask, "comment-rule": CommentRule,
-           "dm-rule": DmAutoReplyRule, "collection": KeywordCollectionJob, "monitor": MonitorTarget}
+           "dm-rule": DmAutoReplyRule, "collection": KeywordCollectionJob, "monitor": MonitorTarget,
+           "douyin-dm-batch": DouyinDmBatch}
 
 
 def _identity(request, scope, body):

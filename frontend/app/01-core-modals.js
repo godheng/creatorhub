@@ -528,10 +528,17 @@ function _uiOpen(title, hint, { okText = "确定", danger = false, wide = false,
   }, 30);
 }
 // 确认框。返回 true / false。danger=true 时确定按钮红色(危险操作)
-function uiConfirm({ title = "确认", message = "", okText = "确定", danger = false } = {}) {
+function uiConfirm({ title = "确认", message = "", detail = "", okText = "确定", danger = false } = {}) {
   return new Promise(res => {
     _uiResolve = res; _uiGetVal = () => true; _uiCancelVal = false;
-    $("ui-body").innerHTML = "";
+    const body = $("ui-body");
+    body.replaceChildren();
+    if (detail) {
+      const preview = document.createElement("p");
+      preview.className = "ui-confirm-detail";
+      preview.textContent = detail;
+      body.append(preview);
+    }
     _uiOpen(title, message, { okText, danger, icon: "i-info" });
   });
 }

@@ -458,6 +458,8 @@ async def resolve_task_result(queue_type: str, task_id: int,
         row = session.get(model, task_id)
         if row is None:
             raise HTTPException(404, "任务不存在")
+        if isinstance(row, AccountActionTask) and row.dm_batch_id is not None:
+            raise HTTPException(409, "请在私信批次中核对发送结果")
         if row.status != "uncertain":
             raise HTTPException(409, "只有结果待确认的任务可以人工核对")
         account_id, previous_error = row.account_id, row.error
@@ -519,6 +521,10 @@ async def batch_stop_tasks(body: BatchStopIn):
             if row is None:
                 skipped.append({"queue_type": queue_type, "id": task_id,
                                 "reason": "任务不存在"})
+                continue
+            if isinstance(row, AccountActionTask) and row.dm_batch_id is not None:
+                skipped.append({"queue_type": queue_type, "id": task_id,
+                                "reason": "请在私信批次中取消任务"})
                 continue
             if queue_type == "collections" and row.status == "running":
                 row.cancel_requested = True

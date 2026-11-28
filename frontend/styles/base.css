@@ -317,6 +317,16 @@
   .dm-auto-row { display:flex; gap:8px; align-items:center; padding:8px 10px; border:1px solid var(--line-soft); border-radius:8px; background:var(--surface); font-size:12px; }
   .dm-auto-row .grow { flex:1; min-width:0; }
   .dm-auto-row .sub { color:var(--mut); font-size:11px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dm-batch-body, .dm-batch-form { display:grid; gap:8px; margin-top:10px; }
+  .dm-batch-body p { margin:0; }
+  .dm-batch-body p:empty { display:none; }
+  .dm-batch-body fieldset { min-width:0; border:1px solid var(--line-soft); border-radius:8px; }
+  .dm-batch-recipient-list, .dm-batch-task-list { max-height:260px; overflow:auto; }
+  .dm-batch-recipient { display:flex; gap:8px; align-items:center; padding:4px; overflow-wrap:anywhere; }
+  .dm-batch-recipient input { flex:none; }
+  .dm-batch-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .dm-batch-task { display:grid; gap:4px; padding:8px 0; border-top:1px solid var(--line-soft); overflow-wrap:anywhere; }
+  .dm-batch-body small { color:var(--mut); }
   @media(max-width:900px){ .dm-auto-grid{grid-template-columns:1fr 1fr} }
   @media(max-width:700px){ .dm-wrap{grid-template-columns:1fr} .dm-list{max-height:200px} }
 
@@ -1188,6 +1198,7 @@
     flex:0 0 auto; margin-top:0; padding-top:14px;
     border-top:1px solid var(--line-soft); background:var(--surface);
   }
+  .ui-confirm-detail { white-space:pre-wrap; overflow-wrap:anywhere; }
   #uimodal .fp-edit-tabs {
     position:sticky; top:-2px; z-index:2; display:grid;
     grid-template-columns:1fr 1fr; gap:6px; margin:0 0 14px; padding:2px 0 8px;

@@ -22,7 +22,7 @@ class CollectionDiscoverMixin:
                                job: KeywordCollectionJob,
                                client: DouyinClient | None = None,
                                context=None) -> tuple[list[dict], str]:
-        mode = str(getattr(self.cfg.engine, "douyin_read_mode", "hybrid") or "hybrid")
+        mode = str(getattr(self.cfg.engine, "douyin_read_mode", "browser") or "browser")
         if mode in {"api", "hybrid"} and client is not None:
             items, error = [], ""
             api_compatibility_failure = False

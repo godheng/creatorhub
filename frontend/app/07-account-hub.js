@@ -153,6 +153,7 @@ async function refreshHubSummary() {
 function refreshHubPanel() {
   const active = document.querySelector('.navitem.active');
   if (!active || active.dataset.tab !== "hub") return;
+  refreshDouyinDmBatchPanel();
   if (HUB_TAB === "myworks") refreshMyWorks();
   else if (HUB_TAB === "following") refreshFollows("following");
   else if (HUB_TAB === "fans") refreshFollows("fan");

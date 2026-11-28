@@ -584,14 +584,14 @@ def build_transport_matrix(cfg: Any, accounts: Iterable[Any]) -> dict[str, Any]:
     channels_readiness = _channels_cdp_readiness(cfg)
     return {
         "settings": {
-            "douyin_read_mode": _setting_value(cfg, "douyin_read_mode", "hybrid"),
+            "douyin_read_mode": _setting_value(cfg, "douyin_read_mode", "browser"),
             "douyin_profile_mode": _setting_value(cfg, "douyin_profile_mode", "hybrid"),
             "douyin_followers_mode": _setting_value(cfg, "douyin_followers_mode", "hybrid"),
             "douyin_dm_sync_mode": _setting_value(cfg, "douyin_dm_sync_mode", "hybrid"),
             "douyin_creator_danmaku_mode": _setting_value(
                 cfg, "douyin_creator_danmaku_mode", "hybrid"),
             "douyin_publish_mode": _setting_value(cfg, "douyin_publish_mode", "browser"),
-            "douyin_write_mode": _setting_value(cfg, "douyin_write_mode", "hybrid"),
+            "douyin_write_mode": _setting_value(cfg, "douyin_write_mode", "browser"),
             "xhs_read_mode": _setting_value(cfg, "xhs_read_mode", "api"),
             "rednote_read_mode": _setting_value(cfg, "rednote_read_mode", "hybrid"),
             "rednote_publish_mode": _setting_value(cfg, "rednote_publish_mode", "browser"),

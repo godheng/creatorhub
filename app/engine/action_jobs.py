@@ -6,6 +6,7 @@ from app.licensing import LicenseRequired
 from datetime import datetime
 import json
 
+from sqlalchemy import or_
 from sqlmodel import select
 
 from app.account_lifecycle import AccountUnavailableError
@@ -20,6 +21,8 @@ from app.platforms.instagram import InstagramClient
 from app.risk import OperationKind, RiskCategory, classify_platform_error
 from app.services.login_sessions import has_active_open_browser
 from app.transport_matrix import douyin_client_environment
+
+_ACTION_GAP_ERROR = "尚未达到账号写操作最小间隔"
 
 
 class ActionJobMixin:
@@ -70,7 +73,7 @@ class ActionJobMixin:
         if not self._action_cap_ok(account_id):
             return "已达到账号写操作额度"
         if not self._action_gap_ok(account_id, gap):
-            return "尚未达到账号写操作最小间隔"
+            return _ACTION_GAP_ERROR
         kind = OperationKind.DM if action == "send_dm" else OperationKind.SOCIAL
         decision = self.risk.preflight(account_id, kind)
         if not decision.allowed:
@@ -84,9 +87,18 @@ class ActionJobMixin:
         now = datetime.utcnow()
         due = []
         with get_session() as s:
+            paused_batches = set(s.exec(select(AccountActionTask.dm_batch_id).where(
+                AccountActionTask.dm_batch_id.is_not(None),
+                AccountActionTask.status.in_(("doing", "uncertain")),
+            )).all())
+            seen_batches = set()
             tasks = s.exec(select(AccountActionTask).where(
-                AccountActionTask.status == "pending")).all()
+                AccountActionTask.status == "pending").order_by(AccountActionTask.id)).all()
             for t in tasks:
+                if t.dm_batch_id is not None:
+                    if t.dm_batch_id in paused_batches or t.dm_batch_id in seen_batches:
+                        continue
+                    seen_batches.add(t.dm_batch_id)
                 if self._task_due(t, now):
                     due.append((t.id, t.account_id, t.min_gap_seconds))
         seen_acct = set()
@@ -127,8 +139,11 @@ class ActionJobMixin:
             with get_session() as s:
                 t = s.get(AccountActionTask, task_id)
                 account_id = t.account_id if t else None
+                batch_id = t.dm_batch_id if t else None
                 kind = (OperationKind.DM if t and t.action == "send_dm"
                         else OperationKind.SOCIAL)
+            if batch_id is not None and not scheduled:
+                return {"ok": False, "error": "批次任务由队列按顺序执行"}
             if await has_active_open_browser(account_id):
                 self._mark_action_open_browser_blocked(task_id, kind)
                 return {
@@ -140,7 +155,16 @@ class ActionJobMixin:
             async with self._operation_guard(
                     account_id, kind, fallback_key=f"act:{task_id}",
                     skip_busy=scheduled):
-                return await self._execute_action_task_locked(task_id)
+                result = await self._execute_action_task_locked(task_id)
+                if batch_id is not None:
+                    with get_session() as s:
+                        remaining = s.exec(select(AccountActionTask.id).where(
+                            AccountActionTask.dm_batch_id == batch_id,
+                            AccountActionTask.status.in_(("pending", "doing", "uncertain")),
+                        ).limit(1)).first()
+                    if remaining is None:
+                        await self.browser.finish_douyin_dm_batch(batch_id)
+                return result
         except _AccountCheckBusy:
             return {
                 "ok": False,
@@ -160,6 +184,15 @@ class ActionJobMixin:
             t = s.get(AccountActionTask, task_id)
             if not t or t.status != "pending":
                 return {"ok": False, "error": "任务不可执行"}
+            batch_id = t.dm_batch_id
+            if batch_id is not None and s.exec(select(AccountActionTask.id).where(
+                AccountActionTask.dm_batch_id == batch_id,
+                or_(
+                    AccountActionTask.status.in_(("doing", "uncertain")),
+                    (AccountActionTask.status == "pending") & (AccountActionTask.id < task_id),
+                ),
+            ).limit(1)).first() is not None:
+                return {"ok": False, "deferred": True, "error": "等待前一条批次私信完成或核对"}
             deferred = self._task_deferral(t)
             if deferred:
                 return deferred
@@ -175,7 +208,7 @@ class ActionJobMixin:
                 return {"ok": False, "error": "proxy unavailable"}
             platform = t.platform
             dy_write_mode = (self._douyin_write_mode()
-                             if platform == "douyin" else "browser")
+                             if platform == "douyin" and batch_id is None else "browser")
             bili_write_mode = (
                 str(getattr(self.cfg.engine, "bilibili_write_mode", "hybrid") or "hybrid").lower()
                 if platform == "bilibili" else "browser"
@@ -205,6 +238,8 @@ class ActionJobMixin:
             gate_error = self._action_gate_error(
                 t.account_id, t.min_gap_seconds, t.action)
             if gate_error:
+                if batch_id is not None and gate_error == _ACTION_GAP_ERROR:
+                    return {"ok": False, "deferred": True, "error": gate_error}
                 kind = (OperationKind.DM if t.action == "send_dm"
                         else OperationKind.SOCIAL)
                 decision = self.risk.preflight(t.account_id, kind)
@@ -323,6 +358,7 @@ class ActionJobMixin:
                         target_uid, target_sec_uid, content,
                         on_submit=lambda: self._mark_write_submit(
                             AccountActionTask, task_id),
+                        batch_id=batch_id,
                     )
                 else:
                     ok, err = await send_dm(
