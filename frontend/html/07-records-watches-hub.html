@@ -524,6 +524,41 @@
           <button class="ghost sm dy-only" style="flex:0 0 auto" onclick="startNewDm()"><svg><use href="#i-plus"/></svg>新私信</button>
           <button style="flex:0 0 auto" onclick="openHubAccountBrowser()"><svg><use href="#i-send"/></svg>打开浏览器收发</button>
         </div>
+        <details class="dm-auto dm-batch dy-only" id="dm-batch-panel" hidden ontoggle="refreshDouyinDmBatchPanel()">
+          <summary>Excel 批量私信</summary>
+          <div class="dm-batch-body">
+            <p id="dm-batch-account" class="hint"></p>
+            <label for="dm-batch-file">关键词采集导出的 Excel 文件</label>
+            <input id="dm-batch-file" type="file" accept=".xlsx" onchange="importDouyinDmBatch(this)">
+            <p id="dm-batch-import-status" role="status"></p>
+            <fieldset id="dm-batch-recipients" hidden>
+              <legend>选择已同意接受私信的收件人</legend>
+              <div class="dm-batch-actions">
+                <button type="button" class="ghost sm" id="dm-batch-select-reviewed"
+                        onclick="selectAllReviewedDouyinDmRecipients()" disabled>全选已核对名单</button>
+              </div>
+              <small>整份名单都已核对，并确认可由当前账号联系时，可一键全选。</small>
+              <div id="dm-batch-recipient-list" class="dm-batch-recipient-list"
+                   onchange="updateDouyinDmBatchSelection()"></div>
+            </fieldset>
+            <form class="dm-batch-form" onsubmit="submitDouyinDmBatch(event)">
+              <label for="dm-batch-content">私信文案</label>
+              <textarea id="dm-batch-content" rows="3" maxlength="500" required
+                        oninput="updateDouyinDmBatchSelection()"></textarea>
+              <div class="dm-batch-actions">
+                <button class="sm" id="dm-batch-submit" type="submit" disabled>确认发送</button>
+                <span id="dm-batch-selection-status" role="status"></span>
+              </div>
+            </form>
+            <div class="dm-batch-actions">
+              <label for="dm-batch-history">发送批次</label>
+              <select id="dm-batch-history" onchange="showDouyinDmBatchHistory(this.value)" aria-describedby="dm-batch-history-status"></select>
+              <button type="button" class="ghost sm" onclick="refreshDouyinDmBatchHistory()">刷新</button>
+            </div>
+            <p id="dm-batch-history-status" role="status"></p>
+            <div id="dm-batch-progress"></div>
+          </div>
+        </details>
         <details class="dm-auto" id="dm-auto-panel">
           <summary>自动回复规则与待审核回复</summary>
           <div class="hint" style="margin-top:8px">仅处理建立监控基线后收到的新消息。默认先生成草稿；自动发送仍受活跃时段、15 分钟私信间隔、小时/每日配额和风险冷却控制。</div>

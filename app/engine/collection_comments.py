@@ -248,7 +248,7 @@ class CollectionCommentsMixin:
         if limit <= 0:
             return [], ""
         mode = str(getattr(
-            self.cfg.engine, "douyin_read_mode", "hybrid") or "hybrid").lower()
+            self.cfg.engine, "douyin_read_mode", "browser") or "browser").lower()
         if mode not in {"api", "hybrid", "browser"}:
             mode = "hybrid"
         error = ""

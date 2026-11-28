@@ -4,7 +4,9 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import re
 from typing import Any, Tuple
+from urllib.parse import urlsplit
 
 from patchright.async_api import Error as BrowserError, TimeoutError as BrowserTimeoutError
 
@@ -305,6 +307,7 @@ async def do_follow(mgr: BrowserManager, identity, platform: str, target_uid: st
             pass
 
 
+_DOUYIN_DM_ENTRY_TEXT = re.compile(r"^(私信|发消息|发私信)$")
 _DOUYIN_DM_EDITOR = (
     '.messageEditorinputArea[data-slate-editor="true"]'
     '[contenteditable="true"][data-placeholder="发送消息"]:visible'
@@ -397,6 +400,7 @@ async def send_dm_api(mgr: BrowserManager, identity, conv_id: str,
 async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str = "",
                    target_sec_uid: str = "", text: str = "", *,
                    on_submit: Any = None,
+                   batch_id: int | None = None,
                    _xhs_visible: bool = False) -> Tuple[bool, str]:
     """给目标发私信(UI 自动化):打开对方主页 → 点「私信」→ 输入 → 发送。
     ⚠️ 各平台私信入口/选择器差异大,首版尽力而为,失败有诊断。"""
@@ -490,14 +494,18 @@ async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str 
                         await page.close()
                     except Exception:
                         pass
-    ctx = None
+    batch_page = platform == "douyin" and batch_id is not None
     page = None
     keep_page_open = False
     try:
-        ctx = (await mgr.context_for(identity) if platform == "xhs"
-               else await mgr.open_headed(identity))
-        page = (await mgr.new_page(identity, block_media=False)
-                if platform == "xhs" else await ctx.new_page())
+        if batch_page:
+            page = await mgr.douyin_dm_batch_page(identity, batch_id)
+        elif platform == "xhs":
+            await mgr.context_for(identity)
+            page = await mgr.new_page(identity, block_media=False)
+        else:
+            ctx = await mgr.open_headed(identity)
+            page = await ctx.new_page()
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         if platform == "xhs":
             try:
@@ -509,28 +517,43 @@ async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str 
             await human_wait(page, 1800)
         if "passport" in page.url or "/login" in page.url:
             return False, "logged_out:账号未登录"
+        if batch_page:
+            expected = urlsplit(url)
+            landed = urlsplit(page.url)
+            if (landed.scheme, landed.netloc, landed.path.rstrip("/")) != (
+                    expected.scheme, expected.netloc, expected.path.rstrip("/")):
+                return False, "未进入当前收件人的抖音主页，未发送"
         if platform == "xhs":
             return await send_xhs_dm_page(
                 mgr, page, text, on_submit=on_submit)
         # 点开「私信」入口
         opened = False
-        for label in ("私信", "发消息", "发私信"):
+        if batch_page:
+            entry = page.get_by_text(_DOUYIN_DM_ENTRY_TEXT).filter(visible=True)
             try:
-                el = page.get_by_text(label, exact=False).first
-                if await el.count():
-                    if platform == "xhs":
-                        await mgr.xhs_interaction.click_visible(el)
-                    else:
+                await entry.wait_for(state="visible", timeout=30000)
+            except BrowserTimeoutError:
+                return False, "收件人主页等待私信入口超时（30 秒），未发送"
+            except BrowserError:
+                return False, "无法确认收件人主页上唯一可见的私信入口，未发送"
+            try:
+                await entry.click(timeout=20000)
+            except BrowserError:
+                return False, "已找到收件人的私信入口，但点击失败，未发送"
+            opened = True
+        else:
+            for label in ("私信", "发消息", "发私信"):
+                try:
+                    el = page.get_by_text(label, exact=False).first
+                    if await el.count():
                         timeout = 20000 if platform == "douyin" else 4000
                         await DEFAULT_HUMAN_ENGINE.click_locator(el, page=page, timeout=timeout)
-                    opened = True
-                    if platform == "xhs":
-                        await mgr.xhs_interaction.pause(0.25, 0.55)
-                    elif platform != "douyin":
-                        await human_wait(page, 1500)
-                    break
-            except Exception:
-                continue
+                        opened = True
+                        if platform != "douyin":
+                            await human_wait(page, 1500)
+                        break
+                except Exception:
+                    continue
         if platform == "douyin":
             editor = page.locator(_DOUYIN_DM_EDITOR)
             try:
@@ -614,7 +637,7 @@ async def send_dm(mgr: BrowserManager, identity, platform: str, target_uid: str 
         return False, f"发私信异常: {e!r}"
     finally:
         try:
-            if page is not None and not keep_page_open and not page.is_closed():
+            if page is not None and not batch_page and not keep_page_open and not page.is_closed():
                 await page.close()
         except Exception:
             pass

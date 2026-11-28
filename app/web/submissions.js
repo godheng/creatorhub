@@ -3,7 +3,7 @@
   const pending = new Map(), keys = new Map();
   function supports(path, options) {
     return (options.method || "GET").toUpperCase() === "POST" && typeof options.body === "string" &&
-      (/^\/api\/(publish|account-actions|comment-rules|collections|dm\/auto-reply-rules)$/.test(path) ||
+      (/^\/api\/(publish|account-actions|comment-rules|collections|dm\/auto-reply-rules|douyin\/dm-batches)$/.test(path) ||
        /^\/api\/contents\/\d+\/repost-(xhs|rednote|douyin|shipinhao|kuaishou|tiktok|bilibili|instagram|twitter|facebook|youtube)$/.test(path));
   }
   async function fingerprint(value) {

@@ -320,7 +320,7 @@ class KeywordCollector(
 
         if job.platform == "douyin":
             mode = str(getattr(
-                self.cfg.engine, "douyin_read_mode", "hybrid") or "hybrid").lower()
+                self.cfg.engine, "douyin_read_mode", "browser") or "browser").lower()
             if mode == "api":
                 # 纯 API：只创建 HTTP session，不启动 Chromium，也不给后续评论
                 # 路径传 page context。失败由任务记录，不做隐式浏览器回退。

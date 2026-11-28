@@ -118,6 +118,8 @@ async def edit_account_action(task_id: int, body: metadata_service.DmActionEditI
         task = session.get(AccountActionTask, task_id)
         if not task:
             raise HTTPException(404, "任务不存在")
+        if task.dm_batch_id is not None:
+            raise HTTPException(409, "私信批次内容已确认，请在私信批次中管理")
         if task.action != "send_dm" or task.status not in {"draft", "pending"}:
             raise HTTPException(400, "仅可编辑未执行的私信任务")
         task.content = content
@@ -145,6 +147,8 @@ async def cancel_account_action(task_id: int):
         t = s.get(AccountActionTask, task_id)
         if not t:
             raise HTTPException(404, "任务不存在")
+        if t.dm_batch_id is not None:
+            raise HTTPException(409, "请在私信批次中取消任务")
         if t.status in ("done", "doing"):
             raise HTTPException(400, "该任务已执行,无法取消")
         t.status = "canceled"; s.add(t); s.commit()
